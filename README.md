@@ -226,17 +226,17 @@ Vertragsdaten, Urlaubstage) — beides im app-privaten Bereich des Geräts.
 
 ```mermaid
 flowchart TD
-    UI["ui/ — Screens &amp; Komponenten<br/>React 19"]
+    UI["ui/ — Screens und Komponenten<br/>React 19"]
     TR["tracking/ — laufende Session"]
     DOM["domain/ — reine Logik<br/>Zeit · Aggregation · Arbeitszeitkonto · BUrlG"]
     DB["db/ — einzige Datenzugriffsschicht"]
-    PDF["pdf/ — Bericht &amp; Teilen"]
+    PDF["pdf/ — Bericht und Teilen"]
     UPD["update/ — In-App-Update"]
 
     DEXIE[("Dexie / IndexedDB<br/>Zeiteinträge")]
     PREF[("Capacitor Preferences<br/>Profil · Vertrag · Urlaub")]
-    FS["Filesystem + Share<br/>PDF · CSV · Backup"]
-    GH["GitHub Releases<br/>version.json + APK"]
+    FS["Filesystem plus Share<br/>PDF · CSV · Backup"]
+    GH["GitHub Releases<br/>version.json plus APK"]
 
     UI --> TR
     UI --> DOM
