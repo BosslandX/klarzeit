@@ -1,0 +1,339 @@
+import { useState } from 'react';
+import { addDays, addMonths, addWeeks, format, getYear, startOfMonth } from 'date-fns';
+import {
+  dayPeriod,
+  groupByDay,
+  monthPeriod,
+  rangePeriod,
+  totalBreakMinutes,
+  totalMs,
+  weekPeriod,
+  type Period,
+  type PeriodKind,
+} from '../../domain/aggregate';
+import {
+  buildBalanceLedger,
+  buildVacationStatus,
+} from '../../domain/employment';
+import { getEntriesInRange, useEntriesInRange } from '../../db/entries';
+import { getProfile } from '../../db/profile';
+import {
+  getEmployment,
+  getVacationDays,
+  useEmployment,
+  useVacationDays,
+} from '../../db/employment';
+import {
+  decimalHours,
+  formatClock,
+  formatDays,
+  formatDuration,
+  formatSignedDuration,
+  fromDateInput,
+  netMs,
+} from '../../domain/time';
+import { buildReportPdf, reportFilename, type ReportExtras } from '../../pdf/report-pdf';
+import { entriesToCsv } from '../../db/backup';
+import { sharePdf, shareTextFile } from '../../pdf/share';
+import { IconChevronLeft, IconChevronRight, IconShare } from '../components/Icons';
+
+const KINDS: { key: PeriodKind; label: string }[] = [
+  { key: 'day', label: 'Tag' },
+  { key: 'week', label: 'Woche' },
+  { key: 'month', label: 'Monat' },
+  { key: 'range', label: 'Zeitraum' },
+];
+
+function buildPeriod(
+  kind: PeriodKind,
+  ref: number,
+  from: number,
+  to: number,
+): Period {
+  switch (kind) {
+    case 'day':
+      return dayPeriod(ref);
+    case 'week':
+      return weekPeriod(ref);
+    case 'month':
+      return monthPeriod(ref);
+    case 'range':
+      return rangePeriod(from, to);
+  }
+}
+
+export function ReportsScreen() {
+  const [kind, setKind] = useState<PeriodKind>('week');
+  const [ref, setRef] = useState<number>(Date.now());
+  const [rangeFrom, setRangeFrom] = useState<number>(
+    addDays(Date.now(), -7).getTime(),
+  );
+  const [rangeTo, setRangeTo] = useState<number>(Date.now());
+  const [busy, setBusy] = useState(false);
+
+  const period = buildPeriod(kind, ref, rangeFrom, rangeTo);
+  const entries = useEntriesInRange(period.from, period.to) ?? [];
+  const grandMs = totalMs(entries);
+  const days = groupByDay(entries);
+
+  // Arbeitszeitkonto + Urlaub nur fuer Monatsreports.
+  const { employment } = useEmployment();
+  const { days: vacationDays } = useVacationDays();
+  const isMonth = kind === 'month';
+  // Fuer das fortgeschriebene Konto Eintraege ab Beschaeftigungsbeginn laden.
+  const ledgerEntries =
+    useEntriesInRange(Math.min(employment.startDate, period.from), period.to) ?? [];
+  const ledger = isMonth
+    ? buildBalanceLedger(employment, ledgerEntries, ref)
+    : null;
+  const vacation = isMonth
+    ? buildVacationStatus(
+        employment,
+        vacationDays.map((d) => d.date),
+        getYear(period.from),
+      )
+    : null;
+
+  const shift = (dir: -1 | 1) => {
+    if (kind === 'day') setRef((r) => addDays(r, dir).getTime());
+    else if (kind === 'week') setRef((r) => addWeeks(r, dir).getTime());
+    else if (kind === 'month')
+      setRef((r) => {
+        const next = addMonths(r, dir).getTime();
+        // Nicht in die Zukunft blaettern: Zukunftsmonate haetten volles Soll bei
+        // 0 Ist und wuerden den fortgeschriebenen Saldo verfaelschen.
+        if (dir === 1 && startOfMonth(next).getTime() > startOfMonth(Date.now()).getTime()) {
+          return r;
+        }
+        return next;
+      });
+  };
+
+  const handlePdf = async () => {
+    setBusy(true);
+    try {
+      // Profil frisch laden, damit der Personen-Kopf nie leer ist (Race vermeiden).
+      const profile = await getProfile();
+      // Konto/Urlaub fuer Monatsreports frisch aus der DB berechnen.
+      let extras: ReportExtras | undefined;
+      // Body-Eintraege aus demselben frischen DB-Snapshot wie das Konto ableiten,
+      // damit Tabelle und Arbeitszeitkonto im PDF nie auseinanderlaufen (Race).
+      let bodyEntries = entries;
+      if (isMonth) {
+        const emp = await getEmployment();
+        const [vac, wide] = await Promise.all([
+          getVacationDays(),
+          getEntriesInRange(Math.min(emp.startDate, period.from), period.to),
+        ]);
+        bodyEntries = wide.filter((e) => e.start >= period.from && e.start <= period.to);
+        const led = buildBalanceLedger(emp, wide, ref);
+        if (led) {
+          extras = {
+            employment: emp,
+            ledger: led,
+            vacation: buildVacationStatus(
+              emp,
+              vac.map((d) => d.date),
+              getYear(period.from),
+            ),
+          };
+        }
+      }
+      const doc = buildReportPdf(profile, period, bodyEntries, extras);
+      await sharePdf(doc, reportFilename(period), `Klarzeit – ${period.label}`);
+    } catch (e) {
+      window.alert(
+        `PDF fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCsv = async () => {
+    setBusy(true);
+    try {
+      const csv = entriesToCsv(entries);
+      const name = reportFilename(period).replace(/\.pdf$/i, '.csv');
+      await shareTextFile(csv, name, `Klarzeit – ${period.label}`, 'text/csv');
+    } catch (e) {
+      window.alert(
+        `CSV fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="screen">
+      <header className="screen-header">
+        <h1>Reports</h1>
+      </header>
+
+      <div className="segmented">
+        {KINDS.map((k) => (
+          <button
+            key={k.key}
+            className={`seg${kind === k.key ? ' active' : ''}`}
+            onClick={() => setKind(k.key)}
+          >
+            {k.label}
+          </button>
+        ))}
+      </div>
+
+      {kind === 'range' ? (
+        <div className="range-row">
+          <label className="field">
+            <span>Von</span>
+            <input
+              type="date"
+              value={format(rangeFrom, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                const t = fromDateInput(e.target.value);
+                if (!Number.isNaN(t)) setRangeFrom(t);
+              }}
+            />
+          </label>
+          <label className="field">
+            <span>Bis</span>
+            <input
+              type="date"
+              value={format(rangeTo, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                const t = fromDateInput(e.target.value);
+                if (!Number.isNaN(t)) setRangeTo(t);
+              }}
+            />
+          </label>
+        </div>
+      ) : (
+        <div className="period-nav">
+          <button className="icon-btn" onClick={() => shift(-1)} title="Zurueck">
+            <IconChevronLeft />
+          </button>
+          <span className="period-label">{period.label}</span>
+          <button className="icon-btn" onClick={() => shift(1)} title="Weiter">
+            <IconChevronRight />
+          </button>
+        </div>
+      )}
+
+      <div className="report-summary">
+        <div>
+          <span className="muted">Gesamt</span>
+          <strong>{formatDuration(grandMs)}</strong>
+          <small>{decimalHours(grandMs).toFixed(2)} Std.</small>
+        </div>
+        <div>
+          <span className="muted">Tage</span>
+          <strong>{days.length}</strong>
+        </div>
+        <div>
+          <span className="muted">Eintraege</span>
+          <strong>{entries.length}</strong>
+        </div>
+        <div>
+          <span className="muted">Pausen</span>
+          <strong>{totalBreakMinutes(entries)} min</strong>
+        </div>
+      </div>
+
+      {isMonth && ledger && vacation && (
+        <div className="konto-grid">
+          <section className="konto-card">
+            <h3>Arbeitszeitkonto</h3>
+            <div className="konto-row">
+              <span>Soll (Monat)</span>
+              <strong>{formatDuration(ledger.target.sollMs)}</strong>
+            </div>
+            <div className="konto-row">
+              <span>Ist (Monat)</span>
+              <strong>{formatDuration(ledger.target.istMs)}</strong>
+            </div>
+            <div className="konto-row">
+              <span>Saldo (Monat)</span>
+              <strong className={ledger.target.saldoMs >= 0 ? 'pos' : 'neg'}>
+                {formatSignedDuration(ledger.target.saldoMs)}
+              </strong>
+            </div>
+            <div className="konto-row">
+              <span>Übertrag (Vormonate)</span>
+              <strong className={ledger.carryIn >= 0 ? 'pos' : 'neg'}>
+                {formatSignedDuration(ledger.carryIn)}
+              </strong>
+            </div>
+            <div className="konto-row total">
+              <span>Saldo gesamt (Monatsende)</span>
+              <strong className={ledger.closing >= 0 ? 'pos' : 'neg'}>
+                {formatSignedDuration(ledger.closing)}
+              </strong>
+            </div>
+          </section>
+          <section className="konto-card">
+            <h3>Urlaub {vacation.year}</h3>
+            <div className="konto-row">
+              <span>Anspruch (§ 3 BUrlG)</span>
+              <strong>{formatDays(vacation.annualFull)}</strong>
+            </div>
+            {vacation.isEntryYear && vacation.mode === 'both' && (
+              <div className="konto-row">
+                <span>anteilig § 5 ({vacation.fullMonths}/12)</span>
+                <strong>{formatDays(vacation.prorataRounded)}</strong>
+              </div>
+            )}
+            <div className="konto-row">
+              <span>genommen</span>
+              <strong>{formatDays(vacation.taken)}</strong>
+            </div>
+            <div className="konto-row total">
+              <span>Resturlaub</span>
+              <strong className={vacation.remaining < 0 ? 'neg' : 'pos'}>
+                {formatDays(vacation.remaining)}
+              </strong>
+            </div>
+          </section>
+        </div>
+      )}
+
+      <div className="report-actions">
+        <button className="btn btn-primary" disabled={busy} onClick={() => void handlePdf()}>
+          <IconShare width={18} height={18} /> PDF erstellen &amp; teilen
+        </button>
+        <button className="btn btn-ghost" disabled={busy} onClick={() => void handleCsv()}>
+          CSV exportieren
+        </button>
+      </div>
+
+      {entries.length === 0 ? (
+        <div className="empty">Keine Eintraege in diesem Zeitraum.</div>
+      ) : (
+        days.map((day) => (
+          <section key={day.key} className="day-group">
+            <div className="day-head">
+              <span>{day.label}</span>
+              <span className="day-total">{formatDuration(day.totalMs)}</span>
+            </div>
+            {day.entries.map((e) => (
+              <article key={e.id} className="entry-card readonly">
+                <div className="entry-main">
+                  <div className="entry-time">
+                    {formatClock(e.start)}–{formatClock(e.end)}
+                    {e.breakMinutes > 0 && (
+                      <span className="entry-break"> · {e.breakMinutes} min Pause</span>
+                    )}
+                  </div>
+                  <div className="entry-activity">
+                    {e.activity || <span className="muted">(keine Taetigkeit)</span>}
+                  </div>
+                </div>
+                <div className="entry-duration">{formatDuration(netMs(e))}</div>
+              </article>
+            ))}
+          </section>
+        ))
+      )}
+    </div>
+  );
+}

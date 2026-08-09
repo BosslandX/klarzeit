@@ -1,0 +1,30 @@
+/** Personenbezogene Stammdaten (Single-User). Erscheint im Report-Kopf. */
+export interface Profile {
+  vorname: string;
+  nachname: string;
+  personalnummer: string;
+  arbeitgeber: string;
+  abteilung: string;
+}
+
+/** Herkunft eines Eintrags: per Stoppuhr erfasst oder manuell nachgetragen. */
+export type EntrySource = 'tracked' | 'manual';
+
+/** Ein abgeschlossener Arbeitszeit-Eintrag. Zeiten als Epoch-Millisekunden. */
+export interface TimeEntry {
+  id?: number; // Dexie Auto-Increment Primaerschluessel
+  start: number; // Beginn (epoch ms)
+  end: number; // Ende (epoch ms)
+  breakMinutes: number; // Pause in Minuten (wird von der Dauer abgezogen)
+  activity: string; // Taetigkeit / Beschreibung
+  note: string; // optionale Notiz
+  source: EntrySource;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Laufende, noch nicht gestoppte Erfassung (uebersteht App-Neustart). */
+export interface RunningSession {
+  start: number; // epoch ms
+  activity: string;
+}

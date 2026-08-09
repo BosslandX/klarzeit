@@ -1,0 +1,36 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# Capacitor / Android Build-Artefakte
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+android/capacitor-cordova-android-plugins/
+
+# Von Capacitor generierte Web-Assets (entstehen bei `npx cap sync`)
+android/app/src/main/assets/
+
+# Signing-Secrets (NIEMALS committen!)
+android/keystore.properties
+*.keystore
+*.jks
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Lokale Claude-Code-Einstellungen (rechnerspezifisch)
+.claude/
+
+# Persoenliches Arbeitsjournal, nicht Teil der Veroeffentlichung
+docs/
+
+# Privacy-Scanner: enthaelt die zu suchenden Klarnamen als Muster und darf
+# deshalb selbst nicht veroeffentlicht werden (er wuerde genau das preisgeben,
+# wovor er schuetzen soll). Lokales Werkzeug.
+tools/privacy-scan.mjs

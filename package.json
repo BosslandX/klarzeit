@@ -1,0 +1,46 @@
+{
+  "name": "klarzeit",
+  "private": true,
+  "version": "1.3.0",
+  "type": "module",
+  "description": "Klarzeit - Offline-Arbeitszeiterfassung mit Arbeitszeitkonto und gesetzlichem Urlaub (Android, Capacitor)",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android",
+    "apk": "npm run build && npx cap sync android && node tools/gradle.mjs assembleDebug",
+    "apk:release": "npm run build && npx cap sync android && node tools/gradle.mjs assembleRelease",
+    "icons": "node tools/gen-icons.mjs && npx capacitor-assets generate --android && node tools/optimize-png.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0",
+    "@capacitor/share": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.1",
+    "date-fns": "^4.1.0",
+    "dexie": "^4.0.11",
+    "dexie-react-hooks": "^1.1.7",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.1.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "puppeteer-core": "^25.5.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.1.9"
+  }
+}
