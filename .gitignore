@@ -27,6 +27,9 @@ android/keystore.properties
 # Lokale Claude-Code-Einstellungen (rechnerspezifisch)
 .claude/
 
+# Serena-Projektgedaechtnis: Arbeitsnotizen, koennen private Details enthalten
+.serena/
+
 # Persoenliches Arbeitsjournal, nicht Teil der Veroeffentlichung
 docs/
 
