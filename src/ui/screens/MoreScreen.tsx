@@ -527,7 +527,7 @@ export function MoreScreen() {
       <section className="card-section">
         <h2>Ueber</h2>
         <p className="muted small">
-          Klarzeit 1.3 · Offline Single-User · Capacitor + React.
+          Klarzeit {__APP_VERSION__} · Offline Single-User · Capacitor + React.
         </p>
       </section>
     </div>
