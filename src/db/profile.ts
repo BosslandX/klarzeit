@@ -22,6 +22,17 @@ export async function getProfile(): Promise<Profile> {
   }
 }
 
+/**
+ * Enthaelt das gespeicherte Profil ueberhaupt eine Angabe? Der Backup-Merge darf
+ * ein ausgefuelltes Profil nicht ueberschreiben, ein leeres aber sehr wohl
+ * befuellen — der Key allein existiert schon nach einem Tap auf
+ * "Profil speichern" mit lauter leeren Feldern.
+ */
+export async function hasUsableProfile(): Promise<boolean> {
+  const p = await getProfile();
+  return Object.values(p).some((v) => v.trim() !== '');
+}
+
 export async function saveProfile(profile: Profile): Promise<void> {
   await Preferences.set({ key: KEY, value: JSON.stringify(profile) });
 }

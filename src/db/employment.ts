@@ -2,6 +2,7 @@ import { Preferences } from '@capacitor/preferences';
 import { useCallback, useEffect, useState } from 'react';
 import {
   defaultEmployment,
+  mergeVacationDays,
   type Employment,
   type VacationDay,
   type VacationYearMode,
@@ -52,6 +53,19 @@ export async function getEmployment(): Promise<Employment> {
   } catch {
     return defaultEmployment;
   }
+}
+
+/**
+ * Sind BRAUCHBARE Vertragsdaten gespeichert? Der Backup-Merge darf solche nicht
+ * ueberschreiben — die blosse Existenz des Keys reicht als Kriterium aber nicht:
+ * ein einziger Tap auf "Beschaeftigung speichern" legt ihn schon mit den
+ * Defaults an (weeklyHours 0), und ein Merge-Import wuerde dann die echten
+ * Vertragsdaten aus dem Backup stillschweigend verwerfen. Massgeblich ist
+ * deshalb die Pflichtangabe: ohne Wochenstunden rechnet nichts.
+ */
+export async function hasUsableEmployment(): Promise<boolean> {
+  const emp = await getEmployment();
+  return emp.weeklyHours > 0;
 }
 
 export async function saveEmployment(emp: Employment): Promise<void> {
@@ -133,6 +147,7 @@ export function useVacationDays(): {
   days: VacationDay[];
   loading: boolean;
   add: (date: number, note?: string) => Promise<void>;
+  addMany: (dates: readonly number[]) => Promise<number>;
   remove: (date: number) => Promise<void>;
 } {
   const [days, setDays] = useState<VacationDay[]>([]);
@@ -159,11 +174,28 @@ export function useVacationDays(): {
     setDays(cleaned);
   }, []);
 
+  /**
+   * Traegt mehrere Tage in EINEM Schreibvorgang ein (Zeitraum-Erfassung).
+   * Bereits vorhandene Tage bleiben unveraendert; gibt die Anzahl der
+   * tatsaechlich NEU hinzugekommenen Tage zurueck, damit die Oberflaeche
+   * zurueckmelden kann, was passiert ist.
+   */
+  const addMany = useCallback(async (dates: readonly number[]) => {
+    const current = await getVacationDays();
+    const merged = mergeVacationDays(
+      current,
+      dates.map((date) => ({ date, note: '' })),
+    );
+    await saveVacationDays(merged);
+    setDays(merged);
+    return merged.length - current.length;
+  }, []);
+
   const remove = useCallback(async (date: number) => {
     const next = (await getVacationDays()).filter((d) => d.date !== date);
     await saveVacationDays(next);
     setDays(next);
   }, []);
 
-  return { days, loading, add, remove };
+  return { days, loading, add, addMany, remove };
 }

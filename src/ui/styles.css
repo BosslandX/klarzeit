@@ -477,6 +477,19 @@ textarea:focus {
 .vac-add .btn {
   white-space: nowrap;
 }
+.vac-or {
+  margin: 12px 0 6px;
+}
+
+.vac-range {
+  display: flex;
+  gap: 8px;
+}
+
+.vac-range .field {
+  flex: 1;
+}
+
 .vac-list {
   list-style: none;
   margin: 0;

@@ -83,15 +83,12 @@ export function ReportsScreen() {
   // Fuer das fortgeschriebene Konto Eintraege ab Beschaeftigungsbeginn laden.
   const ledgerEntries =
     useEntriesInRange(Math.min(employment.startDate, period.from), period.to) ?? [];
+  const vacationDates = vacationDays.map((d) => d.date);
   const ledger = isMonth
-    ? buildBalanceLedger(employment, ledgerEntries, ref)
+    ? buildBalanceLedger(employment, ledgerEntries, ref, vacationDates)
     : null;
   const vacation = isMonth
-    ? buildVacationStatus(
-        employment,
-        vacationDays.map((d) => d.date),
-        getYear(period.from),
-      )
+    ? buildVacationStatus(employment, vacationDates, getYear(period.from))
     : null;
 
   const shift = (dir: -1 | 1) => {
@@ -126,7 +123,12 @@ export function ReportsScreen() {
           getEntriesInRange(Math.min(emp.startDate, period.from), period.to),
         ]);
         bodyEntries = wide.filter((e) => e.start >= period.from && e.start <= period.to);
-        const led = buildBalanceLedger(emp, wide, ref);
+        const led = buildBalanceLedger(
+          emp,
+          wide,
+          ref,
+          vac.map((d) => d.date),
+        );
         if (led) {
           extras = {
             employment: emp,
@@ -252,6 +254,14 @@ export function ReportsScreen() {
               <span>Ist (Monat)</span>
               <strong>{formatDuration(ledger.target.istMs)}</strong>
             </div>
+            {ledger.target.vacationDays > 0 && (
+              <div className="konto-row">
+                <span>Urlaub ({formatDays(ledger.target.vacationDays)})</span>
+                <strong className="pos">
+                  {formatSignedDuration(ledger.target.vacationCreditMs)}
+                </strong>
+              </div>
+            )}
             <div className="konto-row">
               <span>Saldo (Monat)</span>
               <strong className={ledger.target.saldoMs >= 0 ? 'pos' : 'neg'}>

@@ -13,6 +13,7 @@ import {
   netMs,
 } from '../domain/time';
 import {
+  dailyTargetMs,
   fullMonthlyTargetMs,
   waitingPeriodEnd,
   type BalanceLedger,
@@ -263,6 +264,15 @@ function drawKontoUndUrlaub(doc: jsPDF, top: number, extras: ReportExtras): numb
   const kontoRows: PanelRow[] = [
     { label: 'Soll (Monat)', value: `${formatDuration(t.sollMs)}  (${dec(t.sollMs)})` },
     { label: 'Ist (Monat)', value: `${formatDuration(t.istMs)}  (${dec(t.istMs)})` },
+  ];
+  if (t.vacationDays > 0) {
+    kontoRows.push({
+      label: `Urlaub (${formatDays(t.vacationDays)})`,
+      value: formatSignedDuration(t.vacationCreditMs),
+      color: POS,
+    });
+  }
+  kontoRows.push(
     { label: 'Saldo (Monat)', value: formatSignedDuration(t.saldoMs), color: saldoCol },
     { label: 'Uebertrag (Vormonate)', value: formatSignedDuration(ledger.carryIn), color: carryCol },
     {
@@ -271,11 +281,18 @@ function drawKontoUndUrlaub(doc: jsPDF, top: number, extras: ReportExtras): numb
       color: closeCol,
       bold: true,
     },
-  ];
+  );
   const monatlSoll = dec(fullMonthlyTargetMs(emp.weeklyHours));
+  const urlaubHinweis =
+    t.vacationDays > 0
+      ? ` Urlaub ist bezahlte Freistellung (§ 1 BUrlG) und entlastet das Soll um ` +
+        `bis zu ${dec(dailyTargetMs(emp))} Std./Tag, abzueglich am selben Tag ` +
+        `bereits erfasster Zeit.`
+      : '';
   const kontoFoot =
     `Basis: ${String(emp.weeklyHours).replace('.', ',')} Std./Woche x 52/12 = ${monatlSoll} Std./Monat. ` +
-    `Beschaeftigt seit ${formatDate(emp.startDate)}. Ausgleich n. § 2 (4) Arbeitsvertrag.`;
+    `Beschaeftigt seit ${formatDate(emp.startDate)}. Ausgleich n. § 2 (4) Arbeitsvertrag.` +
+    urlaubHinweis;
 
   const urlaubRows: PanelRow[] = [
     { label: `Jahresanspruch ${v.year} (§ 3 BUrlG)`, value: formatDays(v.annualFull) },

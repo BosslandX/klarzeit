@@ -1,15 +1,17 @@
 import { getAllEntries } from './entries';
 import { db } from './db';
-import { getProfile, saveProfile, emptyProfile } from './profile';
+import { getProfile, hasUsableProfile, saveProfile, emptyProfile } from './profile';
 import {
   cleanEmployment,
   cleanVacationDays,
   getEmployment,
   getVacationDays,
+  hasUsableEmployment,
   saveEmployment,
   saveVacationDays,
 } from './employment';
 import type { Profile, TimeEntry } from '../domain/types';
+import { mergeVacationDays } from '../domain/employment';
 import type { Employment, VacationDay } from '../domain/employment';
 import { decimalHours, formatClock, formatDate, netMs } from '../domain/time';
 
@@ -104,8 +106,14 @@ function cleanProfile(p: unknown): Profile {
 
 /**
  * Stellt ein Backup wieder her.
- * - replace: vorhandene Daten loeschen, IDs des Backups uebernehmen
- * - merge: Backup-Eintraege als neue Datensaetze hinzufuegen (IDs neu vergeben)
+ * - replace: vorhandene Daten loeschen, IDs des Backups uebernehmen. Profil,
+ *   Vertragsdaten und Urlaubstage werden durch die des Backups ersetzt.
+ * - merge: Backup-Eintraege als neue Datensaetze hinzufuegen (IDs neu vergeben).
+ *   Merge heisst ueberall "fuegt nur hinzu": Urlaubstage werden vereinigt (bei
+ *   gleichem Datum gewinnt der vorhandene Tag), Profil und Vertragsdaten werden
+ *   nur uebernommen, wenn lokal noch keine gespeichert sind. Andernfalls wuerde
+ *   ein aelteres Backup still die aktuellen Stammdaten und alle seither
+ *   erfassten Urlaubstage loeschen.
  *
  * Validierung erfolgt VOR jeglichem Schreiben/Loeschen. clear() und bulkPut()
  * laufen in EINER Dexie-Transaktion, damit bei einem Fehler nichts verloren geht
@@ -143,15 +151,23 @@ export async function restoreBackup(
     await db.entries.bulkPut(entries);
   });
 
-  if (data.profile) {
+  // Stammdaten sind Einzelwerte, kein Anhaengen moeglich: im Merge-Modus daher
+  // nur uebernehmen, wenn lokal noch nichts Brauchbares hinterlegt ist
+  // (Erstimport auf ein leeres Geraet). Ausgefuellte Angaben bleiben unangetastet.
+  if (data.profile && (mode === 'replace' || !(await hasUsableProfile()))) {
     await saveProfile(cleanProfile(data.profile));
   }
   // Ab Version 2: Vertragsdaten + Urlaubstage (validiert) uebernehmen.
-  if (data.employment) {
+  if (data.employment && (mode === 'replace' || !(await hasUsableEmployment()))) {
     await saveEmployment(cleanEmployment(data.employment));
   }
   if (Array.isArray(data.vacations)) {
-    await saveVacationDays(cleanVacationDays(data.vacations));
+    const incoming = cleanVacationDays(data.vacations);
+    await saveVacationDays(
+      mode === 'merge'
+        ? mergeVacationDays(await getVacationDays(), incoming)
+        : incoming,
+    );
   }
   return entries.length;
 }

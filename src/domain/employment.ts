@@ -4,8 +4,10 @@ import {
   endOfDay,
   startOfDay,
   addMonths,
+  eachDayOfInterval,
   eachMonthOfInterval,
   getDaysInMonth,
+  getDay,
   getYear,
   getMonth,
   differenceInCalendarDays,
@@ -83,6 +85,17 @@ export function fullMonthlyTargetMs(weeklyHours: number): number {
 }
 
 /**
+ * Soll-Arbeitszeit EINES Arbeitstages in ms: Wochenstunden / Arbeitstage.
+ * Bezugsgroesse fuer die Urlaubsgutschrift im Arbeitszeitkonto. 0 Arbeitstage
+ * ergibt 0 statt Infinity (cleanEmployment erzwingt zwar 1..6, die Funktion
+ * ist aber auch fuer ungepruefte Werte gutmuetig).
+ */
+export function dailyTargetMs(emp: Employment): number {
+  if (emp.workdaysPerWeek <= 0) return 0;
+  return (emp.weeklyHours / emp.workdaysPerWeek) * HOUR;
+}
+
+/**
  * Soll-Arbeitszeit eines Monats in ms. Bei Teilmonaten (Eintritts-/Austrittsmonat)
  * anteilig nach beschaeftigten Kalendertagen. Monate ausserhalb der Beschaeftigung
  * ergeben 0.
@@ -109,9 +122,11 @@ export function monthSollMs(emp: Employment, monthRef: number): number {
 export interface MonthBalance {
   monthStart: number; // epoch ms (startOfMonth)
   label: string; // z.B. "Juni 2026"
-  sollMs: number;
+  sollMs: number; // Brutto-Soll des Monats (ohne Urlaubsabzug)
   istMs: number;
-  saldoMs: number; // istMs - sollMs (positiv = Ueberstunden)
+  vacationDays: number; // im Monat genommene Urlaubstage (im Beschaeftigungsfenster)
+  vacationCreditMs: number; // Gutschrift dafuer, gedeckelt auf sollMs
+  saldoMs: number; // istMs + vacationCreditMs - sollMs (positiv = Ueberstunden)
 }
 
 /** Fortgeschriebenes Arbeitszeitkonto bis zu einem Zielmonat. */
@@ -149,15 +164,68 @@ function istMsOfMonth(
 }
 
 /**
+ * Urlaubstage eines Monats und die Gutschrift dafuer.
+ *
+ * Symmetrisch zu istMsOfMonth/monthSollMs auf das Beschaeftigungsfenster
+ * geklammert: ein Urlaubstag ausserhalb der Beschaeftigung entlastet nicht.
+ *
+ * Die Gutschrift fuellt einen Urlaubstag nur auf das Tagessoll AUF. Ist am
+ * selben Tag schon Zeit erfasst — etwa weil der Tag frueher als manueller
+ * Eintrag "Urlaub" nachgetragen wurde —, wird nur die Differenz gutgeschrieben.
+ * Ohne diese Verrechnung wuerde derselbe Tag doppelt zaehlen (einmal als Ist,
+ * einmal als Gutschrift) und kuenstliche Ueberstunden erzeugen.
+ */
+function vacationOfMonth(
+  emp: Employment,
+  entries: readonly TimeEntry[],
+  vacationDates: readonly number[],
+  monthRef: number,
+): { days: number; creditMs: number } {
+  const mStart = startOfMonth(monthRef).getTime();
+  const mEnd = endOfMonth(monthRef).getTime();
+  const empStart = startOfDay(emp.startDate).getTime();
+  const empEnd = emp.endDate != null ? endOfDay(emp.endDate).getTime() : Infinity;
+  const inMonth = vacationDates.filter(
+    (d) => d >= mStart && d <= mEnd && d >= empStart && d <= empEnd,
+  );
+  const perDay = dailyTargetMs(emp);
+  const creditMs = inMonth.reduce((sum, day) => {
+    const dayStart = startOfDay(day).getTime();
+    const dayEnd = endOfDay(day).getTime();
+    const istOfDay = entries.reduce(
+      (s, e) =>
+        e.start >= dayStart && e.start <= dayEnd && e.start >= empStart && e.start <= empEnd
+          ? s + netMs(e)
+          : s,
+      0,
+    );
+    return sum + Math.max(0, perDay - istOfDay);
+  }, 0);
+  return {
+    days: inMonth.length,
+    creditMs: Math.round(creditMs / MINUTE) * MINUTE,
+  };
+}
+
+/**
  * Baut das Arbeitszeitkonto vom Eintrittsmonat bis zum Monat von `refEpoch`.
  * `entries` sollte den gesamten Zeitraum (Beginn .. Zielmonatsende) abdecken;
  * die Zuordnung erfolgt nach dem Beginn jedes Eintrags. Gibt null zurueck, wenn
  * der Zielmonat vor dem Eintrittsmonat liegt.
+ *
+ * `vacationDates` (Tagesdaten genommener Urlaubstage) entlasten das Konto:
+ * Urlaub ist bezahlte Freistellung (§ 1 BUrlG), an einem Urlaubstag entsteht
+ * also keine Arbeitspflicht. Statt das Soll stillschweigend zu kuerzen wird die
+ * Entlastung als eigene Gutschrift ausgewiesen, damit Brutto-Soll und Ist im
+ * Report nachvollziehbar bleiben. Bereits erfasste Zeit am Urlaubstag wird
+ * dabei angerechnet, ein Tag zaehlt also nie doppelt. Ohne Urlaubstage rechnet
+ * die Funktion exakt wie zuvor.
  */
 export function buildBalanceLedger(
   emp: Employment,
   entries: readonly TimeEntry[],
   refEpoch: number,
+  vacationDates: readonly number[] = [],
 ): BalanceLedger | null {
   const firstMonth = startOfMonth(emp.startDate);
   const targetMonth = startOfMonth(refEpoch);
@@ -169,12 +237,22 @@ export function buildBalanceLedger(
   }).map((m) => {
     const sollMs = monthSollMs(emp, m.getTime());
     const istMs = istMsOfMonth(emp, entries, m.getTime());
+    const vac = vacationOfMonth(emp, entries, vacationDates, m.getTime());
+    const vacationDays = vac.days;
+    // Deckel auf das Monats-Soll: reiner Urlaub kann die Arbeitspflicht
+    // hoechstens aufheben, niemals Ueberstunden erzeugen. Nicht gegen das
+    // Monats-Ist deckeln — die Verrechnung mit bereits erfasster Zeit ist in
+    // vacationOfMonth bereits TAGGENAU erledigt; ein zweiter Abzug auf
+    // Monatsebene wuerde Arbeit an urlaubsfreien Tagen entwerten.
+    const vacationCreditMs = Math.min(vac.creditMs, sollMs);
     return {
       monthStart: m.getTime(),
       label: format(m, 'MMMM yyyy', { locale: de }),
       sollMs,
       istMs,
-      saldoMs: istMs - sollMs,
+      vacationDays,
+      vacationCreditMs,
+      saldoMs: istMs + vacationCreditMs - sollMs,
     };
   });
 
@@ -184,6 +262,55 @@ export function buildBalanceLedger(
     opening + months.slice(0, -1).reduce((s, mb) => s + mb.saldoMs, 0);
   const closing = carryIn + target.saldoMs;
   return { months, opening, carryIn, target, closing };
+}
+
+// --- Urlaubstage erfassen ---
+
+/**
+ * Arbeitstage eines Zeitraums als Tagesdaten (lokale Mitternacht), aufsteigend.
+ *
+ * Der Vertrag speichert nur die ANZAHL der Arbeitstage pro Woche, nicht welche
+ * Wochentage das sind. Ausgeschlossen werden daher ausschliesslich die klaren
+ * Nicht-Arbeitstage: immer der Sonntag, zusaetzlich der Samstag bei weniger als
+ * sechs Arbeitstagen. Bei einer 3- oder 4-Tage-Woche liefert die Funktion also
+ * bewusst zu viele Tage — der Nutzer korrigiert sie einzeln, statt dass die App
+ * eine Wochentagsverteilung errät, die sie nicht kennt.
+ *
+ * Feiertage sind der App unbekannt und bleiben enthalten. `bis` vor `von`
+ * ergibt eine leere Liste.
+ */
+export function workdaysInRange(
+  fromEpoch: number,
+  toEpoch: number,
+  workdaysPerWeek: number,
+): number[] {
+  const from = startOfDay(fromEpoch);
+  const to = startOfDay(toEpoch);
+  if (to.getTime() < from.getTime()) return [];
+  const includeSaturday = workdaysPerWeek >= WERKTAGE_PER_WEEK;
+  return eachDayOfInterval({ start: from, end: to })
+    .filter((d) => {
+      const wd = getDay(d); // 0 = Sonntag, 6 = Samstag
+      if (wd === 0) return false;
+      if (wd === 6) return includeSaturday;
+      return true;
+    })
+    .map((d) => d.getTime());
+}
+
+/**
+ * Vereinigt zwei Urlaubslisten. Bei gleichem Datum gewinnt der BESTEHENDE
+ * Eintrag, damit ein Backup-Import lokale Tage (und deren Notiz) nie
+ * ueberschreibt. Ergebnis aufsteigend sortiert.
+ */
+export function mergeVacationDays(
+  existing: readonly VacationDay[],
+  incoming: readonly VacationDay[],
+): VacationDay[] {
+  const known = new Set(existing.map((d) => d.date));
+  return [...existing, ...incoming.filter((d) => !known.has(d.date))].sort(
+    (a, b) => a.date - b.date,
+  );
 }
 
 // --- Urlaub (BUrlG) ---

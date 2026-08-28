@@ -1,17 +1,19 @@
 import { useRef, useState } from 'react';
-import { format } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 import { useProfile } from '../../db/profile';
 import { useEmployment, useVacationDays } from '../../db/employment';
 import type { Profile } from '../../domain/types';
 import {
   annualVacationDays,
+  dailyTargetMs,
   fullMonthlyTargetMs,
+  workdaysInRange,
   type Employment,
   type VacationYearMode,
 } from '../../domain/employment';
 import {
   decimalHours,
-  formatDate,
+  formatDateWithWeekday,
   fromDateInput,
   HOUR,
 } from '../../domain/time';
@@ -28,6 +30,13 @@ import {
   downloadAndInstall,
   type UpdateInfo,
 } from '../../update/updater';
+
+/**
+ * Groesster am Stueck eintragbarer Urlaubszeitraum (Kalendertage). Ein Jahr ist
+ * mehr als jeder reale Urlaub; die Grenze verhindert, dass ein Vertipper im
+ * Jahresfeld die Vorschau ueber Hunderttausende Tage rechnen laesst.
+ */
+const MAX_VACATION_RANGE_DAYS = 366;
 
 const VACATION_MODE_LABELS: { value: VacationYearMode; label: string }[] = [
   { value: 'both', label: 'Beide (voll + anteilig)' },
@@ -53,10 +62,18 @@ export function MoreScreen() {
   const [updateMsg, setUpdateMsg] = useState('');
   const [available, setAvailable] = useState<UpdateInfo | null>(null);
   const { employment, save: saveEmp } = useEmployment();
-  const { days: vacDays, add: addVac, remove: removeVac } = useVacationDays();
+  const {
+    days: vacDays,
+    add: addVac,
+    addMany: addVacMany,
+    remove: removeVac,
+  } = useVacationDays();
   const [empForm, setEmpForm] = useState<Employment | null>(null);
   const [empFlash, setEmpFlash] = useState(false);
   const [newVacDate, setNewVacDate] = useState('');
+  const [vacFrom, setVacFrom] = useState('');
+  const [vacTo, setVacTo] = useState('');
+  const [vacRangeMsg, setVacRangeMsg] = useState('');
 
   // Lokaler Formularzustand, initialisiert aus dem geladenen Profil.
   const current = form ?? profile;
@@ -80,6 +97,40 @@ export function MoreScreen() {
     if (Number.isNaN(t)) return;
     await addVac(t);
     setNewVacDate('');
+  };
+
+  // Zweiter Erfassungsweg: ganzer Zeitraum statt Einzeltag. Die Vorschau wird
+  // bei jeder Eingabe neu berechnet, damit vor dem Klick sichtbar ist, wie
+  // viele Tage tatsaechlich eingetragen werden. Die Obergrenze schuetzt den
+  // Render-Pfad: ein <input type="date"> laesst Jahreszahlen bis 275760 zu, und
+  // workdaysInRange legt pro Kalendertag ein Date-Objekt an.
+  const rangeSpanDays =
+    Number.isNaN(fromDateInput(vacFrom)) || Number.isNaN(fromDateInput(vacTo))
+      ? 0
+      : differenceInCalendarDays(fromDateInput(vacTo), fromDateInput(vacFrom)) + 1;
+  const rangeTooLong = rangeSpanDays > MAX_VACATION_RANGE_DAYS;
+  const rangeDays =
+    rangeSpanDays <= 0 || rangeTooLong
+      ? []
+      : workdaysInRange(
+          fromDateInput(vacFrom),
+          fromDateInput(vacTo),
+          emp.workdaysPerWeek,
+        );
+
+  const handleAddVacationRange = async () => {
+    if (rangeDays.length === 0) return;
+    const added = await addVacMany(rangeDays);
+    const skipped = rangeDays.length - added;
+    setVacFrom('');
+    setVacTo('');
+    // Inline statt window.alert: die neuen Tage stehen sofort in der Liste
+    // darunter, die Meldung ergaenzt nur, was uebersprungen wurde.
+    setVacRangeMsg(
+      `${added} Urlaubstag(e) eingetragen` +
+        (skipped > 0 ? `, ${skipped} war(en) bereits erfasst` : '') +
+        '.',
+    );
   };
 
   const handleSaveProfile = async () => {
@@ -329,8 +380,11 @@ export function MoreScreen() {
 
         <h3 className="sub-head">Genommene Urlaubstage</h3>
         <p className="muted small">
-          Jeder Eintrag zaehlt als 1 Urlaubstag und mindert den Resturlaub des
-          jeweiligen Jahres.
+          Jeder Eintrag zaehlt als 1 Urlaubstag, mindert den Resturlaub des
+          jeweiligen Jahres und entlastet das Arbeitszeitkonto um bis zu{' '}
+          {decimalHours(dailyTargetMs(emp)).toFixed(2).replace('.', ',')} Std.
+          Ist an dem Tag schon Zeit erfasst, wird nur die Differenz
+          gutgeschrieben — ein Tag zaehlt nie doppelt.
         </p>
         <div className="vac-add">
           <input
@@ -346,13 +400,55 @@ export function MoreScreen() {
             Urlaubstag hinzufuegen
           </button>
         </div>
+
+        <p className="muted small vac-or">oder ganzen Zeitraum eintragen:</p>
+        <div className="vac-range">
+          <label className="field">
+            <span>von</span>
+            <input
+              type="date"
+              value={vacFrom}
+              onChange={(e) => {
+                setVacFrom(e.target.value);
+                setVacRangeMsg('');
+              }}
+            />
+          </label>
+          <label className="field">
+            <span>bis</span>
+            <input
+              type="date"
+              value={vacTo}
+              onChange={(e) => {
+                setVacTo(e.target.value);
+                setVacRangeMsg('');
+              }}
+            />
+          </label>
+        </div>
+        <button
+          className="btn btn-block"
+          disabled={rangeDays.length === 0}
+          onClick={() => void handleAddVacationRange()}
+        >
+          {rangeDays.length > 0
+            ? `${rangeDays.length} Arbeitstag(e) eintragen`
+            : 'Zeitraum eintragen'}
+        </button>
+        <p className="muted small">
+          {rangeTooLong
+            ? `Der Zeitraum ist zu lang (max. ${MAX_VACATION_RANGE_DAYS} Tage am Stueck). Bitte Datum pruefen.`
+            : vacRangeMsg ||
+              'Sonntage werden immer uebersprungen, Samstage ab 6 Arbeitstagen/Woche mitgezaehlt. Feiertage kennt die App nicht — einzelne Tage danach gegebenenfalls wieder entfernen.'}
+        </p>
+
         {vacDays.length === 0 ? (
           <p className="muted small">Noch keine Urlaubstage erfasst.</p>
         ) : (
           <ul className="vac-list">
             {vacDays.map((d) => (
               <li key={d.date}>
-                <span>{formatDate(d.date)}</span>
+                <span>{formatDateWithWeekday(d.date)}</span>
                 <button
                   className="link-btn danger"
                   onClick={() => void removeVac(d.date)}

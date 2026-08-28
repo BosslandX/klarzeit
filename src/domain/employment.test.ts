@@ -3,13 +3,16 @@ import {
   annualVacationDays,
   buildBalanceLedger,
   buildVacationStatus,
+  dailyTargetMs,
   defaultEmployment,
   fullMonthlyTargetMs,
   fullMonthsEmployedInYear,
+  mergeVacationDays,
   monthSollMs,
   roundTeilurlaub,
   waitingFulfilledInYear,
   waitingPeriodEnd,
+  workdaysInRange,
   type Employment,
 } from './employment';
 import type { TimeEntry } from './types';
@@ -231,5 +234,258 @@ describe('Urlaubsanspruch (BUrlG)', () => {
     expect(s.isEntryYear).toBe(false);
     expect(s.fullMonths).toBe(12);
     expect(s.entitlement).toBe(16);
+  });
+});
+
+describe('Tagessoll', () => {
+  it('Wochenstunden / Arbeitstage', () => {
+    expect(dailyTargetMs(emp)).toBe(5 * HOUR); // 20 h / 4 Tage
+    expect(dailyTargetMs({ ...emp, weeklyHours: 40, workdaysPerWeek: 5 })).toBe(8 * HOUR);
+  });
+
+  it('0 Arbeitstage waere eine Division durch null -> 0', () => {
+    expect(dailyTargetMs({ ...emp, workdaysPerWeek: 0 })).toBe(0);
+  });
+});
+
+describe('Urlaubsgutschrift im Arbeitszeitkonto', () => {
+  const vac = (y: number, mo: number, d: number) => new Date(y, mo - 1, d).getTime();
+
+  it('ohne Urlaubstage bleibt der Saldo unveraendert (Rueckwaertskompatibilitaet)', () => {
+    const entries = [entry(2026, 5, 5, 8, 12)]; // 4 h
+    const a = buildBalanceLedger(emp, entries, new Date(2026, 4, 28).getTime());
+    const b = buildBalanceLedger(emp, entries, new Date(2026, 4, 28).getTime(), []);
+    expect(a!.target.saldoMs).toBe(4 * HOUR - SOLL);
+    expect(b!.target.saldoMs).toBe(a!.target.saldoMs);
+    expect(b!.target.vacationDays).toBe(0);
+    expect(b!.target.vacationCreditMs).toBe(0);
+  });
+
+  it('ein Urlaubstag schreibt ein Tagessoll gut', () => {
+    const entries = [entry(2026, 5, 5, 8, 12)]; // 4 h
+    const ledger = buildBalanceLedger(
+      emp,
+      entries,
+      new Date(2026, 4, 28).getTime(),
+      [vac(2026, 5, 6)],
+    );
+    expect(ledger!.target.vacationDays).toBe(1);
+    expect(ledger!.target.vacationCreditMs).toBe(5 * HOUR);
+    // Soll bleibt brutto stehen, die Gutschrift geht in den Saldo ein.
+    expect(ledger!.target.sollMs).toBe(SOLL);
+    expect(ledger!.target.istMs).toBe(4 * HOUR);
+    expect(ledger!.target.saldoMs).toBe(4 * HOUR + 5 * HOUR - SOLL);
+  });
+
+  it('Urlaubstag vor Beschaeftigungsbeginn wird nicht gutgeschrieben', () => {
+    const midStart: Employment = { ...emp, startDate: new Date(2026, 4, 16).getTime() };
+    const ledger = buildBalanceLedger(midStart, [], new Date(2026, 4, 28).getTime(), [
+      vac(2026, 5, 5), // vor Beginn
+      vac(2026, 5, 20), // nach Beginn
+    ]);
+    expect(ledger!.target.vacationDays).toBe(1);
+  });
+
+  it('Urlaubstag nach befristetem Ende wird nicht gutgeschrieben', () => {
+    const ends: Employment = { ...emp, endDate: new Date(2026, 4, 15).getTime() };
+    const ledger = buildBalanceLedger(ends, [], new Date(2026, 4, 28).getTime(), [
+      vac(2026, 5, 11), // vor Ende
+      vac(2026, 5, 20), // nach Ende
+    ]);
+    expect(ledger!.target.vacationDays).toBe(1);
+  });
+
+  it('Gutschrift eines Vormonats wandert in den Uebertrag', () => {
+    const ledger = buildBalanceLedger(emp, [], new Date(2026, 5, 10).getTime(), [
+      vac(2026, 5, 6), // Mai
+    ]);
+    expect(ledger!.months).toHaveLength(2);
+    expect(ledger!.carryIn).toBe(5 * HOUR - SOLL); // Mai: nur die Gutschrift
+    expect(ledger!.target.vacationDays).toBe(0); // Juni ohne Urlaub
+    expect(ledger!.closing).toBe(5 * HOUR - SOLL - SOLL);
+  });
+
+  it('Urlaubstage anderer Monate zaehlen nicht in den Zielmonat', () => {
+    const ledger = buildBalanceLedger(emp, [], new Date(2026, 5, 10).getTime(), [
+      vac(2026, 5, 6), // Mai
+      vac(2026, 6, 8), // Juni
+    ]);
+    expect(ledger!.target.vacationDays).toBe(1); // nur der Juni-Tag
+  });
+});
+
+describe('Arbeitstage eines Zeitraums', () => {
+  const d = (y: number, mo: number, dd: number) => new Date(y, mo - 1, dd).getTime();
+
+  it('Mo-Fr bei 5 Arbeitstagen: Wochenende uebersprungen', () => {
+    // 08.06.2026 = Mo, 19.06.2026 = Fr -> 2 volle Wochen ohne Sa/So
+    const days = workdaysInRange(d(2026, 6, 8), d(2026, 6, 19), 5);
+    expect(days).toHaveLength(10);
+    expect(days[0]).toBe(d(2026, 6, 8));
+    expect(days[days.length - 1]).toBe(d(2026, 6, 19));
+    expect(days).not.toContain(d(2026, 6, 13)); // Samstag
+    expect(days).not.toContain(d(2026, 6, 14)); // Sonntag
+  });
+
+  it('bei 6 Arbeitstagen zaehlt der Samstag mit, der Sonntag nie', () => {
+    const days = workdaysInRange(d(2026, 6, 8), d(2026, 6, 19), 6);
+    expect(days).toHaveLength(11); // 10 + Sa 13.06.
+    expect(days).toContain(d(2026, 6, 13));
+    expect(days).not.toContain(d(2026, 6, 14));
+  });
+
+  it('reines Wochenende ergibt bei 5 Arbeitstagen nichts', () => {
+    expect(workdaysInRange(d(2026, 6, 13), d(2026, 6, 14), 5)).toEqual([]);
+  });
+
+  it('einzelner Tag: von = bis', () => {
+    expect(workdaysInRange(d(2026, 6, 10), d(2026, 6, 10), 5)).toEqual([d(2026, 6, 10)]);
+  });
+
+  it('bis vor von ergibt eine leere Liste', () => {
+    expect(workdaysInRange(d(2026, 6, 19), d(2026, 6, 8), 5)).toEqual([]);
+  });
+
+  it('Uhrzeiten in den Eingaben stoeren nicht (Normalisierung auf Mitternacht)', () => {
+    const from = new Date(2026, 5, 8, 17, 45).getTime();
+    const to = new Date(2026, 5, 9, 3, 10).getTime();
+    expect(workdaysInRange(from, to, 5)).toEqual([d(2026, 6, 8), d(2026, 6, 9)]);
+  });
+});
+
+describe('Urlaubslisten zusammenfuehren', () => {
+  const v = (y: number, mo: number, dd: number, note = '') => ({
+    date: new Date(y, mo - 1, dd).getTime(),
+    note,
+  });
+
+  it('vereinigt beide Listen und sortiert aufsteigend', () => {
+    const merged = mergeVacationDays([v(2026, 6, 10)], [v(2026, 6, 3)]);
+    expect(merged.map((x) => x.date)).toEqual([
+      v(2026, 6, 3).date,
+      v(2026, 6, 10).date,
+    ]);
+  });
+
+  it('bestehende Eintraege gehen nie verloren', () => {
+    const existing = [v(2026, 6, 10), v(2026, 6, 11)];
+    const merged = mergeVacationDays(existing, [v(2026, 6, 1)]);
+    expect(merged).toHaveLength(3);
+    for (const e of existing) {
+      expect(merged.some((m) => m.date === e.date)).toBe(true);
+    }
+  });
+
+  it('bei gleichem Datum gewinnt der bestehende Eintrag (Notiz bleibt)', () => {
+    const merged = mergeVacationDays(
+      [v(2026, 6, 10, 'meine Notiz')],
+      [v(2026, 6, 10, 'aus dem Backup')],
+    );
+    expect(merged).toHaveLength(1);
+    expect(merged[0].note).toBe('meine Notiz');
+  });
+
+  it('leere Eingaben', () => {
+    expect(mergeVacationDays([], [])).toEqual([]);
+    expect(mergeVacationDays([], [v(2026, 6, 1)])).toHaveLength(1);
+    expect(mergeVacationDays([v(2026, 6, 1)], [])).toHaveLength(1);
+  });
+});
+
+describe('Urlaubsgutschrift trifft auf bereits erfasste Zeit (Doppelzaehlung)', () => {
+  const vac = (y: number, mo: number, d: number) => new Date(y, mo - 1, d).getTime();
+  const ref = new Date(2026, 4, 28).getTime();
+
+  it('Urlaubstag ohne Erfassung: volle Gutschrift', () => {
+    const l = buildBalanceLedger(emp, [], ref, [vac(2026, 5, 6)]);
+    expect(l!.target.vacationCreditMs).toBe(5 * HOUR);
+  });
+
+  it('Urlaubstag mit bereits erfasstem vollen Tag: KEINE zusaetzliche Gutschrift', () => {
+    // Wer den Urlaubstag frueher als manuellen Eintrag "Urlaub" nachgetragen hat,
+    // darf ihn nicht zusaetzlich gutgeschrieben bekommen.
+    const entries = [entry(2026, 5, 6, 8, 13)]; // 5 h am Urlaubstag
+    const l = buildBalanceLedger(emp, entries, ref, [vac(2026, 5, 6)]);
+    expect(l!.target.istMs).toBe(5 * HOUR);
+    expect(l!.target.vacationCreditMs).toBe(0);
+    expect(l!.target.saldoMs).toBe(5 * HOUR - SOLL); // genau wie ohne Urlaubsliste
+  });
+
+  it('Urlaubstag mit halb erfasstem Tag: nur die Differenz wird gutgeschrieben', () => {
+    const entries = [entry(2026, 5, 6, 8, 10)]; // 2 h am Urlaubstag
+    const l = buildBalanceLedger(emp, entries, ref, [vac(2026, 5, 6)]);
+    expect(l!.target.vacationCreditMs).toBe(3 * HOUR); // 5 h Tagessoll - 2 h
+    expect(l!.target.saldoMs).toBe(2 * HOUR + 3 * HOUR - SOLL);
+  });
+
+  it('mehr erfasst als Tagessoll: Gutschrift 0, die Mehrarbeit bleibt erhalten', () => {
+    const entries = [entry(2026, 5, 6, 8, 16)]; // 8 h am Urlaubstag
+    const l = buildBalanceLedger(emp, entries, ref, [vac(2026, 5, 6)]);
+    expect(l!.target.vacationCreditMs).toBe(0);
+    expect(l!.target.saldoMs).toBe(8 * HOUR - SOLL);
+  });
+
+  it('Erfassung an einem ANDEREN Tag mindert die Gutschrift nicht', () => {
+    const entries = [entry(2026, 5, 7, 8, 13)]; // 5 h, aber am 07., Urlaub am 06.
+    const l = buildBalanceLedger(emp, entries, ref, [vac(2026, 5, 6)]);
+    expect(l!.target.vacationCreditMs).toBe(5 * HOUR);
+    expect(l!.target.saldoMs).toBe(5 * HOUR + 5 * HOUR - SOLL);
+  });
+
+  it('mehrere Eintraege am selben Urlaubstag werden zusammengezaehlt', () => {
+    const entries = [entry(2026, 5, 6, 8, 10), entry(2026, 5, 6, 13, 15)]; // 2 h + 2 h
+    const l = buildBalanceLedger(emp, entries, ref, [vac(2026, 5, 6)]);
+    expect(l!.target.vacationCreditMs).toBe(1 * HOUR); // 5 h - 4 h
+  });
+});
+
+describe('Deckel der Urlaubsgutschrift', () => {
+  const vac = (y: number, mo: number, d: number) => new Date(y, mo - 1, d).getTime();
+  const ref = new Date(2026, 4, 28).getTime();
+
+  it('Arbeit an urlaubsfreien Tagen wird durch den Urlaub NICHT entwertet', () => {
+    // 12 urlaubsfreie Tage a 7 h = 84 h Ist, dazu 4 Urlaubstage (je 5 h Soll).
+    // Der Urlaub nimmt 20 h Arbeitspflicht weg, es verbleiben 66:40 Soll —
+    // die 84 h ergeben also echte Ueberstunden. Wuerde die Gutschrift gegen das
+    // Monats-Ist statt nur gegen das Tages-Ist verrechnet, stuende hier 0:00.
+    const entries = Array.from({ length: 12 }, (_, i) => entry(2026, 5, i + 1, 8, 15));
+    const urlaub = [25, 26, 27, 28].map((d) => vac(2026, 5, d));
+    const l = buildBalanceLedger(emp, entries, ref, urlaub);
+    expect(l!.target.istMs).toBe(84 * HOUR);
+    expect(l!.target.vacationCreditMs).toBe(20 * HOUR);
+    expect(l!.target.saldoMs).toBe(84 * HOUR + 20 * HOUR - SOLL); // +17:20
+  });
+
+  it('Ueberstundenmonat: der Urlaubstag entlastet zusaetzlich', () => {
+    // 100 h Ist an urlaubsfreien Tagen, 1 Urlaubstag. Der Tag mindert den
+    // Resturlaub — dann muss er auch das Konto entlasten, sonst ist er im
+    // Arbeitszeitkonto wertlos.
+    const entries = Array.from({ length: 20 }, (_, i) => entry(2026, 5, i + 2, 8, 13));
+    const l = buildBalanceLedger(emp, entries, ref, [vac(2026, 5, 25)]);
+    expect(l!.target.istMs).toBe(100 * HOUR);
+    expect(l!.target.vacationDays).toBe(1);
+    expect(l!.target.vacationCreditMs).toBe(5 * HOUR);
+    expect(l!.target.saldoMs).toBe(100 * HOUR + 5 * HOUR - SOLL); // +18:20
+  });
+
+  it('reiner Urlaub erzeugt keine Ueberstunden (Deckel auf das Monats-Soll)', () => {
+    // 25 Urlaubstage x 5 h = 125 h Rohgutschrift bei 86:40 Monats-Soll und 0 h
+    // Ist. Ohne Deckel entstuenden aus reinem Urlaub +38:20 Ueberstunden.
+    const urlaub = Array.from({ length: 25 }, (_, i) => vac(2026, 5, i + 1));
+    const l = buildBalanceLedger(emp, [], ref, urlaub);
+    expect(l!.target.vacationCreditMs).toBe(SOLL);
+    expect(l!.target.saldoMs).toBe(0);
+  });
+
+  it('Monat ohne Soll (ausserhalb der Beschaeftigung) bekommt keine Gutschrift', () => {
+    const ends: Employment = { ...emp, endDate: new Date(2026, 4, 31).getTime() };
+    // Juni liegt komplett nach dem Ende -> Soll 0, Urlaubstage duerfen nicht wirken.
+    const l = buildBalanceLedger(ends, [], new Date(2026, 5, 15).getTime(), [
+      vac(2026, 6, 8),
+    ]);
+    const juni = l!.months[l!.months.length - 1];
+    expect(juni.sollMs).toBe(0);
+    expect(juni.vacationCreditMs).toBe(0);
+    expect(juni.saldoMs).toBe(0);
   });
 });

@@ -61,6 +61,11 @@ export function formatDate(epoch: number): string {
   return format(epoch, 'dd.MM.yyyy', { locale: de });
 }
 
+/** Tagesdatum mit Wochentag, z.B. "Mo, 08.06.2026". Macht Fehlgriffe (Sa/So) sichtbar. */
+export function formatDateWithWeekday(epoch: number): string {
+  return format(epoch, 'EE, dd.MM.yyyy', { locale: de });
+}
+
 export function formatDateShort(epoch: number): string {
   return format(epoch, 'EE, dd.MM.', { locale: de });
 }
