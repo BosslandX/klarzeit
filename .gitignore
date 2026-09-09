@@ -37,3 +37,14 @@ docs/
 # deshalb selbst nicht veroeffentlicht werden (er wuerde genau das preisgeben,
 # wovor er schuetzen soll). Lokales Werkzeug.
 tools/privacy-scan.mjs
+
+# --- Auftragskette (composer-kit) ---
+# Lieferungen und Protokolle der Ausfuehrenden.
+auftraege/_ergebnisse/*
+auftraege/_probe/*
+!auftraege/_ergebnisse/.gitkeep
+!auftraege/_probe/.gitkeep
+# Statuszahlen-Datenbank: Schema versioniert, Inhalt nicht.
+tools/tracking.db
+# Arbeitsorte der Auftraege
+.wt/

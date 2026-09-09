@@ -75,3 +75,75 @@ Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
   nicht `releases/latest/download/…`.
 - **Vor jedem Push:** `node tools/privacy-scan.mjs` muss null Treffer melden.
 - `docs/` ist gitignored (persönliches Arbeitsjournal, nicht Teil der Veröffentlichung).
+
+---
+
+## Auftragskette: Orchestrator (Opus) ↔ Ausführender (composer-2.5)
+
+**Du bist Orchestrator.** Der Ausführende ist `composer-2.5` über `tools\auftrag.ps1`.
+
+- Du schreibst Auftrag **und Erwartung** VOR dem Lauf, nie danach. Eine Erwartung, die
+  nach dem Ergebnis entsteht, kann nicht mehr widerlegt werden.
+- Du liest **jeden** gelieferten Beleg selbst an der Quelle nach. Ein Agentenbericht ist
+  eine Hypothese, kein Beleg.
+- Du entscheidest über Marker. Ein Ausführender schlägt vor, er setzt nicht.
+- Schreibhoheit: alles außer `auftraege/_ergebnisse/` und `auftraege/_probe/` änderst nur du.
+- Vor jedem Merge eines Auftrags-Zweigs: `tools\gate.ps1` fahren.
+
+### Wer welche Arbeit macht
+
+**Handarbeit am Material gehört an `composer-2.5`.** Das ist der Standardweg, nicht die
+Ausnahme. Darunter fällt alles, was Sichten und Zählen ist:
+
+lesen · zählen · suchen · greppen · Dokumente sichten · Stellen gegeneinander halten ·
+Zahlen nachrechnen · Skripte schreiben, die messen
+
+### Claude-Subagenten
+
+**Für ausführende Arbeit gesperrt.** Kein Task-Agent, kein Workflow, keine Fan-outs für
+das, was oben steht — auch nicht kurz, auch nicht auf Haiku. Der Grund aus dem
+Vorbildprojekt: für die Prüfung eines einzigen Auftrags liefen dort sechs Opus-Agenten.
+
+**Lesende Claude-Agenten für Recherche und Review bleiben erlaubt** — aber nur mit
+ausdrücklichem `model`-Schalter. Ohne ihn erbt der Subagent das Orchestrator-Modell,
+also Opus. Genau so sind die sechs entstanden.
+
+`ultracode` hebt diese Regel nicht auf. Wo `ultracode` „nimm einen Workflow" sagt und
+diese Datei „nimm den Composer", gilt diese Datei.
+
+| Lage | richtig |
+|---|---|
+| Handarbeit am Material ist nötig | `tools\auftrag.ps1` mit `composer-2.5` |
+| ein Auftrag soll vor dem Lauf geprüft werden | **selbst prüfen**: Anker zählen, Kontrollen fahren, Rechnungen nachrechnen. Das ist billig und findet erfahrungsgemäß das meiste. |
+| ein Befund trägt eine Markerentscheidung | **selbst an der Quelle nachlesen** |
+| der Composer kommt an das Material nicht heran | **Material in den Arbeitsort legen** (`tools\auftrag.ps1`, Liste `$quellBaeume`), nicht „dann eben Opus" |
+
+### Wege
+
+| Was | Wo |
+|-----|-----|
+| Aufträge | `auftraege/AUF-nnn.md`, Vorlage daneben |
+| Lieferungen der Ausführenden | `auftraege/_ergebnisse/` |
+| Erprobung, nicht versioniert | `auftraege/_probe/` |
+| Statuszahlen (einzige Quelle) | `tools/tracking.db` |
+| Rechteschalter | `tools\cursor.ps1 -Status` / `-An` / `-Aus` |
+| Tor vor dem Merge | `tools\gate.ps1` |
+| Abnahme einer Lieferung | `python -u tools/abnahme.py <lieferung.json>` |
+
+### Zwei Sätze, die den ganzen Aufbau tragen
+
+**Die `deny`-Listen in `.cursor/cli.an.json` halten nicht.** In beiden Vorbildprojekten
+fiel jede von fünf geprüften Sperren. Sie sind eine Absichtserklärung, keine Grenze. Die
+wirksame Grenze ist der git-Worktree plus der Fingerabdruck, den `auftrag.ps1` hinterher
+zieht. **AUF-000 misst, welche Einträge hier tatsächlich halten** — bis dahin ist das
+eine Erwartung.
+
+**Der Geprüfte darf das Prüfgerät nicht besitzen.** `tools/` ist für den Ausführenden
+gesperrt, weil dort `abnahme.py`, `gate.ps1` und `beleg_pruefen.py` stehen. Wer sein
+eigenes Tor umschreiben darf, stellt sich sein Grün selbst her.
+
+### Herkunft
+
+`C:\gamedev\composer-kit`, Profil `code`. Änderungen an `tools/` gehören mit
+Begründung in den Baukasten zurück — sonst divergieren die Fassungen lautlos, wie es
+zwischen den vier Bestandsprojekten geschehen ist (22–51 % abweichende Zeilen).

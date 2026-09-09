@@ -1,0 +1,433 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Lieferung eines Ausfuehrenden -- Profil code (Software, die gebaut und gemessen wird)",
+  "description": "Die EINE Datei, die ein Auftrag hinterlaesst. Gegen dieses Schema und gegen tools/tracker_schema.sql geprueft von tools/abnahme.py. Was hier nicht steht, ist nicht geliefert.",
+  "type": "object",
+  "required": [
+    "auftrag",
+    "stand",
+    "befunde",
+    "nicht_erreicht"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "auftrag": {
+      "type": "string",
+      "pattern": "^AUF-[0-9]{3}$",
+      "description": "Die Nummer des EINEN Auftrags, der bearbeitet wurde. Genau einer."
+    },
+    "stand": {
+      "type": "object",
+      "required": [
+        "head",
+        "baum_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "head": {
+          "type": "string",
+          "minLength": 7,
+          "description": "git rev-parse HEAD im Arbeitsbaum, SELBST gefahren, nicht aus dem Auftrag abgeschrieben."
+        },
+        "arbeitsort": {
+          "type": "string",
+          "description": "Verzeichnis, in dem gearbeitet wurde."
+        },
+        "baum_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "description": "SHA-256 ueber die sortierte Liste der Quelldateien im Arbeitsort (Pfad + Groesse je Zeile), SELBST erzeugt -- ohne node_modules und Build-Ausgaben. Er belegt, WORAN gearbeitet wurde."
+        }
+      }
+    },
+    "befunde": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/befund"
+      },
+      "description": "Darf leer sein. Eine leere Liste mit ehrlichem nicht_erreicht ist mehr wert als ein erfundener Befund."
+    },
+    "nicht_erreicht": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "was",
+          "warum"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "was": {
+            "type": "string",
+            "minLength": 8
+          },
+          "warum": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      },
+      "description": "Was der Auftrag verlangte und nicht geliefert wurde. PFLICHT, auch wenn leer. Ein leeres nicht_erreicht ist kein Erfolgszeichen, sondern meist ein Zeichen, dass der Auftrag keine Stelle hatte, an der eine Luecke sichtbar werden konnte."
+    },
+    "werkzeuge": {
+      "type": "array",
+      "description": "Jedes Werkzeug, das der Ausfuehrende selbst gebaut hat. Es gehoert nach re/_ergebnisse/ oder re/_probe/, nie nach re/tools/.",
+      "items": {
+        "type": "object",
+        "required": [
+          "pfad",
+          "selbsttest",
+          "exit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "pfad": {
+            "$ref": "#/$defs/pfad"
+          },
+          "selbsttest": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Der Befehl, der den Selbsttest faehrt, und was er prueft. Ein Werkzeug ohne Selbsttest ist kein Messgeraet."
+          },
+          "positivkontrolle": {
+            "type": "string"
+          },
+          "negativkontrolle": {
+            "type": "string"
+          },
+          "exit": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pfad": {
+      "type": "string",
+      "minLength": 6,
+      "pattern": "^[^ ]*[/\\\\][^ ]*$",
+      "description": "Repo-relativer Pfad, ohne Leerzeichen, mit mindestens einem Trenner."
+    },
+    "anker": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Woertliches Stueck, das in der Zieldatei GENAU EINMAL vorkommt: ein Bezeichner, eine Signatur, eine Bytefolge ('26 26 00 04'). Eine Zeilennummer darf im Feld stelle dahinterstehen, NIE an seiner Statt. Dieselbe Regel fahren re/tools/anker_check.py und die 23 Mutationssuiten."
+    },
+    "quellbeleg": {
+      "type": "object",
+      "required": [
+        "rang",
+        "pfad",
+        "anker"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rang": {
+          "enum": [
+            "C1",
+            "C2",
+            "C3",
+            "C4"
+          ],
+          "description": "C1 Codestelle -- die Zeile, die es tut. C2 Schnittstellenvertrag: Typdefinition, Schema, API-Spezifikation. C3 Fremdcode -- Bibliothek oder Abhaengigkeit, nicht unter eigener Kontrolle. C4 Vermutung -- KEIN Beleg, schliesst nichts ab."
+        },
+        "pfad": {
+          "$ref": "#/$defs/pfad"
+        },
+        "anker": {
+          "$ref": "#/$defs/anker",
+          "description": "Ein woertliches Stueck, das in der Zieldatei GENAU EINMAL vorkommt. Schreibweise der Stelle: 'datei.ts:N'. Ein nacktes ':N' ist verboten -- es hat ohne Dateinamen keinen festen Referenten. Ein Testname taugt als Anker, wenn er im Repo eindeutig ist."
+        },
+        "stelle": {
+          "type": "string",
+          "description": "Zeile oder Offset. Ergaenzt den Anker, ersetzt ihn nie."
+        }
+      }
+    },
+    "laufzeitbeleg": {
+      "type": "object",
+      "required": [
+        "rang",
+        "pfad",
+        "anker",
+        "positivkontrolle",
+        "negativkontrolle"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rang": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3"
+          ],
+          "description": "L1 Testlauf mit Ausgabe (der Test ist benannt, sein Ergebnis liegt bei). L2 Werkzeuglauf: tsc, lint, build, coverage -- mit Ausgabe. L3 Einzelmessung. ★ Abweichung von der urspruenglichen Vorgabe, ausdruecklich: dort standen 'C2 Testlauf' und 'C3 Werkzeuglauf' unter denselben C-Raengen wie die Codestelle. Ein Testlauf belegt aber nicht, was IM Code steht, sondern was er TUT -- das ist die Laufzeitseite. Zusammengelegt haette ein 'C2' nicht mehr unterschieden, ob jemand eine Zeile gelesen oder einen Test gefahren hat."
+        },
+        "pfad": {
+          "$ref": "#/$defs/pfad"
+        },
+        "anker": {
+          "$ref": "#/$defs/anker"
+        },
+        "stelle": {
+          "type": "string"
+        },
+        "positivkontrolle": {
+          "type": "string",
+          "minLength": 8,
+          "description": "Der Fall, der ANSCHLAGEN MUSS. Schlaegt er nicht an, misst das Werkzeug nichts."
+        },
+        "negativkontrolle": {
+          "type": "string",
+          "minLength": 8,
+          "description": "Der Fall, der NICHT anschlagen darf. Schlaegt er an, meldet das Werkzeug alles rot."
+        },
+        "nulldiff": {
+          "type": "string",
+          "description": "Zwei Messungen desselben unveraenderten Standes. Bei L2 Pflicht: streut das Ergebnis, misst der Vergleich Rauschen statt Wirkung."
+        }
+      }
+    },
+    "gegenstand": {
+      "type": "object",
+      "required": [
+        "art",
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "art": {
+          "enum": [
+            "modul",
+            "funktion",
+            "typ",
+            "endpunkt",
+            "komponente",
+            "konfiguration"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 3
+        },
+        "werk": {
+          "type": "string",
+          "description": "Das Modul oder Paket, zu dem die Stelle gehoert."
+        },
+        "stelle": {
+          "type": "string",
+          "description": "Die Stelle darin -- Funktion, Klasse, Route, Komponente."
+        }
+      }
+    },
+    "grundgesamtheit": {
+      "type": "object",
+      "required": [
+        "menge",
+        "anzahl",
+        "befehl"
+      ],
+      "additionalProperties": false,
+      "description": "PFLICHT, sobald die aussage ein Vollstaendigkeitswort traegt (alle, nur, immer, nie, kein, nirgends, saemtliche, ausschliesslich). Wer 'alle Aufrufer' schreibt, muss alle gezaehlt haben. Gemessen in diesem Projekt: eine Zahl im Fliesstext lief durch alle Kontrollen, weil kein Werkzeug eine Zahl nachzaehlt, die in Prosa steht.",
+      "properties": {
+        "menge": {
+          "type": "string",
+          "minLength": 5,
+          "description": "Woruber genau wird die Allaussage gemacht -- die Bezugsmenge in Worten."
+        },
+        "anzahl": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Wie gross ist sie? Gezaehlt, nicht geschaetzt."
+        },
+        "befehl": {
+          "type": "string",
+          "minLength": 5,
+          "description": "Der Befehl, der diese Zahl erzeugt hat. Ohne ihn ist die Zahl eine Behauptung."
+        },
+        "wurzel": {
+          "type": "string",
+          "description": "Bei Suchen im Baum: die verwendete Wurzel. docs/CONSTITUTION.md Regel 10 -- eine Suche mit der Wurzel 're' findet im gitignorierten Smali-Baum NICHTS und meldet das als 0 Treffer. Fuer Aussagen ueber den Smali-Baum ist die Wurzel re\\smali\\smali."
+        },
+        "positivkontrolle": {
+          "type": "string",
+          "description": "Bei einer Nullaussage PFLICHT im Sinn von Regel 10: ein BEKANNTER Treffer, der mit derselben Wurzel und demselben Werkzeug gefunden wurde. Ohne ihn belegt ein Nullergebnis nur, dass nichts gefunden wurde -- nicht, dass nichts da ist."
+        }
+      }
+    },
+    "beleg": {
+      "description": "DER BELEG IST KEIN EIGENES FELD, SONDERN EINE VON ZWEI FORMEN: quellbeleg (Rang S1-S3, zeigt in die Quelle) oder laufzeitbeleg (Rang L1-L3, zeigt auf einen Lauf). Er stand bis S233 nirgends in diesem Schema -- gemessen an AUF-003: 39 Befunde, 0 davon mit Beleg, und die Lieferung war schema-konform. Regel 2 der Verfassung ('Kein [x] ohne Beleg') steht darum jetzt unten in allOf. Die achsenscharfe Fassung (dekodiert braucht S, beobachtet braucht L, portiert braucht beides plus impl_datei) steht NICHT hier, sondern an ihrer einen Stelle: tools/tracker_schema.sql. Ein hier nachgebauter zweiter Satz Regeln wuerde vom ersten abweichen, und dann waere unklar, welcher gilt."
+    },
+    "befund": {
+      "type": "object",
+      "required": [
+        "id",
+        "aussage",
+        "sicherheit",
+        "achse",
+        "marker_vorschlag",
+        "begruendung_marker"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "marker_vorschlag": {
+                "const": "[x]"
+              }
+            },
+            "required": [
+              "marker_vorschlag"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "quellbeleg"
+                ]
+              },
+              {
+                "required": [
+                  "laufzeitbeleg"
+                ]
+              }
+            ],
+            "$comment": "docs/CONSTITUTION.md Regel 2: Kein [x] ohne Beleg. Siehe $defs.beleg."
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "marker_vorschlag": {
+                "const": "[?]"
+              }
+            },
+            "required": [
+              "marker_vorschlag"
+            ]
+          },
+          "then": {
+            "required": [
+              "blockade"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "marker_vorschlag": {
+                "const": "[!]"
+              }
+            },
+            "required": [
+              "marker_vorschlag"
+            ]
+          },
+          "then": {
+            "required": [
+              "widerspruch_zu"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "sicherheit": {
+                "const": "gemessen"
+              }
+            },
+            "required": [
+              "sicherheit"
+            ]
+          },
+          "then": {
+            "required": [
+              "befehl",
+              "ausgabe_auszug"
+            ],
+            "$comment": "Ein Werkzeug, das durchlaeuft, hat nicht automatisch etwas gemessen. tools/abnahme.py Stufe 1 prueft dasselbe, Stufe 5 FAEHRT den befehl."
+          }
+        }
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^F[0-9]+$"
+        },
+        "aussage": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Praezise und pruefbar, KEINE Zusammenfassung. Achtung auf die Woerter alle, nur, immer, nie: im Vorbildprojekt hielten von 88 geprueften Ankern alle 88 woertlich -- gefallen sind ausschliesslich Vollstaendigkeitsaussagen."
+        },
+        "sicherheit": {
+          "enum": [
+            "gemessen",
+            "gelesen",
+            "vermutet"
+          ],
+          "description": "gemessen = ein Werkzeug ist gelaufen und die Ausgabe liegt bei. gelesen = im Listing nachgelesen. vermutet = weder noch. 'vermutet' ist erlaubt und erwuenscht; eine Vermutung als Messung auszugeben ist der einzige Fehler, der hier nicht verziehen wird."
+        },
+        "achse": {
+          "enum": [
+            "implementiert",
+            "getestet",
+            "gemessen"
+          ],
+          "description": "implementiert = der Code steht und tut, was er soll (Codestelle als Beleg). getestet = ein Test faehrt darueber und faellt ohne die Aenderung um -- ein Test, der auch ohne sie gruen bleibt, deckt nichts ab. gemessen = eine Zahl liegt vor, mit Werkzeuglauf, Positiv- UND Negativkontrolle sowie Null-Diff bei jedem Vorher/Nachher-Vergleich. Die drei sind GETRENNT zu halten -- 'implementiert' ist nie fuer sich schon 'getestet'."
+        },
+        "marker_vorschlag": {
+          "enum": [
+            "[ ]",
+            "[~]",
+            "[x]",
+            "[?]",
+            "[!]"
+          ],
+          "description": "VORSCHLAG. Der Ausfuehrende setzt keine Marker. Fuenf, wie docs/CONSTITUTION.md Regel 1 sie nennt -- '[!!]' ist im Projekt zwar im Gebrauch, aber nirgends definiert und wird hier abgewiesen."
+        },
+        "begruendung_marker": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Warum dieser Marker und kein staerkerer. Bei [x]: welche Belege ihn tragen."
+        },
+        "quellbeleg": {
+          "$ref": "#/$defs/quellbeleg"
+        },
+        "laufzeitbeleg": {
+          "$ref": "#/$defs/laufzeitbeleg"
+        },
+        "gegenstand": {
+          "$ref": "#/$defs/gegenstand"
+        },
+        "grundgesamtheit": {
+          "$ref": "#/$defs/grundgesamtheit"
+        },
+        "blockade": {
+          "type": "string",
+          "minLength": 10,
+          "description": "PFLICHT bei [?]: WARUM offen. Welcher Aufruf, welche Argumente sind nicht dekodiert. '[?] ohne Grund' ist keine Hypothese, sondern eine Luecke."
+        },
+        "widerspruch_zu": {
+          "type": "string",
+          "minLength": 10,
+          "description": "PFLICHT bei [!]: wogegen der Befund steht, mit Pfad und Anker der widersprochenen Stelle."
+        },
+        "befehl": {
+          "type": "string",
+          "description": "Der ausgefuehrte Befehl, woertlich und wiederholbar."
+        },
+        "ausgabe_auszug": {
+          "type": "string",
+          "description": "Auszug der Ausgabe. Ein Werkzeug, das durchlaeuft, hat nicht automatisch etwas gemessen."
+        },
+        "ablage": {
+          "$ref": "#/$defs/pfad",
+          "description": "Die Datei, die die Aenderung traegt. Pflicht, wenn achse 'gemessen' mit [x] gemeldet wird."
+        }
+      }
+    }
+  }
+}
