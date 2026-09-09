@@ -29,6 +29,16 @@ import sys
 HIER = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HIER)
 import profil                              # noqa: E402  bewusst nach sys.path
+# ---------------------------------------------------------------- AUSGABEKODIERUNG
+# GEMESSEN AM 2026-09-09 in klarzeit: die Abnahme brach mit
+#   UnicodeEncodeError: 'charmap' codec can't encode character '*'
+# ab, weil ein Anker ein Sonderzeichen trug und Windows stdout nach cp1252 kodiert.
+# Das Werkzeug lief NICHT durch -- und ein abgestuerzter Lauf sieht aus wie eine
+# nicht bestandene Abnahme, obwohl er gar nicht geurteilt hat.
+# Ein Pruefgeraet darf nicht an dem scheitern, was es pruefen soll.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 REPO = os.path.dirname(HIER)
 SCHEMA = os.path.join(HIER, 'tracker_schema.sql')
 DATEN = os.path.join(HIER, 'tracker_daten.sql')

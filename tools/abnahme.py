@@ -103,6 +103,16 @@ L_RANG = _enum('$defs', 'laufzeitbeleg', 'properties', 'rang')
 # Das Profil liefert, was sich nicht aus dem Schema ergibt: die Musterlieferung des
 # Selbsttests, die Probedateien dazu, und wie ein Befund in die Datenbank kommt.
 import profil                                   # noqa: E402  bewusst nach sys.path
+# ---------------------------------------------------------------- AUSGABEKODIERUNG
+# GEMESSEN AM 2026-09-09 in klarzeit: die Abnahme brach mit
+#   UnicodeEncodeError: 'charmap' codec can't encode character '*'
+# ab, weil ein Anker ein Sonderzeichen trug und Windows stdout nach cp1252 kodiert.
+# Das Werkzeug lief NICHT durch -- und ein abgestuerzter Lauf sieht aus wie eine
+# nicht bestandene Abnahme, obwohl er gar nicht geurteilt hat.
+# Ein Pruefgeraet darf nicht an dem scheitern, was es pruefen soll.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 # ==========================================================================
 
 # Die vier Woerter des Vorbilds, um die deutschen Geschwister erweitert. Als Wortgrenzen

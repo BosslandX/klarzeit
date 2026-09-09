@@ -55,6 +55,16 @@ import json
 import os
 import sys
 import time
+# ---------------------------------------------------------------- AUSGABEKODIERUNG
+# GEMESSEN AM 2026-09-09 in klarzeit: die Abnahme brach mit
+#   UnicodeEncodeError: 'charmap' codec can't encode character '*'
+# ab, weil ein Anker ein Sonderzeichen trug und Windows stdout nach cp1252 kodiert.
+# Das Werkzeug lief NICHT durch -- und ein abgestuerzter Lauf sieht aus wie eine
+# nicht bestandene Abnahme, obwohl er gar nicht geurteilt hat.
+# Ein Pruefgeraet darf nicht an dem scheitern, was es pruefen soll.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 HIER = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HIER)
@@ -62,12 +72,7 @@ REPO = os.path.dirname(HIER)
 # Die Baeume, die git nicht sieht UND in die nachweislich geschrieben wird.
 # re/decompiled/ steht hier NICHT: es ist versioniert, git status sieht es.
 BAEUME = [
-    'node_modules',
-    'dist',
-    'docs',
-    '.serena',
-    'android/app/build',
-    'auftraege/_probe',
+{{BLINDE_BAEUME}}
 ]
 
 
