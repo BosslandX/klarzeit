@@ -132,11 +132,11 @@ diese Datei „nimm den Composer", gilt diese Datei.
 
 ### Zwei Sätze, die den ganzen Aufbau tragen
 
-**Die `deny`-Listen in `.cursor/cli.an.json` halten nicht.** In beiden Vorbildprojekten
-fiel jede von fünf geprüften Sperren. Sie sind eine Absichtserklärung, keine Grenze. Die
-wirksame Grenze ist der git-Worktree plus der Fingerabdruck, den `auftrag.ps1` hinterher
-zieht. **AUF-000 misst, welche Einträge hier tatsächlich halten** — bis dahin ist das
-eine Erwartung.
+**Die `deny`-Listen in `.cursor/cli.an.json` halten nicht.** Am 2026-09-09 gemessen
+(AUF-002): das `Write`-Werkzeug wird blockiert, **`Shell(python)` umgeht die Liste
+vollständig** — bis hin zu einer Datei außerhalb des Arbeitsorts. Sie ist eine
+Absichtserklärung, keine Grenze. Was hält, ist der Fingerabdruck aus `auftrag.ps1`;
+er hat den Ausbruch gemeldet. Einzelheiten: `.cursor/RECHTE.md`.
 
 **Der Geprüfte darf das Prüfgerät nicht besitzen.** `tools/` ist für den Ausführenden
 gesperrt, weil dort `abnahme.py`, `gate.ps1` und `beleg_pruefen.py` stehen. Wer sein
@@ -147,3 +147,31 @@ eigenes Tor umschreiben darf, stellt sich sein Grün selbst her.
 `C:\gamedev\composer-kit`, Profil `code`. Änderungen an `tools/` gehören mit
 Begründung in den Baukasten zurück — sonst divergieren die Fassungen lautlos, wie es
 zwischen den vier Bestandsprojekten geschehen ist (22–51 % abweichende Zeilen).
+
+
+---
+
+## ⛔ Die deny-Liste in `.cursor/cli.an.json` ist KEINE Grenze
+
+**Am 2026-09-09 gemessen** (`klarzeit`, AUF-002): Das `Write`-Werkzeug wird von der
+deny-Liste blockiert — **`Shell(python)` umgeht sie vollständig.** Im Versuch wurden alle
+zwölf Ziele geschrieben, darunter `CLAUDE.md`, eine Datei ohne Endung, drei Ebenen tief —
+und eine Datei **außerhalb des Arbeitsorts**.
+
+Solange `Shell(python)` erlaubt ist — und ohne das kann ein Ausführender nichts messen —
+ist jede Write-Sperre eine Absichtserklärung.
+
+**Was tatsächlich hält, ist der Fingerabdruck** in `tools/auftrag.ps1`. Er hat den
+Ausbruch gemeldet. Er misst vor und nach dem Lauf `git status`, die `.wt`-Nachbarschaft,
+die Wahrheitsquellen und über `tools/blindbaum.py` die Bäume, die `git status` nicht sieht.
+
+Der Worktree begrenzt, wohin **versehentlich** geschrieben wird. Er verhindert keinen
+absichtlichen Ausbruch.
+
+**Folge für jeden Auftrag:** Was nicht angefasst werden soll, gehört **in den
+Auftragstext**, nicht nur in die deny-Liste. Der Auftragstext erreicht den Ausführenden;
+die deny-Liste erreicht nur sein `Write`-Werkzeug.
+
+**Folge für dieses Projekt:** Wer einem Ausführenden Material anvertraut, dessen Verlust
+wehtut, braucht eine echte Sandbox — nicht diese Datei. Einzelheiten und die gemessenen
+Zahlen: `.cursor/RECHTE.md`.
