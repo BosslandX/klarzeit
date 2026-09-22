@@ -5,7 +5,7 @@ import {
   updateEntry,
   useAllEntriesDesc,
 } from '../../db/entries';
-import { useEmployments } from '../../db/employment';
+import { getEmployments, useEmployments } from '../../db/employment';
 import { groupByDay } from '../../domain/aggregate';
 import type { Period } from '../../domain/aggregate';
 import type { TimeEntry } from '../../domain/types';
@@ -99,7 +99,10 @@ export function EntriesScreen() {
         to: entry.end,
         label: `Einzeleintrag ${formatDateTime(entry.start)}`,
       };
-      const doc = buildReportPdf(profile, period, [entry]);
+      const employments = await getEmployments();
+      const employment =
+        employments.find((e) => e.id === entry.employmentId) ?? employments[0];
+      const doc = buildReportPdf(profile, period, [entry], employment);
       await sharePdf(doc, reportFilename(period), 'Klarzeit – Einzeleintrag');
     } catch (e) {
       window.alert(

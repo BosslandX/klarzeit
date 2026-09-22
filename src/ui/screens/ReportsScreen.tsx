@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { addDays, addMonths, addWeeks, format, getYear, startOfMonth } from 'date-fns';
 import {
   dayPeriod,
@@ -15,12 +15,16 @@ import {
   buildBalanceLedger,
   buildVacationStatus,
 } from '../../domain/employment';
-import { getEntriesInRange, useEntriesInRange } from '../../db/entries';
+import {
+  getEntriesInRange,
+  getEntriesInRangeForEmployment,
+  useEntriesInRangeForEmployment,
+} from '../../db/entries';
 import { getProfile } from '../../db/profile';
 import {
-  getEmployment,
+  getActiveEmploymentId,
   getVacationDays,
-  useEmployment,
+  useEmployments,
   useVacationDays,
 } from '../../db/employment';
 import {
@@ -70,26 +74,52 @@ export function ReportsScreen() {
   );
   const [rangeTo, setRangeTo] = useState<number>(Date.now());
   const [busy, setBusy] = useState(false);
+  const [selectedEmploymentId, setSelectedEmploymentId] = useState('');
+
+  const { employments, loading: empsLoading } = useEmployments();
+  const showEmploymentPicker = employments.length > 1;
+
+  useEffect(() => {
+    if (empsLoading || employments.length === 0) return;
+    void getActiveEmploymentId().then((activeId) => {
+      setSelectedEmploymentId((prev) => {
+        if (prev && employments.some((e) => e.id === prev)) return prev;
+        return employments.some((e) => e.id === activeId)
+          ? activeId
+          : employments[0].id;
+      });
+    });
+  }, [empsLoading, employments]);
+
+  const employment =
+    employments.find((e) => e.id === selectedEmploymentId) ?? employments[0];
+  const employmentId = employment?.id ?? '';
 
   const period = buildPeriod(kind, ref, rangeFrom, rangeTo);
-  const entries = useEntriesInRange(period.from, period.to) ?? [];
+  const entries =
+    useEntriesInRangeForEmployment(period.from, period.to, employmentId) ?? [];
   const grandMs = totalMs(entries);
   const days = groupByDay(entries);
 
-  // Arbeitszeitkonto + Urlaub nur fuer Monatsreports.
-  const { employment } = useEmployment();
   const { days: vacationDays } = useVacationDays();
   const isMonth = kind === 'month';
-  // Fuer das fortgeschriebene Konto Eintraege ab Beschaeftigungsbeginn laden.
   const ledgerEntries =
-    useEntriesInRange(Math.min(employment.startDate, period.from), period.to) ?? [];
-  const vacationDates = vacationDays.map((d) => d.date);
-  const ledger = isMonth
-    ? buildBalanceLedger(employment, ledgerEntries, ref, vacationDates)
-    : null;
-  const vacation = isMonth
-    ? buildVacationStatus(employment, vacationDates, getYear(period.from))
-    : null;
+    useEntriesInRangeForEmployment(
+      employment ? Math.min(employment.startDate, period.from) : period.from,
+      period.to,
+      employmentId,
+    ) ?? [];
+  const vacationDates = vacationDays
+    .filter((d) => d.employmentId === employmentId)
+    .map((d) => d.date);
+  const ledger =
+    isMonth && employment
+      ? buildBalanceLedger(employment, ledgerEntries, ref, vacationDates)
+      : null;
+  const vacation =
+    isMonth && employment
+      ? buildVacationStatus(employment, vacationDates, getYear(period.from))
+      : null;
 
   const shift = (dir: -1 | 1) => {
     if (kind === 'day') setRef((r) => addDays(r, dir).getTime());
@@ -97,8 +127,6 @@ export function ReportsScreen() {
     else if (kind === 'month')
       setRef((r) => {
         const next = addMonths(r, dir).getTime();
-        // Nicht in die Zukunft blaettern: Zukunftsmonate haetten volles Soll bei
-        // 0 Ist und wuerden den fortgeschriebenen Saldo verfaelschen.
         if (dir === 1 && startOfMonth(next).getTime() > startOfMonth(Date.now()).getTime()) {
           return r;
         }
@@ -107,41 +135,39 @@ export function ReportsScreen() {
   };
 
   const handlePdf = async () => {
+    if (!employment) return;
     setBusy(true);
     try {
-      // Profil frisch laden, damit der Personen-Kopf nie leer ist (Race vermeiden).
       const profile = await getProfile();
-      // Konto/Urlaub fuer Monatsreports frisch aus der DB berechnen.
       let extras: ReportExtras | undefined;
-      // Body-Eintraege aus demselben frischen DB-Snapshot wie das Konto ableiten,
-      // damit Tabelle und Arbeitszeitkonto im PDF nie auseinanderlaufen (Race).
       let bodyEntries = entries;
       if (isMonth) {
-        const emp = await getEmployment();
         const [vac, wide] = await Promise.all([
           getVacationDays(),
-          getEntriesInRange(Math.min(emp.startDate, period.from), period.to),
+          getEntriesInRangeForEmployment(
+            Math.min(employment.startDate, period.from),
+            period.to,
+            employment.id,
+          ),
         ]);
-        bodyEntries = wide.filter((e) => e.start >= period.from && e.start <= period.to);
-        const led = buildBalanceLedger(
-          emp,
-          wide,
-          ref,
-          vac.map((d) => d.date),
+        const vacForEmp = vac.filter((d) => d.employmentId === employment.id);
+        bodyEntries = wide.filter(
+          (e) => e.start >= period.from && e.start <= period.to,
         );
+        const vacDates = vacForEmp.map((d) => d.date);
+        const led = buildBalanceLedger(employment, wide, ref, vacDates);
         if (led) {
           extras = {
-            employment: emp,
             ledger: led,
             vacation: buildVacationStatus(
-              emp,
-              vac.map((d) => d.date),
+              employment,
+              vacDates,
               getYear(period.from),
             ),
           };
         }
       }
-      const doc = buildReportPdf(profile, period, bodyEntries, extras);
+      const doc = buildReportPdf(profile, period, bodyEntries, employment, extras);
       await sharePdf(doc, reportFilename(period), `Klarzeit – ${period.label}`);
     } catch (e) {
       window.alert(
@@ -184,6 +210,23 @@ export function ReportsScreen() {
           </button>
         ))}
       </div>
+
+      {showEmploymentPicker && employment && (
+        <label className="field">
+          <span>Beschaeftigung</span>
+          <select
+            value={selectedEmploymentId}
+            onChange={(e) => setSelectedEmploymentId(e.target.value)}
+          >
+            {employments.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+                {e.arbeitgeber ? ` — ${e.arbeitgeber}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {kind === 'range' ? (
         <div className="range-row">
@@ -269,7 +312,7 @@ export function ReportsScreen() {
               </strong>
             </div>
             <div className="konto-row">
-              <span>Übertrag (Vormonate)</span>
+              <span>Uebertrag (Vormonate)</span>
               <strong className={ledger.carryIn >= 0 ? 'pos' : 'neg'}>
                 {formatSignedDuration(ledger.carryIn)}
               </strong>

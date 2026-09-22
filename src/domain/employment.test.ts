@@ -496,3 +496,69 @@ describe('Deckel der Urlaubsgutschrift', () => {
     expect(juni.saldoMs).toBe(0);
   });
 });
+
+describe('Auswertung getrennt je Beschaeftigung (AUF-007)', () => {
+  const empA: Employment = {
+    ...emp,
+    id: 'emp-a',
+    name: 'Job A',
+    weeklyHours: 40,
+    workdaysPerWeek: 5,
+    startDate: new Date(2026, 0, 1).getTime(),
+  };
+  const empB: Employment = {
+    ...emp,
+    id: 'emp-b',
+    name: 'Job B',
+    weeklyHours: 40,
+    workdaysPerWeek: 5,
+    startDate: new Date(2026, 0, 1).getTime(),
+  };
+
+  function entryFor(
+    employmentId: string,
+    y: number,
+    mo: number,
+    d: number,
+    fromH: number,
+    toH: number,
+  ): TimeEntry {
+    const e = entry(y, mo, d, fromH, toH);
+    return { ...e, employmentId };
+  }
+
+  const ref = new Date(2026, 4, 15).getTime();
+  const entryA = entryFor('emp-a', 2026, 5, 5, 8, 16); // 8 h
+  const entryB = entryFor('emp-b', 2026, 5, 6, 9, 13); // 4 h
+  const istAAllein = 8 * HOUR;
+  const istSummeBeider = 12 * HOUR;
+
+  it('buildBalanceLedger mit gefilterten Eintraegen: Ist von A allein, nicht Summe beider', () => {
+    const l = buildBalanceLedger(empA, [entryA], ref);
+    expect(l!.target.istMs).toBe(istAAllein);
+    expect(istSummeBeider).toBe(istAAllein + 4 * HOUR);
+    const lBoth = buildBalanceLedger(empA, [entryA, entryB], ref);
+    expect(lBoth!.target.istMs).toBe(istSummeBeider);
+  });
+
+  it('Urlaubstag bei A entlastet nur A Konto, nicht B', () => {
+    const vacDay = new Date(2026, 4, 20).getTime();
+    const lA = buildBalanceLedger(empA, [], ref, [vacDay]);
+    const lB = buildBalanceLedger(empB, [], ref, []);
+    expect(lA!.target.vacationDays).toBe(1);
+    expect(lB!.target.vacationDays).toBe(0);
+  });
+
+  it('buildVacationStatus fuer B zaehlt nur B Urlaubstage', () => {
+    const a1 = new Date(2026, 5, 2).getTime();
+    const a2 = new Date(2026, 5, 3).getTime();
+    const b1 = new Date(2026, 5, 10).getTime();
+    const b2 = new Date(2026, 5, 11).getTime();
+    const nurB = [b1, b2];
+    const alle = [a1, a2, b1, b2];
+    const statusB = buildVacationStatus(empB, nurB, 2026);
+    const faelschlichAlle = buildVacationStatus(empB, alle, 2026);
+    expect(statusB.taken).toBe(2);
+    expect(faelschlichAlle.taken).toBe(4);
+  });
+});

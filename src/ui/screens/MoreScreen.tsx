@@ -54,9 +54,6 @@ const VACATION_MODE_LABELS: { value: VacationYearMode; label: string }[] = [
 const FIELDS: { key: keyof Profile; label: string; placeholder: string }[] = [
   { key: 'vorname', label: 'Vorname', placeholder: 'Max' },
   { key: 'nachname', label: 'Nachname', placeholder: 'Mustermann' },
-  { key: 'personalnummer', label: 'Personalnummer / ID', placeholder: 'z.B. 10042' },
-  { key: 'arbeitgeber', label: 'Arbeitgeber', placeholder: 'Firma GmbH' },
-  { key: 'abteilung', label: 'Abteilung / Position', placeholder: 'Entwicklung' },
 ];
 
 export function MoreScreen() {

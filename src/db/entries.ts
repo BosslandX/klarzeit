@@ -46,6 +46,19 @@ export async function getEntriesInRange(
   return db.entries.where('start').between(from, to, true, true).sortBy('start');
 }
 
+/** Eintraege eines Zeitraums fuer eine Beschaeftigung (Index employmentId). */
+export async function getEntriesInRangeForEmployment(
+  from: number,
+  to: number,
+  employmentId: string,
+): Promise<TimeEntry[]> {
+  return db.entries
+    .where('employmentId')
+    .equals(employmentId)
+    .filter((e) => e.start >= from && e.start <= to)
+    .sortBy('start');
+}
+
 export async function getAllEntries(): Promise<TimeEntry[]> {
   return db.entries.orderBy('start').toArray();
 }
@@ -72,6 +85,18 @@ export function useEntriesInRange(
   return useLiveQuery(
     () => db.entries.where('start').between(from, to, true, true).sortBy('start'),
     [from, to],
+  );
+}
+
+/** Wie useEntriesInRange, aber nur Eintraege der gewaehlten Beschaeftigung. */
+export function useEntriesInRangeForEmployment(
+  from: number,
+  to: number,
+  employmentId: string,
+): TimeEntry[] | undefined {
+  return useLiveQuery(
+    () => getEntriesInRangeForEmployment(from, to, employmentId),
+    [from, to, employmentId],
   );
 }
 

@@ -24,7 +24,6 @@ import { displayName } from '../db/profile';
 
 /** Zusatzdaten fuer Monatsreports: Arbeitszeitkonto + Urlaub. */
 export interface ReportExtras {
-  employment: Employment;
   ledger: BalanceLedger;
   vacation: VacationStatus;
 }
@@ -119,27 +118,40 @@ function drawFooter(doc: jsPDF): void {
   doc.text('Klarzeit – Arbeitszeitnachweis', MARGIN_X, h - 18);
 }
 
-/** Mitarbeiter-Panel (graue Box mit Label/Wert-Spalten). Gibt das untere Y zurück. */
-function drawEmployeePanel(doc: jsPDF, profile: Profile, top: number): number {
-  const w = doc.internal.pageSize.getWidth();
-  const contentW = w - 2 * MARGIN_X;
+/** Kopfzeilen-Daten: Person aus Profil, Vertrag aus Beschaeftigung. */
+export function buildEmployeePanelFields(
+  profile: Profile,
+  employment: Employment,
+): { label: string; value: string }[] {
   const fields: { label: string; value: string }[] = [
     { label: 'Mitarbeiter', value: displayName(profile) },
   ];
-  if (profile.personalnummer) {
-    fields.push({ label: 'Personalnummer', value: profile.personalnummer });
+  if (employment.personalnummer) {
+    fields.push({ label: 'Personalnummer', value: employment.personalnummer });
   }
-  // Arbeitgeber + Abteilung in einer Spalte buendeln (spart Breite).
-  const org = [profile.arbeitgeber, profile.abteilung].filter(Boolean).join(' – ');
+  const org = [employment.arbeitgeber, employment.abteilung].filter(Boolean).join(' – ');
   if (org) {
     const label =
-      profile.arbeitgeber && profile.abteilung
+      employment.arbeitgeber && employment.abteilung
         ? 'Arbeitgeber / Abteilung'
-        : profile.arbeitgeber
+        : employment.arbeitgeber
           ? 'Arbeitgeber'
           : 'Abteilung';
     fields.push({ label, value: org });
   }
+  return fields;
+}
+
+/** Mitarbeiter-Panel (graue Box mit Label/Wert-Spalten). Gibt das untere Y zurück. */
+function drawEmployeePanel(
+  doc: jsPDF,
+  profile: Profile,
+  employment: Employment,
+  top: number,
+): number {
+  const w = doc.internal.pageSize.getWidth();
+  const contentW = w - 2 * MARGIN_X;
+  const fields = buildEmployeePanelFields(profile, employment);
 
   const colW = contentW / fields.length;
   doc.setFont('helvetica', 'bold');
@@ -250,12 +262,18 @@ function drawInfoPanel(
 }
 
 /** Zeichnet Arbeitszeitkonto (links) + Urlaub (rechts) nebeneinander. */
-function drawKontoUndUrlaub(doc: jsPDF, top: number, extras: ReportExtras): number {
+function drawKontoUndUrlaub(
+  doc: jsPDF,
+  top: number,
+  employment: Employment,
+  extras: ReportExtras,
+): number {
   const w = doc.internal.pageSize.getWidth();
   const contentW = w - 2 * MARGIN_X;
   const gap = 14;
   const colW = (contentW - gap) / 2;
-  const { employment: emp, ledger, vacation: v } = extras;
+  const emp = employment;
+  const { ledger, vacation: v } = extras;
 
   const t = ledger.target;
   const saldoCol = t.saldoMs >= 0 ? POS : NEG;
@@ -336,6 +354,7 @@ export function buildReportPdf(
   profile: Profile,
   period: Period,
   entries: TimeEntry[],
+  employment: Employment,
   extras?: ReportExtras,
 ): jsPDF {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -343,11 +362,11 @@ export function buildReportPdf(
 
   drawHeader(doc, period, false);
   let y = BAND_H + 3 + 22;
-  y = drawEmployeePanel(doc, profile, y) + 16;
+  y = drawEmployeePanel(doc, profile, employment, y) + 16;
 
   // Arbeitszeitkonto + Urlaub zuerst (nur Monatsreports) — auch ohne Eintraege.
   if (extras) {
-    y = drawKontoUndUrlaub(doc, y, extras) + 16;
+    y = drawKontoUndUrlaub(doc, y, employment, extras) + 16;
   }
 
   if (entries.length === 0) {
