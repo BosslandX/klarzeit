@@ -576,15 +576,33 @@ BEFEHL_FRIST = 120
 
 
 def _befehle_einsammeln(b):
-    """Jeder Befehl eines Befundes: (Feldname, Befehl, Zahl-die-er-tragen-muss)."""
+    """Jeder Befehl eines Befundes: (Feldname, Befehl, Zahl-die-er-tragen-muss, Soll-Exit).
+
+    DER SOLL-EXIT IST NEU (2026-09-22, klarzeit) UND STEHT OHNE ANGABE AUF 0.
+    Grund: seit diese Kette Code-Auftraege faehrt, VERLANGT die Achse 'getestet' eine
+    Negativkontrolle -- einen Testlauf, der rot wird, wenn man die Aenderung zurueckdreht.
+    Dessen Exit 1 ist die Aussage selbst und kein Fehlschlag. Ohne dieses Feld meldet
+    Stufe 5 jede solche Kontrolle als Befund; gemessen an AUF-003 waren das 6 von 8.
+    Wer sich angewoehnt, das Rot dieser Stufe zu ueberstimmen, hat sie abgeschaltet.
+
+    KEIN FREIBRIEF: der Soll-Exit wird VERGLICHEN, nicht geglaubt. Ein Befund, der 1
+    ankuendigt und 0 bekommt, ist ebenso ein Befund -- die Negativkontrolle im Selbsttest
+    weiter unten prueft genau das.
+    """
     raus = []
     if not isinstance(b, dict):
         return raus
+
+    def exit_soll(d):
+        v = d.get('erwarteter_exit')
+        return v if isinstance(v, int) and not isinstance(v, bool) else 0
+
     gg = b.get('grundgesamtheit')
     if isinstance(gg, dict) and (gg.get('befehl') or '').strip():
-        raus.append(('grundgesamtheit.befehl', gg['befehl'].strip(), gg.get('anzahl')))
+        raus.append(('grundgesamtheit.befehl', gg['befehl'].strip(), gg.get('anzahl'),
+                     exit_soll(gg)))
     if (b.get('befehl') or '').strip():
-        raus.append(('befehl', b['befehl'].strip(), None))
+        raus.append(('befehl', b['befehl'].strip(), None, exit_soll(b)))
     return raus
 
 
@@ -666,7 +684,7 @@ def befehle_pruefen(lief, basis, still=False):
     import subprocess
     f = []
     for i, b in enumerate(lief.get('befunde') or []):
-        for feld, bef, zahl in _befehle_einsammeln(b):
+        for feld, bef, zahl, exit_soll in _befehle_einsammeln(b):
             wo = 'befund[%d] (%s) %s' % (i, (b or {}).get('id', 'ohne id'), feld)
             sname, argv = schale(bef)
             if argv is None:
@@ -688,10 +706,13 @@ def befehle_pruefen(lief, basis, still=False):
                 f.append('%s: %r laeuft in %s laenger als %d s und wurde abgebrochen.'
                          % (wo, bef[:48], sname, BEFEHL_FRIST))
                 continue
-            if rc != 0:
-                f.append('%s: %r endet in %s mit Exit %d. Ein Befehl, der nicht '
-                         'durchlaeuft, hat die Zahl nicht erzeugt: %s'
-                         % (wo, bef[:48], sname, rc,
+            if rc != exit_soll:
+                grund = ('Ein Befehl, der nicht durchlaeuft, hat die Zahl nicht erzeugt'
+                         if exit_soll == 0 else
+                         'Der Befund kuendigt erwarteter_exit %d an -- der trifft nicht zu'
+                         % exit_soll)
+                f.append('%s: %r endet in %s mit Exit %d (erwartet %d). %s: %s'
+                         % (wo, bef[:48], sname, rc, exit_soll, grund,
                             aus.strip().splitlines()[-1:] or ['(leer)']))
             elif isinstance(zahl, int) and not _traegt_zahl(aus, zahl):
                 f.append('%s: %r laeuft in %s durch, seine Ausgabe traegt die angegebene '
@@ -699,8 +720,8 @@ def befehle_pruefen(lief, basis, still=False):
                          'HEUTE nicht reproduzierbar: %r'
                          % (wo, bef[:48], sname, zahl, aus.strip()[:60]))
             elif not still:
-                print('  [ok] %-30s %-10s Exit 0  %s'
-                      % (wo[:30], sname, bef[:44]))
+                print('  [ok] %-30s %-10s Exit %d  %s'
+                      % (wo[:30], sname, rc, bef[:44]))
     return f
 
 
@@ -799,7 +820,7 @@ def skripte_pruefen(lief, basis, still=False):
     f = []
     gesehen = set()
     for i, b in enumerate(lief.get('befunde') or []):
-        for feld, bef, _zahl in _befehle_einsammeln(b):
+        for feld, bef, _zahl, _exit in _befehle_einsammeln(b):
             wo = 'befund[%d] (%s) %s' % (i, (b or {}).get('id', 'ohne id'), feld)
             if '.git' in _entwindows(bef):
                 f.append('%s: der BEFEHL selbst greift auf .git zu -- %r. Im Worktree des '
@@ -856,7 +877,7 @@ def pruefmengen(lief):
             bel = b.get(name)
             if isinstance(bel, dict) and bel.get('pfad') and bel.get('anker'):
                 belege += 1
-        for _feld, _bef, _z in _befehle_einsammeln(b):
+        for _feld, _bef, _z, _exit in _befehle_einsammeln(b):
             befehle += 1
             for _p in _skriptpfade(_bef):
                 skripte.add(os.path.normcase(_p))
@@ -1283,6 +1304,33 @@ def selbsttest():
                      traf[0][:60] if traf else 'NICHT ERKANNT'))
             if not ok:
                 fehler += 1
+
+        # --- erwarteter_exit (neu 2026-09-22): das Feld muss in BEIDE Richtungen wirken.
+        #     Ohne diese zwei Kontrollen prueft es nichts, und ein Feld, das nichts prueft,
+        #     ist eine Ausrede mit Schema-Eintrag.
+        def s5e(befehl, anzahl, soll):
+            l = _muster()
+            l['befunde'][0]['grundgesamtheit'] = {
+                'menge': 'Probemenge', 'anzahl': anzahl, 'befehl': befehl,
+                'erwarteter_exit': soll}
+            return befehle_pruefen(l, basis, still=True)
+
+        got = s5e('python -c "print(7); raise SystemExit(1)"', 7, 1)
+        ok = not got
+        print('  [%s] Positiv-Kontrolle erwarteter_exit: angekuendigter Exit 1 kommt '
+              'durch -- %s' % ('ok' if ok else 'FEHLER',
+                               'keine Befunde' if ok else str(got[:1])))
+        if not ok:
+            fehler += 1
+
+        got = s5e('python -c "print(7)"', 7, 1)
+        traf = [x for x in got if 'erwartet 1' in x]
+        ok = len(traf) >= 1
+        print('  [%s] Negativkontrolle erwarteter_exit: angekuendigte 1, geliefert 0 -> '
+              'Befund -- %s' % ('ok' if ok else 'FEHLER',
+                                traf[0][:70] if traf else 'NICHT ERKANNT'))
+        if not ok:
+            fehler += 1
 
         # --- Kontrolle AM WERKZEUG: sagt die Pruefmenge die leere Menge an? ---
         voll = pruefmengen(_muster())

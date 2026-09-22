@@ -246,6 +246,11 @@
           "minLength": 5,
           "description": "Der Befehl, der diese Zahl erzeugt hat. Ohne ihn ist die Zahl eine Behauptung."
         },
+        "erwarteter_exit": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Welchen Exitcode dieser Befehl haben MUSS. Fehlt das Feld, gilt 0. Noetig seit dem code-Profil: die Achse 'getestet' verlangt eine Negativkontrolle, also einen Testlauf, der ROT wird -- sein Exit 1 ist dann die Aussage selbst und kein Fehlschlag. Das Feld ist kein Freibrief: wer 1 ankuendigt und 0 bekommt, wird ebenso rot. Gemessen an AUF-003 (klarzeit, 2026-09-22): 6 von 8 Befunden der Stufe 5 kamen allein daher, dass ein absichtlich roter Testlauf als Fehlschlag gewertet wurde."
+        },
         "wurzel": {
           "type": "string",
           "description": "Bei Suchen im Baum: die verwendete Wurzel. docs/CONSTITUTION.md Regel 10 -- eine Suche mit der Wurzel 're' findet im gitignorierten Smali-Baum NICHTS und meldet das als 0 Treffer. Fuer Aussagen ueber den Smali-Baum ist die Wurzel re\\smali\\smali."
@@ -418,6 +423,11 @@
         "befehl": {
           "type": "string",
           "description": "Der ausgefuehrte Befehl, woertlich und wiederholbar."
+        },
+        "erwarteter_exit": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Welchen Exitcode 'befehl' haben MUSS. Fehlt das Feld, gilt 0. Fuer Negativkontrollen, deren Lauf absichtlich rot wird (Achse 'getestet'). Kein Freibrief: eine angekuendigte 1, die als 0 zurueckkommt, ist ebenso ein Befund."
         },
         "ausgabe_auszug": {
           "type": "string",
