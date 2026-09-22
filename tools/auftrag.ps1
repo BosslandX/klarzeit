@@ -714,6 +714,24 @@ Sagen "  5  Tor vor dem Lauf          : gruen"
 if (Test-Path $wt) { Abbruch ".wt\$auf gibt es schon. Erst 'tools\auftrag.ps1 -Nummer $Nummer -Aufraeumen'." }
 Sagen "  6  Arbeitsort frei           : ja  (.wt\$auf)"
 
+# 6b Windows-Langpfade, sobald ueberhaupt ein Quellbaum kopiert wird.
+#    GEMESSEN am 2026-09-22: mit node_modules im Arbeitsort entstehen Pfade bis 292
+#    Zeichen -- die Capacitor-Plugins bringen gebaute Android-Artefakte mit
+#    (node_modules\@capacitor\filesystem\android\build\.transforms\...\*.dex). Ohne
+#    core.longpaths scheitert 'git worktree remove' mit "Filename too long", und zwar
+#    NACHDEM git die Worktree-Metadaten bereits geloescht hat. Zurueck bleibt ein
+#    verwaister 300-MB-Ordner, den git danach nicht mehr anfasst ("is not a working
+#    tree") -- er muss von Hand weg (robocopy /MIR aus einem leeren Verzeichnis).
+#    Einmal passiert, einmal von Hand aufgeraeumt. Das reicht als Anlass fuer diese
+#    vier Zeilen.
+if ($quellBaeume.Count -gt 0) {
+    $lp = (Native git @("-C", $repo, "config", "--get", "core.longpaths")).Ausgabe.Trim()
+    if ($lp -ne "true") {
+        Abbruch "core.longpaths steht auf '$lp', es werden aber $($quellBaeume.Count) Quellbaum/-baeume kopiert. Der Arbeitsort laesst sich danach womoeglich nicht mehr entfernen. Setzen mit:  git config core.longpaths true"
+    }
+    Sagen "  6b Windows-Langpfade         : an  (core.longpaths=true)"
+}
+
 # ------------------------------------------------- FINGERABDRUCK VOR DEM LAUF
 # Get-Fingerabdruck und Vergleich stehen weiter oben bei den Hilfsfunktionen --
 # -SelbsttestParallel braucht sie, bevor die Vorpruefungen laufen.
