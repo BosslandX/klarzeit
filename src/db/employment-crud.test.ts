@@ -1,0 +1,135 @@
+import 'fake-indexeddb/auto';
+import Dexie from 'dexie';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const prefStore = new Map<string, string>();
+
+vi.mock('@capacitor/preferences', () => ({
+  Preferences: {
+    get: async ({ key }: { key: string }) => ({
+      value: prefStore.has(key) ? prefStore.get(key)! : null,
+    }),
+    set: async ({ key, value }: { key: string; value: string }) => {
+      prefStore.set(key, value);
+    },
+    remove: async ({ key }: { key: string }) => {
+      prefStore.delete(key);
+    },
+  },
+}));
+
+import {
+  addEmployment,
+  countEntriesOfEmployment,
+  getEmployments,
+  getVacationDays,
+  INITIAL_EMPLOYMENT_ID,
+  removeEmployment,
+  saveVacationDays,
+  updateEmployment,
+} from './employment';
+import { db } from './db';
+import { addEntry } from './entries';
+import { defaultEmployment } from '../domain/employment';
+
+function seedOneEmployment() {
+  prefStore.set(
+    'employments',
+    JSON.stringify([
+      {
+        ...defaultEmployment,
+        id: INITIAL_EMPLOYMENT_ID,
+        name: 'Hauptjob',
+        weeklyHours: 40,
+      },
+    ]),
+  );
+}
+
+describe('Beschaeftigungs-Verwaltung', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    seedOneEmployment();
+  });
+
+  it('addEmployment haengt an: aus 1 wird 2, neue ID ist nicht emp-1', async () => {
+    const list = await addEmployment({ name: 'Nebenjob', weeklyHours: 10 });
+    expect(list).toHaveLength(2);
+    expect(list[1].name).toBe('Nebenjob');
+    expect(list[1].id).not.toBe('emp-1');
+    const again = await getEmployments();
+    expect(again).toHaveLength(2);
+  });
+
+  it('updateEmployment aendert nur die gemeinte und laesst id unangetastet', async () => {
+    const list = await addEmployment({ name: 'Zweit', weeklyHours: 8 });
+    const secondId = list[1].id;
+    await updateEmployment(secondId, { name: 'Geaendert', weeklyHours: 12 });
+    const after = await getEmployments();
+    expect(after[0].weeklyHours).toBe(40);
+    expect(after[1].id).toBe(secondId);
+    expect(after[1].name).toBe('Geaendert');
+    expect(after[1].weeklyHours).toBe(12);
+  });
+
+  it('removeEmployment verweigert Loeschen solange Zeiteintrag haengt, Meldung nennt Anzahl', async () => {
+    await addEntry({
+      start: 1_700_000_000_000,
+      end: 1_700_000_360_000,
+      breakMinutes: 0,
+      activity: 'a',
+      note: '',
+      source: 'manual',
+      employmentId: INITIAL_EMPLOYMENT_ID,
+    });
+    await expect(removeEmployment(INITIAL_EMPLOYMENT_ID)).rejects.toThrow(
+      'Loeschen nicht moeglich: 1 Zeiteintrag(e) haengen an dieser Beschaeftigung.',
+    );
+  });
+
+  it('removeEmployment verweigert Loeschen der letzten Beschaeftigung', async () => {
+    await expect(removeEmployment(INITIAL_EMPLOYMENT_ID)).rejects.toThrow(
+      'Die letzte Beschaeftigung kann nicht geloescht werden.',
+    );
+  });
+
+  it('removeEmployment loescht wenn nichts haengt, uebrige unveraendert', async () => {
+    const list = await addEmployment({ name: 'Zweit', weeklyHours: 5 });
+    const secondId = list[1].id;
+    const after = await removeEmployment(secondId);
+    expect(after).toHaveLength(1);
+    expect(after[0].id).toBe(INITIAL_EMPLOYMENT_ID);
+    expect(after[0].weeklyHours).toBe(40);
+  });
+
+  it('countEntriesOfEmployment zaehlt nur Eintraege der gemeinten Beschaeftigung', async () => {
+    const list = await addEmployment({ name: 'B', weeklyHours: 10 });
+    const secondId = list[1].id;
+    const base = {
+      start: 1_700_000_000_000,
+      end: 1_700_000_360_000,
+      breakMinutes: 0,
+      activity: 'a',
+      note: '',
+      source: 'manual' as const,
+    };
+    await addEntry({ ...base, employmentId: INITIAL_EMPLOYMENT_ID });
+    await addEntry({ ...base, start: 2, employmentId: INITIAL_EMPLOYMENT_ID });
+    await addEntry({ ...base, start: 3, employmentId: secondId });
+    expect(await countEntriesOfEmployment(INITIAL_EMPLOYMENT_ID)).toBe(2);
+    expect(await countEntriesOfEmployment(secondId)).toBe(1);
+  });
+
+  it('Urlaubstag wird mit employmentId gespeichert und gelesen', async () => {
+    const list = await addEmployment({ name: 'Zweit', weeklyHours: 5 });
+    const secondId = list[1].id;
+    await saveVacationDays([
+      { date: 1_700_100_000_000, note: '', employmentId: secondId },
+    ]);
+    const days = await getVacationDays();
+    expect(days[0].employmentId).toBe(secondId);
+  });
+});

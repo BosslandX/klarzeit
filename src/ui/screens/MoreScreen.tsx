@@ -1,7 +1,14 @@
 import { useRef, useState } from 'react';
 import { differenceInCalendarDays, format } from 'date-fns';
 import { useProfile } from '../../db/profile';
-import { useEmployment, useVacationDays } from '../../db/employment';
+import {
+  addEmployment,
+  removeEmployment,
+  updateEmployment,
+  useEmployments,
+  useVacationDays,
+} from '../../db/employment';
+
 import type { Profile } from '../../domain/types';
 import {
   annualVacationDays,
@@ -61,15 +68,21 @@ export function MoreScreen() {
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateMsg, setUpdateMsg] = useState('');
   const [available, setAvailable] = useState<UpdateInfo | null>(null);
-  const { employment, save: saveEmp } = useEmployment();
+  const {
+    employments,
+    loading: empListLoading,
+    refresh: refreshEmps,
+  } = useEmployments();
   const {
     days: vacDays,
     add: addVac,
     addMany: addVacMany,
     remove: removeVac,
   } = useVacationDays();
-  const [empForm, setEmpForm] = useState<Employment | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<Employment | null>(null);
   const [empFlash, setEmpFlash] = useState(false);
+  const [vacEmpId, setVacEmpId] = useState('');
   const [newVacDate, setNewVacDate] = useState('');
   const [vacFrom, setVacFrom] = useState('');
   const [vacTo, setVacTo] = useState('');
@@ -80,22 +93,67 @@ export function MoreScreen() {
   const setField = (key: keyof Profile, value: string) =>
     setForm({ ...(form ?? profile), [key]: value });
 
-  // Lokaler Formularzustand fuer die Beschaeftigungsdaten.
-  const emp = empForm ?? employment;
-  const setEmpField = <K extends keyof Employment,>(key: K, value: Employment[K]) =>
-    setEmpForm({ ...(empForm ?? employment), [key]: value });
+  const vacTargetId =
+    vacEmpId || employments[0]?.id || '';
+  const vacEmp =
+    employments.find((e) => e.id === vacTargetId) ?? employments[0];
+  const emp = editDraft ?? vacEmp;
+  const setEmpField = <K extends keyof Employment,>(key: K, value: Employment[K]) => {
+    if (!editDraft) return;
+    setEditDraft({ ...editDraft, [key]: value });
+  };
+
+  const empLabel = (id: string) =>
+    employments.find((e) => e.id === id)?.name ?? id;
+
+  const openEdit = (e: Employment) => {
+    setEditingId(e.id);
+    setEditDraft({ ...e });
+  };
+
+  const closeEdit = () => {
+    setEditingId(null);
+    setEditDraft(null);
+  };
+
+  const handleAddEmployment = async () => {
+    const list = await addEmployment({
+      name: 'Beschaeftigung ' + (employments.length + 1),
+    });
+    await refreshEmps();
+    const newest = list[list.length - 1];
+    openEdit(newest);
+  };
 
   const handleSaveEmployment = async () => {
-    await saveEmp(emp);
-    setEmpForm(null);
+    if (!editingId || !editDraft) return;
+    const { id: _omit, ...patch } = editDraft;
+    await updateEmployment(editingId, patch);
+    await refreshEmps();
+    closeEdit();
     setEmpFlash(true);
     setTimeout(() => setEmpFlash(false), 1800);
   };
 
+  const handleDeleteEmployment = async () => {
+    if (!editingId) return;
+    const ok = window.confirm(
+      'Diese Beschaeftigung wirklich loeschen? Zeiteintraege und Urlaubstage muessen vorher entfernt sein.',
+    );
+    if (!ok) return;
+    try {
+      await removeEmployment(editingId);
+      await refreshEmps();
+      closeEdit();
+    } catch (e) {
+      window.alert(msg(e));
+    }
+  };
+
   const handleAddVacation = async () => {
     const t = fromDateInput(newVacDate);
-    if (Number.isNaN(t)) return;
-    await addVac(t);
+    if (Number.isNaN(t) || !vacTargetId) return;
+    await addVac(t, '', vacTargetId);
     setNewVacDate('');
   };
 
@@ -115,12 +173,12 @@ export function MoreScreen() {
       : workdaysInRange(
           fromDateInput(vacFrom),
           fromDateInput(vacTo),
-          emp.workdaysPerWeek,
+          vacEmp != null ? vacEmp.workdaysPerWeek : 5,
         );
 
   const handleAddVacationRange = async () => {
     if (rangeDays.length === 0) return;
-    const added = await addVacMany(rangeDays);
+    const added = await addVacMany(rangeDays, vacTargetId);
     const skipped = rangeDays.length - added;
     setVacFrom('');
     setVacTo('');
@@ -249,7 +307,7 @@ export function MoreScreen() {
     }
   };
 
-  if (loading) return <div className="screen center muted">Lade…</div>;
+  if (loading || empListLoading) return <div className="screen center muted">Lade…</div>;
 
   return (
     <div className="screen">
@@ -283,9 +341,73 @@ export function MoreScreen() {
         <h2>Beschaeftigung &amp; Arbeitszeitkonto</h2>
         <p className="muted small">
           Grundlage fuer den Soll/Ist-Saldo und den gesetzlichen Urlaub in den
-          Monatsreports. Trage hier deine Vertragsdaten ein (Wochenstunden,
-          Arbeitstage/Woche und Beginn). Wird lokal gespeichert.
+          Monatsreports. Mehrere Beschaeftigungen sind moeglich; je Eintrag
+          Vertragsdaten pflegen. Wird lokal gespeichert.
         </p>
+
+        <h3 className="sub-head">Deine Beschaeftigungen</h3>
+        {employments.length === 0 ? (
+          <p className="muted small">Noch keine Beschaeftigung angelegt.</p>
+        ) : (
+          <ul className="vac-list">
+            {employments.map((e) => (
+              <li key={e.id}>
+                <span>
+                  <strong>{e.name}</strong>
+                  {e.arbeitgeber ? ' — ' + e.arbeitgeber : ''}
+                  {' — '}
+                  {e.weeklyHours} Std./Woche
+                </span>
+                <button className="link-btn" type="button" onClick={() => openEdit(e)}>
+                  bearbeiten
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          className="btn btn-block"
+          type="button"
+          onClick={() => void handleAddEmployment()}
+        >
+          Weitere Beschaeftigung anlegen
+        </button>
+
+        {editingId && editDraft && (
+          <div className="emp-edit">
+            <h3 className="sub-head">Beschaeftigung bearbeiten</h3>
+            <label className="field">
+              <span>Anzeigename</span>
+              <input
+                type="text"
+                value={editDraft.name}
+                onChange={(ev) => setEmpField('name', ev.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>Arbeitgeber</span>
+              <input
+                type="text"
+                value={editDraft.arbeitgeber}
+                onChange={(ev) => setEmpField('arbeitgeber', ev.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>Personalnummer / ID</span>
+              <input
+                type="text"
+                value={editDraft.personalnummer}
+                onChange={(ev) => setEmpField('personalnummer', ev.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>Abteilung / Position</span>
+              <input
+                type="text"
+                value={editDraft.abteilung}
+                onChange={(ev) => setEmpField('abteilung', ev.target.value)}
+              />
+            </label>
         <label className="field">
           <span>Beginn des Arbeitsverhaeltnisses</span>
           <input
@@ -374,18 +496,45 @@ export function MoreScreen() {
           Std. · gesetzl. Urlaub: {annualVacationDays(emp.workdaysPerWeek)}{' '}
           Tage/Jahr (BUrlG).
         </p>
-        <button className="btn btn-primary" onClick={() => void handleSaveEmployment()}>
-          {empFlash ? '✓ Gespeichert' : 'Beschaeftigung speichern'}
-        </button>
+            <button className="btn btn-primary" type="button" onClick={() => void handleSaveEmployment()}>
+              {empFlash ? '✓ Gespeichert' : 'Aenderungen speichern'}
+            </button>
+            <button
+              className="btn danger-outline"
+              type="button"
+              onClick={() => void handleDeleteEmployment()}
+            >
+              Beschaeftigung loeschen
+            </button>
+            <button className="btn" type="button" onClick={closeEdit}>
+              Bearbeiten abbrechen
+            </button>
+          </div>
+        )}
 
         <h3 className="sub-head">Genommene Urlaubstage</h3>
         <p className="muted small">
           Jeder Eintrag zaehlt als 1 Urlaubstag, mindert den Resturlaub des
           jeweiligen Jahres und entlastet das Arbeitszeitkonto um bis zu{' '}
-          {decimalHours(dailyTargetMs(emp)).toFixed(2).replace('.', ',')} Std.
-          Ist an dem Tag schon Zeit erfasst, wird nur die Differenz
+          {vacEmp
+            ? decimalHours(dailyTargetMs(vacEmp)).toFixed(2).replace('.', ',')
+            : '0,00'}{' '}
+          Std. Ist an dem Tag schon Zeit erfasst, wird nur die Differenz
           gutgeschrieben — ein Tag zaehlt nie doppelt.
         </p>
+        <label className="field">
+          <span>Urlaub fuer Beschaeftigung</span>
+          <select
+            value={vacTargetId}
+            onChange={(e) => setVacEmpId(e.target.value)}
+          >
+            {employments.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="vac-add">
           <input
             type="date"
@@ -448,9 +597,13 @@ export function MoreScreen() {
           <ul className="vac-list">
             {vacDays.map((d) => (
               <li key={d.date}>
-                <span>{formatDateWithWeekday(d.date)}</span>
+                <span>
+                  {formatDateWithWeekday(d.date)}
+                  <span className="muted small"> ({empLabel(d.employmentId)})</span>
+                </span>
                 <button
                   className="link-btn danger"
+                  type="button"
                   onClick={() => void removeVac(d.date)}
                 >
                   entfernen

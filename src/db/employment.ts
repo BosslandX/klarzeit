@@ -8,6 +8,7 @@ import {
   type VacationYearMode,
 } from '../domain/employment';
 import { getProfile } from './profile';
+import { db } from './db';
 
 const KEY_EMP = 'employment';
 const KEY_EMPLOYMENTS = 'employments';
@@ -146,6 +147,75 @@ export async function saveEmployment(emp: Employment): Promise<void> {
   await saveEmploymentsList(next);
 }
 
+
+export type EmploymentPatch = Partial<Omit<Employment, 'id'>>;
+
+/** Haengt eine neue Beschaeftigung an und gibt die gespeicherte Liste zurueck. */
+export async function addEmployment(
+  partial: EmploymentPatch = {},
+): Promise<Employment[]> {
+  const list = await getEmployments();
+  const id = createEmploymentId();
+  const newEmp = cleanEmployment({ ...defaultEmployment, ...partial, id });
+  const next = [...list, newEmp];
+  await saveEmploymentsList(next);
+  return next;
+}
+
+/** Aendert nur die Beschaeftigung mit dieser ID; die id bleibt unveraenderlich. */
+export async function updateEmployment(
+  id: string,
+  patch: EmploymentPatch,
+): Promise<Employment[]> {
+  const list = await getEmployments();
+  const idx = list.findIndex((e) => e.id === id);
+  if (idx === -1) {
+    throw new Error('Beschaeftigung nicht gefunden: ' + id);
+  }
+  const merged = cleanEmployment({ ...list[idx], ...patch, id: list[idx].id });
+  const next = [...list];
+  next[idx] = merged;
+  await saveEmploymentsList(next);
+  return next;
+}
+
+export async function countEntriesOfEmployment(id: string): Promise<number> {
+  return db.entries.where('employmentId').equals(id).count();
+}
+
+/**
+ * Entfernt eine Beschaeftigung nur ohne haengende Zeiteintraege/Urlaubstage
+ * und nur wenn mindestens eine Beschaeftigung bleibt.
+ */
+export async function removeEmployment(id: string): Promise<Employment[]> {
+  const list = await getEmployments();
+  const entryCount = await countEntriesOfEmployment(id);
+  const vacations = await getVacationDays();
+  const vacCount = vacations.filter((d) => d.employmentId === id).length;
+  if (entryCount > 0) {
+    throw new Error(
+      'Loeschen nicht moeglich: ' +
+        entryCount +
+        ' Zeiteintrag(e) haengen an dieser Beschaeftigung.',
+    );
+  }
+  if (vacCount > 0) {
+    throw new Error(
+      'Loeschen nicht moeglich: ' +
+        vacCount +
+        ' Urlaubstag(e) haengen an dieser Beschaeftigung.',
+    );
+  }
+  if (list.length <= 1) {
+    throw new Error(
+      'Die letzte Beschaeftigung kann nicht geloescht werden.',
+    );
+  }
+  const next = list.filter((e) => e.id !== id);
+  await saveEmploymentsList(next);
+  return next;
+}
+
 /** Validiert + sortiert Urlaubstage; fehlende employmentId → emp-1. */
 export function cleanVacationDays(raw: unknown): VacationDay[] {
   if (!Array.isArray(raw)) return [];
@@ -220,11 +290,33 @@ export function useEmployment(): {
   return { employment, loading, save };
 }
 
+export function useEmployments(): {
+  employments: Employment[];
+  loading: boolean;
+  refresh: () => Promise<void>;
+} {
+  const [employments, setEmployments] = useState<Employment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const list = await getEmployments();
+    setEmployments(list);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  return { employments, loading, refresh };
+}
+
+
 export function useVacationDays(): {
   days: VacationDay[];
   loading: boolean;
-  add: (date: number, note?: string) => Promise<void>;
-  addMany: (dates: readonly number[]) => Promise<number>;
+  add: (date: number, note?: string, employmentId?: string) => Promise<void>;
+  addMany: (dates: readonly number[], employmentId?: string) => Promise<number>;
   remove: (date: number) => Promise<void>;
 } {
   const [days, setDays] = useState<VacationDay[]>([]);
@@ -243,23 +335,32 @@ export function useVacationDays(): {
     };
   }, []);
 
-  const add = useCallback(async (date: number, note = '') => {
-    const employmentId = await getActiveEmploymentId();
-    const next = await getVacationDays();
-    if (!next.some((d) => d.date === date)) {
-      next.push({ date, note, employmentId });
-    }
-    const cleaned = cleanVacationDays(next);
-    await saveVacationDays(cleaned);
-    setDays(cleaned);
-  }, []);
+  const add = useCallback(
+    async (date: number, note = '', employmentId?: string) => {
+      const eid =
+        employmentId != null && employmentId !== ''
+          ? employmentId
+          : await getActiveEmploymentId();
+      const next = await getVacationDays();
+      if (!next.some((d) => d.date === date)) {
+        next.push({ date, note, employmentId: eid });
+      }
+      const cleaned = cleanVacationDays(next);
+      await saveVacationDays(cleaned);
+      setDays(cleaned);
+    },
+    [],
+  );
 
-  const addMany = useCallback(async (dates: readonly number[]) => {
-    const employmentId = await getActiveEmploymentId();
+  const addMany = useCallback(async (dates: readonly number[], employmentId?: string) => {
+    const eid =
+      employmentId != null && employmentId !== ''
+        ? employmentId
+        : await getActiveEmploymentId();
     const current = await getVacationDays();
     const merged = mergeVacationDays(
       current,
-      dates.map((date) => ({ date, note: '', employmentId })),
+      dates.map((date) => ({ date, note: '', employmentId: eid })),
     );
     await saveVacationDays(merged);
     setDays(merged);
