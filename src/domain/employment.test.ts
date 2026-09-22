@@ -22,6 +22,11 @@ import { HOUR, MINUTE } from './time';
 // (neutralen) App-Defaults, damit die Tests die Rechtslogik konkret pruefen:
 // 20 Wochenstunden an 4 Arbeitstagen, Beginn 01.05.2026.
 const emp: Employment = {
+  id: 'emp-1',
+  name: 'Test',
+  arbeitgeber: '',
+  personalnummer: '',
+  abteilung: '',
   startDate: new Date(2026, 4, 1).getTime(), // 01.05.2026
   endDate: null,
   weeklyHours: 20,
@@ -45,6 +50,7 @@ function entry(
   const start = new Date(y, mo - 1, d, fromH, 0).getTime();
   const end = new Date(y, mo - 1, d, toH, 0).getTime();
   return {
+    employmentId: 'emp-1',
     start,
     end,
     breakMinutes,
@@ -355,6 +361,7 @@ describe('Arbeitstage eines Zeitraums', () => {
 
 describe('Urlaubslisten zusammenfuehren', () => {
   const v = (y: number, mo: number, dd: number, note = '') => ({
+    employmentId: 'emp-1',
     date: new Date(y, mo - 1, dd).getTime(),
     note,
   });

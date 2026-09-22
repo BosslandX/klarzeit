@@ -13,6 +13,7 @@ export type EntrySource = 'tracked' | 'manual';
 /** Ein abgeschlossener Arbeitszeit-Eintrag. Zeiten als Epoch-Millisekunden. */
 export interface TimeEntry {
   id?: number; // Dexie Auto-Increment Primaerschluessel
+  employmentId: string; // Zugehoerige Beschaeftigung
   start: number; // Beginn (epoch ms)
   end: number; // Ende (epoch ms)
   breakMinutes: number; // Pause in Minuten (wird von der Dauer abgezogen)
@@ -25,6 +26,7 @@ export interface TimeEntry {
 
 /** Laufende, noch nicht gestoppte Erfassung (uebersteht App-Neustart). */
 export interface RunningSession {
+  employmentId: string;
   start: number; // epoch ms
   activity: string;
 }

@@ -78,8 +78,13 @@ function isValidEntry(e: unknown): e is TimeEntry {
 
 /** Uebernimmt nur bekannte Felder (verhindert, dass Datenmuell in die DB wandert). */
 function cleanEntry(e: TimeEntry): TimeEntry {
+  const employmentId =
+    typeof e.employmentId === 'string' && e.employmentId.trim() !== ''
+      ? e.employmentId
+      : 'emp-1';
   return {
     id: e.id,
+    employmentId,
     start: e.start,
     end: e.end,
     breakMinutes: e.breakMinutes,
@@ -140,7 +145,7 @@ export async function restoreBackup(
   }
 
   const entries: TimeEntry[] = data.entries.map((e) => {
-    const clean = cleanEntry(e);
+    const clean = cleanEntry(e as TimeEntry);
     return mode === 'merge' ? { ...clean, id: undefined } : clean;
   });
 

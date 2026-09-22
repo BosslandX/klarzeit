@@ -1,6 +1,8 @@
 import Dexie, { type Table } from 'dexie';
 import type { TimeEntry } from '../domain/types';
 
+export const MIGRATION_EMPLOYMENT_ID = 'emp-1';
+
 /**
  * Lokale, app-private IndexedDB via Dexie.
  * Dauerhafte Speicherung wird beim App-Start via navigator.storage.persist()
@@ -16,10 +18,23 @@ export class ZeitDB extends Dexie {
     // "Klarzeit" bewusst stabil: eine Umbenennung wuerde bestehende Datenbanken
     // unerreichbar machen, ohne irgendeinen Vorteil zu bringen.
     super('zeiterfassung');
-    // ++id = Auto-Increment-PK; start/end/source = Indizes fuer Zeitraum-Queries
     this.version(1).stores({
       entries: '++id, start, end, source',
     });
+    this.version(2)
+      .stores({
+        entries: '++id, start, end, source, employmentId',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('entries')
+          .toCollection()
+          .modify((entry) => {
+            if (entry.employmentId == null || entry.employmentId === '') {
+              entry.employmentId = MIGRATION_EMPLOYMENT_ID;
+            }
+          });
+      });
   }
 }
 

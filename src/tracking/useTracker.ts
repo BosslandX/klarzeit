@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getActiveEmploymentId } from '../db/employment';
 import { clearRunning, getRunning, setRunning } from '../db/running';
 import type { RunningSession } from '../domain/types';
 
@@ -51,7 +52,8 @@ export function useTracker(): Tracker {
   }, [running]);
 
   const start = useCallback(async (activity: string) => {
-    const session: RunningSession = { start: Date.now(), activity };
+    const employmentId = await getActiveEmploymentId();
+    const session: RunningSession = { start: Date.now(), activity, employmentId };
     await setRunning(session);
     setRunningState(session);
   }, []);

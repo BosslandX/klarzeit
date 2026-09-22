@@ -24,6 +24,13 @@ import type { TimeEntry } from './types';
  * Urlaub richtet sich nach dem Bundesurlaubsgesetz (BUrlG §§ 3–5).
  */
 export interface Employment {
+  /** Stabile ID, wird nie wiederverwendet. */
+  id: string;
+  /** Anzeigename der Beschaeftigung. */
+  name: string;
+  arbeitgeber: string;
+  personalnummer: string;
+  abteilung: string;
   /** Beginn des Arbeitsverhaeltnisses (epoch ms, lokale Mitternacht). */
   startDate: number;
   /** Optionales (befristetes) Ende, letzter Arbeitstag; null = offen. */
@@ -48,6 +55,7 @@ export type VacationYearMode = 'full' | 'prorata' | 'both';
 
 /** Ein genommener Urlaubstag (jeweils 1 Arbeitstag), als Tagesdatum (epoch ms). */
 export interface VacationDay {
+  employmentId: string;
   date: number; // lokale Mitternacht des Urlaubstags
   note: string;
 }
@@ -69,6 +77,11 @@ export const WAITING_PERIOD_MONTHS = 6;
  * Preferences gespeichert. Bewusst KEINE personenbezogenen Vorgaben im Build.
  */
 export const defaultEmployment: Employment = {
+  id: 'emp-1',
+  name: 'Beschäftigung 1',
+  arbeitgeber: '',
+  personalnummer: '',
+  abteilung: '',
   startDate: new Date(new Date().getFullYear(), 0, 1).getTime(), // 1. Jan. des laufenden Jahres
   endDate: null,
   weeklyHours: 0, // in den Einstellungen (Mehr) eintragen

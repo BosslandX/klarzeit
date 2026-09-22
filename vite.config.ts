@@ -21,6 +21,11 @@ export default defineConfig({
     // 101 Tests statt 1 und 50 -- die Kopie des Baums wurde mitgezaehlt UND die
     // Probedatei des Ausfuehrenden gleich mit. Ein Testlauf, der die Arbeit eines
     // anderen Baums mitzaehlt, misst nicht diesen Baum.
-    exclude: [...configDefaults.exclude, '.wt/**'],
+    // auftraege/** ist der zweite Ausschluss und hat denselben Grund: dort liegen die
+    // Proben der Ausfuehrenden, und eine Negativkontrolle ist dort ABSICHTLICH rot.
+    // GEMESSEN am 2026-09-22: eine Probedatei aus AUF-003 stand nach einem Abnahmelauf
+    // ohne --basis im Hauptbaum und faerbte 'npm test' rot, obwohl alle 58 echten Tests
+    // gruen waren. Ein roter Lauf aus fremder Ursache verdeckt echte Fehler.
+    exclude: [...configDefaults.exclude, '.wt/**', 'auftraege/**'],
   },
 });

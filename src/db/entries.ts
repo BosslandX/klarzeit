@@ -1,12 +1,21 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
+import { getActiveEmploymentId } from './employment';
 import type { TimeEntry } from '../domain/types';
 
 export type NewEntry = Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'>;
 
-export async function addEntry(data: NewEntry): Promise<number> {
+export async function addEntry(
+  data: Omit<NewEntry, 'employmentId'> & { employmentId?: string },
+): Promise<number> {
   const now = Date.now();
-  return db.entries.add({ ...data, createdAt: now, updatedAt: now });
+  const employmentId = data.employmentId ?? (await getActiveEmploymentId());
+  return db.entries.add({
+    ...data,
+    employmentId,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 export async function updateEntry(
