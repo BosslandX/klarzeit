@@ -7,7 +7,7 @@ export interface Tracker {
   running: RunningSession | null;
   elapsedMs: number;
   loading: boolean;
-  start: (activity: string) => Promise<void>;
+  start: (activity: string, employmentId?: string) => Promise<void>;
   /** Beendet die laufende Session und gibt ihre Startzeit zurueck (oder null). */
   finish: () => Promise<RunningSession | null>;
   cancel: () => Promise<void>;
@@ -51,9 +51,12 @@ export function useTracker(): Tracker {
     };
   }, [running]);
 
-  const start = useCallback(async (activity: string) => {
-    const employmentId = await getActiveEmploymentId();
-    const session: RunningSession = { start: Date.now(), activity, employmentId };
+  const start = useCallback(async (activity: string, employmentId?: string) => {
+    const eid =
+      employmentId != null && employmentId !== ''
+        ? employmentId
+        : await getActiveEmploymentId();
+    const session: RunningSession = { start: Date.now(), activity, employmentId: eid };
     await setRunning(session);
     setRunningState(session);
   }, []);

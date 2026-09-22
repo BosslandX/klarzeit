@@ -1,7 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Tracker } from '../../tracking/useTracker';
 import { addEntry } from '../../db/entries';
 import { useEntriesInRange } from '../../db/entries';
+import {
+  getActiveEmploymentId,
+  setActiveEmployment,
+  useEmployments,
+} from '../../db/employment';
 import { dayPeriod, totalMs } from '../../domain/aggregate';
 import { formatClock, formatDuration, formatStopwatch } from '../../domain/time';
 import { IconPlay, IconStop } from '../components/Icons';
@@ -13,16 +18,39 @@ interface Props {
 
 export function HomeScreen({ tracker }: Props) {
   const { running, elapsedMs, loading, start, cancel, updateActivity } = tracker;
+  const { employments, loading: empLoading } = useEmployments();
   const [activity, setActivity] = useState('');
+  const [captureEmploymentId, setCaptureEmploymentId] = useState('');
   const [stopDraft, setStopDraft] = useState<EntryDraft | null>(null);
+
+  useEffect(() => {
+    if (empLoading) return;
+    void getActiveEmploymentId().then((id) => setCaptureEmploymentId(id));
+  }, [empLoading, employments.length]);
 
   const today = dayPeriod(Date.now());
   const todayEntries = useEntriesInRange(today.from, today.to) ?? [];
   const todaySaved = totalMs(todayEntries);
 
+  const showEmploymentPick = employments.length > 1;
+  const runningEmployment = running
+    ? employments.find((e) => e.id === running.employmentId)
+    : undefined;
+
+  const handleEmploymentChange = async (id: string) => {
+    setCaptureEmploymentId(id);
+    try {
+      await setActiveEmployment(id);
+    } catch {
+      /* Select enthaelt nur gueltige IDs */
+    }
+  };
+
   const handleStart = async () => {
     try {
-      await start(activity.trim());
+      const eid =
+        captureEmploymentId || (await getActiveEmploymentId());
+      await start(activity.trim(), eid);
       setActivity('');
     } catch (e) {
       window.alert(
@@ -40,6 +68,7 @@ export function HomeScreen({ tracker }: Props) {
       activity: running.activity,
       note: '',
       source: 'tracked',
+      employmentId: running.employmentId,
     });
   };
 
@@ -62,6 +91,9 @@ export function HomeScreen({ tracker }: Props) {
       {running ? (
         <div className="tracker-card running">
           <div className="tracker-label">Laeuft seit {formatClock(running.start)}</div>
+          {showEmploymentPick && runningEmployment && (
+            <div className="tracker-employment muted">{runningEmployment.name}</div>
+          )}
           <div className="stopwatch">{formatStopwatch(elapsedMs)}</div>
           <input
             className="activity-input"
@@ -81,6 +113,21 @@ export function HomeScreen({ tracker }: Props) {
         <div className="tracker-card">
           <div className="tracker-label">Bereit zur Erfassung</div>
           <div className="stopwatch muted">00:00:00</div>
+          {showEmploymentPick && (
+            <label className="field">
+              <span>Beschaeftigung</span>
+              <select
+                value={captureEmploymentId}
+                onChange={(e) => void handleEmploymentChange(e.target.value)}
+              >
+                {employments.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <input
             className="activity-input"
             type="text"

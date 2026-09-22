@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   addEntry,
   deleteEntry,
   updateEntry,
   useAllEntriesDesc,
 } from '../../db/entries';
+import { useEmployments } from '../../db/employment';
 import { groupByDay } from '../../domain/aggregate';
 import type { Period } from '../../domain/aggregate';
 import type { TimeEntry } from '../../domain/types';
@@ -41,10 +42,34 @@ function defaultManualDraft(): EntryDraft {
   };
 }
 
+function entryToDraft(entry: TimeEntry): EntryDraft {
+  return {
+    start: entry.start,
+    end: entry.end,
+    breakMinutes: entry.breakMinutes,
+    activity: entry.activity,
+    note: entry.note,
+    source: entry.source,
+    employmentId: entry.employmentId,
+  };
+}
+
 export function EntriesScreen() {
   const entries = useAllEntriesDesc();
+  const { employments } = useEmployments();
   const [modal, setModal] = useState<ModalState>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [filterEmploymentId, setFilterEmploymentId] = useState<string>('');
+
+  const showEmploymentInfo = employments.length > 1;
+  const employmentName = (id: string) =>
+    employments.find((e) => e.id === id)?.name ?? id;
+
+  const filteredEntries = useMemo(() => {
+    if (!entries) return undefined;
+    if (!filterEmploymentId) return entries;
+    return entries.filter((e) => e.employmentId === filterEmploymentId);
+  }, [entries, filterEmploymentId]);
 
   const handleSave = async (draft: EntryDraft) => {
     if (modal?.mode === 'edit' && modal.entry.id != null) {
@@ -85,7 +110,9 @@ export function EntriesScreen() {
     }
   };
 
-  const groups = entries ? [...groupByDay(entries)].reverse() : [];
+  const groups = filteredEntries
+    ? [...groupByDay(filteredEntries)].reverse()
+    : [];
 
   return (
     <div className="screen">
@@ -93,9 +120,26 @@ export function EntriesScreen() {
         <h1>Eintraege</h1>
       </header>
 
-      {entries === undefined ? (
+      {showEmploymentInfo && entries && entries.length > 0 && (
+        <label className="field entries-filter">
+          <span>Beschaeftigung</span>
+          <select
+            value={filterEmploymentId}
+            onChange={(e) => setFilterEmploymentId(e.target.value)}
+          >
+            <option value="">Alle Beschaeftigungen</option>
+            {employments.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {filteredEntries === undefined ? (
         <div className="center muted">Lade…</div>
-      ) : entries.length === 0 ? (
+      ) : filteredEntries.length === 0 ? (
         <div className="empty">
           Noch keine Eintraege. Erfasse Zeit auf dem Erfassung-Tab oder trage
           ueber „+" eine vergessene Zeit nach.
@@ -120,6 +164,11 @@ export function EntriesScreen() {
                     {e.activity || <span className="muted">(keine Taetigkeit)</span>}
                     {e.source === 'manual' && (
                       <span className="badge">nachgetragen</span>
+                    )}
+                    {showEmploymentInfo && (
+                      <span className="badge entry-employment">
+                        {employmentName(e.employmentId)}
+                      </span>
                     )}
                   </div>
                   {e.note && <div className="entry-note">{e.note}</div>}
@@ -168,7 +217,9 @@ export function EntriesScreen() {
       {modal && (
         <EntryFormModal
           title={modal.mode === 'edit' ? 'Eintrag bearbeiten' : 'Zeit nachtragen'}
-          initial={modal.mode === 'edit' ? modal.entry : defaultManualDraft()}
+          initial={
+            modal.mode === 'edit' ? entryToDraft(modal.entry) : defaultManualDraft()
+          }
           onCancel={() => setModal(null)}
           onSave={handleSave}
         />

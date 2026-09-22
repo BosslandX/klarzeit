@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { EntrySource } from '../../domain/types';
 import {
   fromDatetimeLocal,
@@ -6,6 +6,11 @@ import {
   formatDuration,
   netMs,
 } from '../../domain/time';
+import {
+  getActiveEmploymentId,
+  setActiveEmployment,
+  useEmployments,
+} from '../../db/employment';
 
 export interface EntryDraft {
   start: number;
@@ -14,6 +19,7 @@ export interface EntryDraft {
   activity: string;
   note: string;
   source: EntrySource;
+  employmentId?: string;
 }
 
 interface Props {
@@ -31,18 +37,40 @@ export function EntryFormModal({
   onCancel,
   onSave,
 }: Props) {
+  const { employments, loading: empLoading } = useEmployments();
   const [start, setStart] = useState(initial.start);
   const [end, setEnd] = useState(initial.end);
   const [breakMinutes, setBreakMinutes] = useState(initial.breakMinutes);
   const [activity, setActivity] = useState(initial.activity);
   const [note, setNote] = useState(initial.note);
+  const [employmentId, setEmploymentId] = useState(initial.employmentId ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initial.employmentId) {
+      setEmploymentId(initial.employmentId);
+      return;
+    }
+    if (empLoading) return;
+    void getActiveEmploymentId().then((id) => setEmploymentId(id));
+  }, [initial.employmentId, empLoading]);
 
   const dauerMs = useMemo(
     () => netMs({ start, end, breakMinutes }),
     [start, end, breakMinutes],
   );
+
+  const showEmploymentPick = employments.length > 1;
+
+  const handleEmploymentChange = async (id: string) => {
+    setEmploymentId(id);
+    try {
+      await setActiveEmployment(id);
+    } catch {
+      /* unbekannte ID sollte im Select nicht vorkommen */
+    }
+  };
 
   const handleSave = async () => {
     if (Number.isNaN(start) || Number.isNaN(end)) {
@@ -57,6 +85,10 @@ export function EntryFormModal({
       setError('Die Pause ist laenger als die erfasste Zeitspanne.');
       return;
     }
+    if (!employmentId) {
+      setError('Bitte eine Beschaeftigung waehlen.');
+      return;
+    }
     setError(null);
     setSaving(true);
     try {
@@ -67,6 +99,7 @@ export function EntryFormModal({
         activity: activity.trim(),
         note: note.trim(),
         source: initial.source,
+        employmentId,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.');
@@ -83,6 +116,22 @@ export function EntryFormModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="modal-title">{title}</h2>
+
+        {showEmploymentPick && (
+          <label className="field">
+            <span>Beschaeftigung</span>
+            <select
+              value={employmentId}
+              onChange={(e) => void handleEmploymentChange(e.target.value)}
+            >
+              {employments.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label className="field">
           <span>Beginn</span>

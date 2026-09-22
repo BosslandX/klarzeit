@@ -13,6 +13,7 @@ import { db } from './db';
 const KEY_EMP = 'employment';
 const KEY_EMPLOYMENTS = 'employments';
 const KEY_VAC = 'vacations';
+const KEY_ACTIVE = 'activeEmployment';
 
 export const INITIAL_EMPLOYMENT_ID = 'emp-1';
 
@@ -127,7 +128,21 @@ export async function getEmployment(): Promise<Employment> {
 
 export async function getActiveEmploymentId(): Promise<string> {
   const list = await getEmployments();
-  return list[0]?.id ?? INITIAL_EMPLOYMENT_ID;
+  const fallback = list[0]?.id ?? INITIAL_EMPLOYMENT_ID;
+  const { value } = await Preferences.get({ key: KEY_ACTIVE });
+  if (typeof value === 'string' && value !== '' && list.some((e) => e.id === value)) {
+    return value;
+  }
+  return fallback;
+}
+
+/** Speichert die zuletzt gewaehlte Beschaeftigung; unbekannte IDs werden abgelehnt. */
+export async function setActiveEmployment(id: string): Promise<void> {
+  const list = await getEmployments();
+  if (!list.some((e) => e.id === id)) {
+    throw new Error('Unbekannte Beschaeftigung: ' + id);
+  }
+  await Preferences.set({ key: KEY_ACTIVE, value: id });
 }
 
 export async function hasUsableEmployment(): Promise<boolean> {
