@@ -1,4 +1,4 @@
-﻿apply plugin: 'com.android.application'
+apply plugin: 'com.android.application'
 
 // Release-Signing: Zugangsdaten aus der (gitignorierten) keystore.properties lesen.
 // Fehlt die Datei, wird ohne Signing gebaut (assembleRelease -> unsigned), statt zu brechen.
