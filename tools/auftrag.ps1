@@ -134,7 +134,19 @@ $protokoll = Join-Path $repo "auftraege\_ergebnisse\${auf}_agentenlauf.txt"
 $manifestPfad      = ""
 $manifestMuster    = 'SHA-256 \| `([0-9a-fA-F]{64})`'
 $wahrheitsQuellen  = @()
-$quellBaeume       = @()
+# node_modules: 303,3 MB in 31.189 Dateien; Copy-Item braucht dafuer rund 17 Sekunden
+# (gemessen 2026-09-22, robocopy zum Vergleich 23 s). OHNE diesen Baum kann der
+# Ausfuehrende weder 'npm test' noch 'npx tsc' fahren -- die Achse 'getestet' des
+# code-Profils waere damit fuer JEDEN Auftrag unerreichbar, und genau so stand es in
+# composer-kit\projekte\klarzeit.json unter "_offen".
+#
+# *** KEINE JUNCTION STATT DER KOPIE. GEMESSEN, NICHT VERMUTET. ***
+# 'git worktree remove --force' folgt einer Junction und LEERT ihr Ziel: 5 Dateien
+# vorher, 0 danach, Exitcode 0, keine Warnung (2026-09-22, mit Wegwerfmaterial unter
+# %TEMP% gemessen -- mit dem echten Baum waere die Messung ihr eigener Schaden
+# gewesen). In hausverwaltung war nur bekannt, dass Junctions das Entfernen
+# BLOCKIEREN; hier blockieren sie nicht, sie loeschen durch.
+$quellBaeume       = @("node_modules")
 $einzelDateien     = @()
 $leerVerzeichnisse = @("dist", "docs")
 # =================================================================
@@ -887,7 +899,7 @@ $anweisung = (
     "Du bist Ausfuehrender, nicht Entscheider. Du setzt keine Marker, du schlaegst sie vor. " +
     "Deine Lieferung ist die Datei $lieferung, gebildet gegen tools/lieferschema.json. " +
     "Schreibe nichts ausserhalb von auftraege/_ergebnisse/ und auftraege/_probe/, ausser wo der Auftrag " +
-    "ausdruecklich einen protokollierten Versuch dagegen verlangt. Fasse tools/ nicht an: dort steht das Pruefgeraet UND tools/privacy-scan.mjs, das die zu schuetzenden Klarnamen als Suchmuster enthaelt -- lies es nicht und zitiere daraus nichts. Baue und teste nicht: node_modules liegt nicht im Arbeitsort, ein Auftrag der npm braucht ist hier nicht fahrbar. " +
+    "ausdruecklich einen protokollierten Versuch dagegen verlangt. Fasse tools/ nicht an: dort steht das Pruefgeraet UND tools/privacy-scan.mjs, das die zu schuetzenden Klarnamen als Suchmuster enthaelt -- lies es nicht und zitiere daraus nichts. node_modules liegt als KOPIE im Arbeitsort: 'npm test' und 'npx tsc --noEmit' sollst du fahren und ihre Ausgabe in die Lieferung nehmen -- ein Code-Befund ohne Testlauf traegt hoechstens die Achse 'implementiert'. Installiere nichts nach und aendere package.json nicht; was fehlt, gehoert nach nicht_erreicht. " +
     "Ein Sucher, der .gitignore achtet, meldet in ignorierten Baeumen 0 Treffer, ohne " +
     "gesucht zu haben. Jede Nullaussage braucht eine Positiv-Kontrolle mit einem bekannten " +
     "Treffer, mit demselben Werkzeug und derselben Wurzel. " +
