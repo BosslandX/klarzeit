@@ -181,7 +181,7 @@ export function ReportsScreen() {
   const handleCsv = async () => {
     setBusy(true);
     try {
-      const csv = entriesToCsv(entries);
+      const csv = entriesToCsv(entries, employments);
       const name = reportFilename(period).replace(/\.pdf$/i, '.csv');
       await shareTextFile(csv, name, `Klarzeit – ${period.label}`, 'text/csv');
     } catch (e) {

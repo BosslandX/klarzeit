@@ -76,6 +76,28 @@ async function saveEmploymentsList(list: Employment[]): Promise<void> {
   });
 }
 
+/** Ersetzt die gespeicherte Beschaeftigungsliste (z. B. Backup-Import). */
+export async function replaceEmployments(list: Employment[]): Promise<void> {
+  await saveEmploymentsList(list);
+}
+
+/** true, wenn der employments-Schluessel bereits gesetzt ist (ohne Legacy-Migration). */
+export async function hasEmploymentsListStored(): Promise<boolean> {
+  const { value } = await Preferences.get({ key: KEY_EMPLOYMENTS });
+  if (!value) return false;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) && parsed.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function hasLegacyEmploymentStored(): Promise<boolean> {
+  const { value } = await Preferences.get({ key: KEY_EMP });
+  return value != null && value !== '';
+}
+
 async function migrateEmploymentsFromLegacy(): Promise<Employment[]> {
   const { value } = await Preferences.get({ key: KEY_EMP });
   let contract: Employment;

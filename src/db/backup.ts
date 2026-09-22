@@ -4,11 +4,17 @@ import { getProfile, hasUsableProfile, saveProfile, emptyProfile } from './profi
 import {
   cleanEmployment,
   cleanVacationDays,
-  getEmployment,
+  getActiveEmploymentId,
+  getEmployments,
   getVacationDays,
+  hasEmploymentsListStored,
+  hasLegacyEmploymentStored,
   hasUsableEmployment,
+  INITIAL_EMPLOYMENT_ID,
+  replaceEmployments,
   saveEmployment,
   saveVacationDays,
+  setActiveEmployment,
 } from './employment';
 import type { Profile, TimeEntry } from '../domain/types';
 import { mergeVacationDays } from '../domain/employment';
@@ -23,29 +29,33 @@ export interface BackupData {
    * erfassten Zeiten verloren.
    */
   app: 'zeiterfassung';
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   exportedAt: number;
   profile: Profile;
   entries: TimeEntry[];
-  // Ab Version 2: Vertragsdaten + genommene Urlaubstage.
   employment?: Employment;
   vacations?: VacationDay[];
+  employments?: Employment[];
+  activeEmployment?: string;
 }
 
 export async function buildBackup(): Promise<BackupData> {
-  const [profile, entries, employment, vacations] = await Promise.all([
-    getProfile(),
-    getAllEntries(),
-    getEmployment(),
-    getVacationDays(),
-  ]);
+  const [profile, entries, employments, activeEmployment, vacations] =
+    await Promise.all([
+      getProfile(),
+      getAllEntries(),
+      getEmployments(),
+      getActiveEmploymentId(),
+      getVacationDays(),
+    ]);
   return {
     app: 'zeiterfassung',
-    version: 2,
+    version: 3,
     exportedAt: Date.now(),
     profile,
     entries,
-    employment,
+    employments,
+    activeEmployment,
     vacations,
   };
 }
@@ -76,12 +86,11 @@ function isValidEntry(e: unknown): e is TimeEntry {
   );
 }
 
-/** Uebernimmt nur bekannte Felder (verhindert, dass Datenmuell in die DB wandert). */
 function cleanEntry(e: TimeEntry): TimeEntry {
   const employmentId =
     typeof e.employmentId === 'string' && e.employmentId.trim() !== ''
       ? e.employmentId
-      : 'emp-1';
+      : INITIAL_EMPLOYMENT_ID;
   return {
     id: e.id,
     employmentId,
@@ -109,21 +118,90 @@ function cleanProfile(p: unknown): Profile {
   };
 }
 
-/**
- * Stellt ein Backup wieder her.
- * - replace: vorhandene Daten loeschen, IDs des Backups uebernehmen. Profil,
- *   Vertragsdaten und Urlaubstage werden durch die des Backups ersetzt.
- * - merge: Backup-Eintraege als neue Datensaetze hinzufuegen (IDs neu vergeben).
- *   Merge heisst ueberall "fuegt nur hinzu": Urlaubstage werden vereinigt (bei
- *   gleichem Datum gewinnt der vorhandene Tag), Profil und Vertragsdaten werden
- *   nur uebernommen, wenn lokal noch keine gespeichert sind. Andernfalls wuerde
- *   ein aelteres Backup still die aktuellen Stammdaten und alle seither
- *   erfassten Urlaubstage loeschen.
- *
- * Validierung erfolgt VOR jeglichem Schreiben/Loeschen. clear() und bulkPut()
- * laufen in EINER Dexie-Transaktion, damit bei einem Fehler nichts verloren geht
- * (automatischer Rollback). Gibt die Anzahl importierter Eintraege zurueck.
- */
+function employmentFromProfile(
+  profile: Profile,
+  contract?: Employment,
+): Employment {
+  const base = contract
+    ? cleanEmployment(contract)
+    : cleanEmployment({ id: INITIAL_EMPLOYMENT_ID });
+  const displayName = profile.arbeitgeber.trim() || 'Beschäftigung 1';
+  return {
+    ...base,
+    id: INITIAL_EMPLOYMENT_ID,
+    name: displayName,
+    arbeitgeber: profile.arbeitgeber,
+    personalnummer: profile.personalnummer,
+    abteilung: profile.abteilung,
+  };
+}
+
+function employmentFromLegacyBackup(data: BackupData): Employment {
+  const profile = cleanProfile(data.profile);
+  const contract = data.employment
+    ? cleanEmployment(data.employment)
+    : undefined;
+  return employmentFromProfile(profile, contract);
+}
+
+export function mergeEmployments(
+  existing: readonly Employment[],
+  incoming: readonly Employment[],
+): Employment[] {
+  const localIds = new Set(existing.map((e) => e.id));
+  const added = incoming
+    .filter((e) => !localIds.has(e.id))
+    .map((e) => cleanEmployment(e));
+  return [...existing.map((e) => cleanEmployment(e)), ...added];
+}
+
+async function applyActiveEmploymentFromBackup(
+  activeId: string | undefined,
+  employments: Employment[],
+): Promise<void> {
+  if (typeof activeId !== 'string' || activeId === '') return;
+  if (!employments.some((e) => e.id === activeId)) return;
+  try {
+    await setActiveEmployment(activeId);
+  } catch {
+    /* getActiveEmploymentId faellt auf erste Beschaeftigung zurueck */
+  }
+}
+
+async function restoreEmployments(
+  data: BackupData,
+  mode: RestoreMode,
+): Promise<void> {
+  if (data.version === 3 && Array.isArray(data.employments)) {
+    const incoming = data.employments.map((e) => cleanEmployment(e));
+    if (mode === 'replace') {
+      await replaceEmployments(incoming);
+      await applyActiveEmploymentFromBackup(data.activeEmployment, incoming);
+      return;
+    }
+    const local = await getEmployments();
+    await replaceEmployments(mergeEmployments(local, incoming));
+    return;
+  }
+
+  const single = employmentFromLegacyBackup(data);
+  if (mode === 'replace') {
+    await replaceEmployments([single]);
+    return;
+  }
+
+  const hasLocal =
+    (await hasEmploymentsListStored()) || (await hasLegacyEmploymentStored());
+  if (!hasLocal) {
+    await replaceEmployments([single]);
+    return;
+  }
+
+  if (data.employment && !(await hasUsableEmployment())) {
+    await saveEmployment(cleanEmployment(data.employment));
+  }
+}
+
 export async function restoreBackup(
   json: string,
   mode: RestoreMode,
@@ -137,7 +215,7 @@ export async function restoreBackup(
   if (data?.app !== 'zeiterfassung' || !Array.isArray(data.entries)) {
     throw new Error('Keine gueltige Zeiterfassung-Backup-Datei.');
   }
-  if (data.version !== 1 && data.version !== 2) {
+  if (data.version !== 1 && data.version !== 2 && data.version !== 3) {
     throw new Error('Nicht unterstuetzte Backup-Version.');
   }
   if (!data.entries.every(isValidEntry)) {
@@ -156,16 +234,12 @@ export async function restoreBackup(
     await db.entries.bulkPut(entries);
   });
 
-  // Stammdaten sind Einzelwerte, kein Anhaengen moeglich: im Merge-Modus daher
-  // nur uebernehmen, wenn lokal noch nichts Brauchbares hinterlegt ist
-  // (Erstimport auf ein leeres Geraet). Ausgefuellte Angaben bleiben unangetastet.
   if (data.profile && (mode === 'replace' || !(await hasUsableProfile()))) {
     await saveProfile(cleanProfile(data.profile));
   }
-  // Ab Version 2: Vertragsdaten + Urlaubstage (validiert) uebernehmen.
-  if (data.employment && (mode === 'replace' || !(await hasUsableEmployment()))) {
-    await saveEmployment(cleanEmployment(data.employment));
-  }
+
+  await restoreEmployments(data, mode);
+
   if (Array.isArray(data.vacations)) {
     const incoming = cleanVacationDays(data.vacations);
     await saveVacationDays(
@@ -179,7 +253,6 @@ export async function restoreBackup(
 
 function csvCell(value: string | number): string {
   let s = String(value);
-  // Schutz vor CSV-/Formel-Injection: fuehrendes Sonderzeichen entschaerfen.
   if (/^[=+\-@\t\r]/.test(s)) {
     s = `'${s}`;
   }
@@ -189,8 +262,21 @@ function csvCell(value: string | number): string {
   return s;
 }
 
-/** CSV-Export (Semikolon-getrennt, fuer deutsches Excel). */
-export function entriesToCsv(entries: TimeEntry[]): string {
+function employmentNameForCsv(
+  employmentId: string,
+  employments?: readonly Employment[],
+): string {
+  if (employments) {
+    const hit = employments.find((e) => e.id === employmentId);
+    if (hit) return hit.name;
+  }
+  return employmentId;
+}
+
+export function entriesToCsv(
+  entries: TimeEntry[],
+  employments?: readonly Employment[],
+): string {
   const header = [
     'Datum',
     'Start',
@@ -198,6 +284,7 @@ export function entriesToCsv(entries: TimeEntry[]): string {
     'Pause_min',
     'Dauer_h',
     'Quelle',
+    'Beschaeftigung',
     'Taetigkeit',
     'Notiz',
   ];
@@ -211,6 +298,7 @@ export function entriesToCsv(entries: TimeEntry[]): string {
         e.breakMinutes,
         decimalHours(netMs(e)).toFixed(2).replace('.', ','),
         e.source === 'manual' ? 'manuell' : 'erfasst',
+        employmentNameForCsv(e.employmentId, employments),
         e.activity,
         e.note,
       ]

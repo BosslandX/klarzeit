@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { differenceInCalendarDays, format } from 'date-fns';
 import { useProfile } from '../../db/profile';
 import {
+  getEmployments,
   addEmployment,
   removeEmployment,
   updateEmployment,
@@ -217,8 +218,9 @@ export function MoreScreen() {
     setBusy(true);
     try {
       const all = await getAllEntries();
+      const employments = await getEmployments();
       await shareTextFile(
-        entriesToCsv(all),
+        entriesToCsv(all, employments),
         `Klarzeit-Alle_${stamp()}.csv`,
         'Klarzeit – alle Eintraege',
         'text/csv',
