@@ -6,7 +6,7 @@
 - **Typ:** Capacitor-Android-App (lokale Zeiterfassung)
 - **Stack:** Vite + React 19 + TypeScript, Capacitor 8, Dexie (IndexedDB), jsPDF, date-fns
 - **App-ID:** `io.github.bosslandx.klarzeit` · webDir: `dist`
-- **Version:** 1.4 (`versionCode 5`)
+- **Version:** 1.5 (`versionCode 6`)
 
 ## Build & Run
 ```bash
@@ -34,8 +34,35 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
 ## Architektur-Konventionen
 - **Immutability**, viele kleine Dateien, Fehler explizit behandeln.
 - Persistenz-Abstraktion: `src/db/` ist die einzige Stelle für Datenzugriffe.
-  Zeiteinträge in Dexie, Profil/laufende Session/**Vertragsdaten + Urlaubstage** in
+  Zeiteinträge in Dexie, Profil/laufende Session/**Beschäftigungen + Urlaubstage** in
   `@capacitor/preferences` (`src/db/employment.ts`).
+- **Mehrere Beschäftigungen (seit 1.5):** `employments` hält eine **Liste**; jeder
+  `TimeEntry`, `VacationDay` und die `RunningSession` tragen `employmentId` als
+  Pflichtfeld. Dexie steht auf `version(2)` mit Index auf `employmentId`; der
+  `upgrade`-Hook gibt Bestandseinträgen `emp-1`. Der alte Einzelschlüssel `employment`
+  bleibt liegen — er ist der Rückweg, falls die Migration schiefgeht.
+  - **IDs:** `emp-1` für die Migration (fest, damit sie deterministisch prüfbar ist),
+    sonst `emp-<zeitstempel>-<zufall>`. **Kein** `crypto.randomUUID` (in alten
+    Android-WebViews nicht überall vorhanden) und **keine** fortlaufende Nummer: eine
+    gelöschte würde neu vergeben, und alte Einträge hingen an der falschen
+    Beschäftigung.
+  - **Aktive Beschäftigung:** Schlüssel `activeEmployment`. `getActiveEmploymentId()`
+    prüft die gespeicherte ID gegen die Liste und fällt auf die erste zurück — sonst
+    bliebe nach `removeEmployment` eine tote ID stehen.
+  - **Löschen** ist gesperrt, solange Zeiteinträge oder Urlaubstage daran hängen, und
+    ebenso für die letzte verbliebene Beschäftigung.
+  - **Kein Sammelbericht über alle Beschäftigungen.** Ein Nachweis, der die Stunden
+    zweier Arbeitgeber addiert, ist für beide unbrauchbar; der Bericht gilt für die
+    gewählte Beschäftigung, und der PDF-Kopf nimmt Arbeitgeber, Personalnummer und
+    Abteilung von dort (Name weiter aus dem Profil).
+  - **`Profile` behält `arbeitgeber`/`personalnummer`/`abteilung`**, obwohl sie in der
+    Oberfläche nicht mehr vorkommen: ältere Backups tragen sie, `cleanProfile` liest
+    sie, und aus ihnen entsteht beim Import die erste Beschäftigung.
+  - ⛔ **`isValidEntry` in `src/db/backup.ts` niemals um `employmentId` verschärfen.**
+    Die Prüfung läuft in `restoreBackup` **vor** der Normalisierung — ein verschärftes
+    `isValidEntry` weist jedes ältere Backup ab, auch das automatische beim Start mit
+    leerer Datenbank. Das ist einmal passiert (AUF-004, erster Anlauf) und wird seither
+    durch einen Test gefangen (`src/db/backup.test.ts`).
 - **Arbeitszeitkonto & gesetzlicher Urlaub:** Logik rein in `src/domain/employment.ts`
   (Soll/Saldo + BUrlG), getestet; nur Monatsreports erhalten die PDF-Blöcke via `ReportExtras`.
   Rechtsgrundlagen als Kommentar/Fußnote referenziert (BUrlG §§ 3–5).

@@ -90,6 +90,8 @@ describe('Beschäftigungs-Migration', () => {
         startDate: 1,
         endDate: null,
         weeklyHours: 10,
+        // Der Wert ist fuer diesen Test beliebig -- geprueft wird, dass eine vorhandene
+        // Liste NICHT ueberschrieben wird, nicht welche Zahl darin steht.
         workdaysPerWeek: 4,
         vacationYearMode: 'full',
         openingBalanceMs: 0,

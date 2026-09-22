@@ -1,4 +1,4 @@
-apply plugin: 'com.android.application'
+﻿apply plugin: 'com.android.application'
 
 // Release-Signing: Zugangsdaten aus der (gitignorierten) keystore.properties lesen.
 // Fehlt die Datei, wird ohne Signing gebaut (assembleRelease -> unsigned), statt zu brechen.
@@ -16,8 +16,8 @@ android {
         applicationId "io.github.bosslandx.klarzeit"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
-        versionName "1.4"
+        versionCode 6
+        versionName "1.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
