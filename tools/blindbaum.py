@@ -72,7 +72,12 @@ REPO = os.path.dirname(HIER)
 # Die Baeume, die git nicht sieht UND in die nachweislich geschrieben wird.
 # re/decompiled/ steht hier NICHT: es ist versioniert, git status sieht es.
 BAEUME = [
-{{BLINDE_BAEUME}}
+    'node_modules',
+    'dist',
+    'docs',
+    '.serena',
+    'android/app/build',
+    'auftraege/_probe',
 ]
 
 
