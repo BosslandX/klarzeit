@@ -353,6 +353,49 @@ function Get-Fingerabdruck {
 # Der Vergleich zweier Fingerabdruecke. Steht als Funktion da, weil er ZWEIMAL gebraucht
 # wird: nach dem Mini-Lauf der Vorpruefung 7 und nach dem eigentlichen Lauf. Beide starten
 # einen Agenten; beide muessen darum gemessen werden.
+<#
+    DIE ARBEIT DES AUSFUEHRENDEN SICHERN -- ALS PATCH.
+
+    WARUM SIE SONST VERLORENGEHT: der Ausfuehrende darf NICHT committen
+    ('Shell(git commit)' steht auf deny, und das bleibt so -- die Historie gehoert dem
+    Orchestrator). Seine Aenderungen liegen damit ausschliesslich als uncommitted
+    changes im Arbeitsort. 'git worktree remove --force' nimmt sie restlos mit und
+    meldet dabei sogar beruhigend "Zweig geloescht (keine eigenen Commits)".
+
+    *** GEMESSEN AM 2026-09-22, AUF-004 ***
+    Genau so ist ein vollstaendig abgenommener Code-Auftrag vernichtet worden: Lieferung,
+    Protokolle und Abnahme (Exit 0) lagen gesichert im Hauptbaum, der Code war weg --
+    243 geaenderte Zeilen in 10 Dateien, darunter ein neuer Migrationstest. Die Sicherung
+    der Lieferung allein SIEHT AUS WIE eine Sicherung und ist keine.
+
+    'git add -A' laeuft NUR im Arbeitsort und beruehrt nur dessen Index; der wird ohnehin
+    gleich geloescht. Ohne ihn fehlten im Patch alle NEUEN Dateien -- und gerade neue
+    Tests sind das Wertvollste an einem Code-Auftrag.
+
+    'git diff --output=' laesst GIT die Datei schreiben, nicht PowerShell: Out-File
+    haengt unter 5.1 eine BOM an und normalisiert Zeilenenden, und beides macht einen
+    Patch fuer 'git apply' unbrauchbar.
+#>
+function Arbeit-Sichern {
+    param([string]$Ort, [string]$Ziel)
+    if (-not (Test-Path $Ort)) { return }
+    $null = Native git @("-C", $Ort, "add", "-A")
+    New-Item -ItemType Directory -Force (Split-Path -Parent $Ziel) | Out-Null
+    $r = Native git @("-C", $Ort, "diff", "--cached", "HEAD", "--output=$Ziel")
+    if ($r.Code -ne 0) {
+        Sagen "  [!] Patch konnte nicht gebildet werden -- die Arbeit ist NICHT gesichert:"
+        Sagen "      $($r.Ausgabe.Trim())"
+        return
+    }
+    if (-not (Test-Path $Ziel)) { Sagen "  [!] Patchdatei fehlt nach dem Schreiben."; return }
+    $gr = (Get-Item $Ziel).Length
+    if ($gr -eq 0) {
+        Sagen "  Arbeit des Ausfuehrenden     : KEINE Aenderung ausserhalb der Ergebnisse."
+    } else {
+        Sagen "  Arbeit gesichert             : $(Split-Path -Leaf $Ziel)  ($gr Bytes Patch)"
+    }
+}
+
 function Vergleich {
     param($v, $n)
     $ausbruch = @()
@@ -406,6 +449,9 @@ if ($Aufraeumen) {
             }
             if ($gerettet -eq 0) { Sagen "  Nichts zu sichern (alles liegt schon im Hauptbaum)." }
         }
+        # 1b DIE ARBEIT SICHERN, bevor der Worktree faellt. Siehe Arbeit-Sichern: der
+        #    Ausfuehrende kann nicht committen, sein Code lebt nur hier.
+        Arbeit-Sichern -Ort $wt -Ziel (Join-Path $repo "auftraege\_ergebnisse\${auf}_arbeit.patch")
         Sagen "  Worktree entfernen: .wt\$auf"
         $r = Native git @("-C", $repo, "worktree", "remove", "--force", ".wt/$auf")
         if ($r.Code -ne 0) { Abbruch "git worktree remove ging nicht durch:`n$($r.Ausgabe)" }
@@ -1037,6 +1083,11 @@ if ($ausbruch.Count -gt 0) {
 # ---------------------------------------------------------------------- URTEIL
 Sagen ""
 Sagen "  Agent beendet, Exit $code"
+
+# SOFORT sichern, nicht erst beim Aufraeumen. Zwischen Lauf und Aufraeumen liegen
+# Abnahme, Nachlesen und Merge -- und in AUF-004 lag dazwischen der Datenverlust.
+Arbeit-Sichern -Ort $wt -Ziel (Join-Path $repo "auftraege\_ergebnisse\${auf}_arbeit.patch")
+
 $lief = Join-Path $wt ($lieferung -replace '/', '\')
 if (Test-Path $lief) {
     Sagen "  Lieferung liegt vor          : $lieferung"
