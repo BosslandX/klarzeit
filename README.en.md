@@ -16,7 +16,7 @@ leave under German law.
 
 [Deutsch](README.md) · **English**
 
-[Download APK](../../releases/latest) · [Screenshots](#screenshots)
+[Download APK](https://github.com/BosslandX/klarzeit-releases/releases/latest) · [Screenshots](#screenshots)
 
 </div>
 
@@ -114,7 +114,7 @@ installer for in-app updates — you confirm the install).
 ## Installation
 
 Not on the Play Store. Grab the signed APK from
-[Releases](../../releases/latest), allow installation from this source when
+[Releases](https://github.com/BosslandX/klarzeit-releases/releases/latest), allow installation from this source when
 Android asks, and install.
 
 ### Building it yourself

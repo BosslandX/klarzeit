@@ -19,11 +19,13 @@ interface ApkInstallerPlugin {
 }
 const ApkInstaller = registerPlugin<ApkInstallerPlugin>('ApkInstaller');
 
-// Bezug ueber die GitHub-Releases des Projekt-Repos. Die "latest/download"-URL
-// zeigt stabil auf das jeweils neueste Release-Asset – kein API-Rate-Limit,
-// kein eigener Server noetig.
+// Bezug ueber ein eigenes, OEFFENTLICHES Release-Repo, das nur APK und
+// version.json traegt (kein Quellcode). Das Code-Repo BosslandX/klarzeit ist
+// privat und liefert unauthentifiziert 404 – CapacitorHttp schickt kein Token.
+// Die "latest/download"-URL zeigt stabil auf das jeweils neueste Release-Asset –
+// kein API-Rate-Limit, kein eigener Server noetig.
 const GH_OWNER = 'BosslandX';
-const GH_REPO = 'klarzeit';
+const GH_REPO = 'klarzeit-releases';
 export const UPDATE_MANIFEST_URL = `https://github.com/${GH_OWNER}/${GH_REPO}/releases/latest/download/version.json`;
 
 /** Inhalt der serverseitigen version.json. */

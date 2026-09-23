@@ -20,7 +20,7 @@ Arbeitszeitkonto und gesetzlichem Urlaub nach BUrlG.
 
 **Deutsch** · [English](README.en.md)
 
-[APK herunterladen](../../releases/latest) ·
+[APK herunterladen](https://github.com/BosslandX/klarzeit-releases/releases/latest) ·
 [Screenshots](#screenshots) ·
 [Arbeitszeitkonto & Urlaub](#-arbeitszeitkonto--gesetzlicher-urlaub) ·
 [Wie Klarzeit entstanden ist](#wie-klarzeit-entstanden-ist)
@@ -285,7 +285,7 @@ assets/       Logo-Quellen und Screenshots
 ## Installation
 
 Klarzeit liegt nicht im Play Store. Die signierte APK gibt es unter
-[Releases](../../releases/latest).
+[Releases](https://github.com/BosslandX/klarzeit-releases/releases/latest).
 
 1. APK herunterladen.
 2. Android fragt beim Öffnen nach der Erlaubnis, Apps aus dieser Quelle zu
@@ -345,31 +345,35 @@ npm run icons
 <details>
 <summary><b>Eine neue Version veröffentlichen</b></summary>
 
-1. `versionCode` (aufsteigend) und `versionName` in `android/app/build.gradle` setzen.
+1. `versionCode` (aufsteigend) und `versionName` in `android/app/build.gradle` setzen,
+   dazu `version` in `package.json` (daraus liest die App ihre Versionsanzeige).
 2. `npm test && npm run build`, dann `npm run apk:release`.
 3. Signatur prüfen: `apksigner verify --print-certs <apk>`.
-4. `version.json` schreiben — `versionCode` muss zur `build.gradle` passen:
+4. `version.json` schreiben — `versionCode` muss zur `build.gradle` passen, `url` ist die
+   Tag-URL mit dem versionierten Dateinamen:
 
 ```json
 {
-  "versionCode": 4,
-  "versionName": "1.3",
-  "url": "https://github.com/BosslandX/klarzeit/releases/latest/download/klarzeit-release.apk",
+  "versionCode": 7,
+  "versionName": "1.5.1",
+  "url": "https://github.com/BosslandX/klarzeit-releases/releases/download/v1.5.1/klarzeit-1.5.1-release.apk",
   "notes": "Was neu ist"
 }
 ```
 
-5. Release anlegen und beide Dateien anhängen:
+5. Release im öffentlichen Release-Repo anlegen und beide Dateien anhängen:
 
 ```bash
-gh release create v1.3 -R BosslandX/klarzeit \
-  --title "Klarzeit 1.3" --notes "Was neu ist" \
-  klarzeit-release.apk version.json
+gh release create v1.5.1 -R BosslandX/klarzeit-releases \
+  --title "Klarzeit 1.5.1" --notes "Was neu ist" \
+  klarzeit-1.5.1-release.apk version.json
 ```
 
-Der Updater liest `releases/latest/download/version.json` über `CapacitorHttp`
-(nicht über `fetch` — der GitHub-Asset-Server sendet keine CORS-Header). Ein
-Update wird nur installiert, wenn App-ID **und** Signatur übereinstimmen.
+Der Updater liest `releases/latest/download/version.json` aus
+[`BosslandX/klarzeit-releases`](https://github.com/BosslandX/klarzeit-releases) — einem
+öffentlichen Repo, das nur Releases trägt. Er fragt über `CapacitorHttp` ab (nicht über
+`fetch` — der GitHub-Asset-Server sendet keine CORS-Header). Ein Update wird nur
+installiert, wenn App-ID **und** Signatur übereinstimmen.
 
 </details>
 

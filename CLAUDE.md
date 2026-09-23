@@ -6,7 +6,7 @@
 - **Typ:** Capacitor-Android-App (lokale Zeiterfassung)
 - **Stack:** Vite + React 19 + TypeScript, Capacitor 8, Dexie (IndexedDB), jsPDF, date-fns
 - **App-ID:** `io.github.bosslandx.klarzeit` · webDir: `dist`
-- **Version:** 1.5 (`versionCode 6`)
+- **Version:** 1.5.1 (`versionCode 7`)
 
 ## Build & Run
 ```bash
@@ -93,12 +93,18 @@ Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
   weil sämtliche Icons noch den Schriftzug der Vorgänger-App tragen und `privacy-scan.mjs`
   **keine Bilddateien prüft**. Vor dem Public-Schalten daher zusätzlich zum Scan die Icons
   unter `assets/` und `android/app/src/main/res/mipmap-*`/`drawable-*` visuell kontrollieren.
-- Releases (APK + `version.json`) liegen im selben Repo; `src/update/updater.ts` zieht sie über
-  `releases/latest/download`. **Solange das Repo privat ist, liefert dieser Pfad unauthentifiziert
-  HTTP 404** (`CapacitorHttp` schickt kein Token) — der In-App-Updater funktioniert erst ab dem
-  Public-Schalten. Kein Bug im Updater.
+- **Releases (APK + `version.json`) liegen seit 1.5.1 im ÖFFENTLICHEN `BosslandX/klarzeit-releases`**
+  — einem reinen Release-Repo ohne Quellcode (Muster `zeiterfassung-releases`).
+  `src/update/updater.ts` zieht `releases/latest/download/version.json` von dort. Grund: Das private
+  Code-Repo liefert unauthentifiziert **HTTP 404** (`CapacitorHttp` schickt kein Token), der Updater
+  war damit tot. Die öffentliche APK trägt noch die Icons der Vorgänger-App — vom User bewusst in Kauf genommen
+  (2026-09-23). Releases bis v1.4 liegen weiter im privaten Code-Repo und sind für den Updater
+  unerreichbar: Wer eine ältere Version installiert hat, installiert 1.5.1 einmal von Hand.
+- Commits im Releases-Repo nur als `BosslandX <20750642+BosslandX@users.noreply.github.com>` —
+  kein Klarname in öffentlicher Historie.
 - Im `version.json` muss die `url` exakt den Asset-Dateinamen tragen. Der enthält die Version
-  (`klarzeit-<version>-release.apk`), also die **Tag-URL** `releases/download/vX.Y/…` verwenden,
+  (`klarzeit-<version>-release.apk`), also die **Tag-URL**
+  `https://github.com/BosslandX/klarzeit-releases/releases/download/vX.Y/…` verwenden,
   nicht `releases/latest/download/…`.
 - **Vor jedem Push:** `node tools/privacy-scan.mjs` muss null Treffer melden.
 - `docs/` ist gitignored (persönliches Arbeitsjournal, nicht Teil der Veröffentlichung).
