@@ -327,7 +327,11 @@ export function ReportsScreen() {
           <section className="konto-card">
             <h3>Urlaub {vacation.year}</h3>
             <div className="konto-row">
-              <span>Anspruch (§ 3 BUrlG)</span>
+              <span>
+                {vacation.fromContract
+                  ? 'Anspruch (Vertrag)'
+                  : 'Anspruch (§ 3 BUrlG)'}
+              </span>
               <strong>{formatDays(vacation.annualFull)}</strong>
             </div>
             {vacation.isEntryYear && vacation.mode === 'both' && (

@@ -43,6 +43,14 @@ export function cleanEmployment(raw: unknown): Employment {
   const weeklyHours = weeklyRaw > 0 ? weeklyRaw : defaultEmployment.weeklyHours;
   const wdRaw = Math.round(num(x.workdaysPerWeek, defaultEmployment.workdaysPerWeek));
   const workdaysPerWeek = Math.min(6, Math.max(1, wdRaw));
+  let contractVacationDays: number | null = null;
+  if (
+    typeof x.contractVacationDays === 'number' &&
+    Number.isFinite(x.contractVacationDays) &&
+    x.contractVacationDays > 0
+  ) {
+    contractVacationDays = x.contractVacationDays;
+  }
   const id =
     typeof x.id === 'string' && x.id.trim() !== ''
       ? x.id
@@ -66,6 +74,7 @@ export function cleanEmployment(raw: unknown): Employment {
     workdaysPerWeek,
     vacationYearMode: mode,
     openingBalanceMs: num(x.openingBalanceMs, 0),
+    contractVacationDays,
   };
 }
 

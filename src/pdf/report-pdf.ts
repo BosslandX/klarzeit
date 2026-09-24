@@ -261,6 +261,48 @@ function drawInfoPanel(
   return top + h;
 }
 
+
+/** Urlaubsblock: Zeilen + Fussnote (reine Textlogik fuer Tests und PDF). */
+export function buildVacationPanelText(
+  v: VacationStatus,
+  emp: Employment,
+): { rows: { label: string; value: string }[]; foot: string } {
+  const annualLabel = v.fromContract
+    ? `Jahresanspruch ${v.year} (Vertrag)`
+    : `Jahresanspruch ${v.year} (§ 3 BUrlG)`;
+  const rows: { label: string; value: string }[] = [
+    { label: annualLabel, value: formatDays(v.annualFull) },
+  ];
+  if (v.isEntryYear && v.mode === 'both') {
+    rows.push({
+      label: `anteilig § 5 (${v.fullMonths}/12)`,
+      value: formatDays(v.prorataRounded),
+    });
+  }
+  rows.push({ label: `genommen ${v.year}`, value: formatDays(v.taken) });
+  rows.push({ label: 'Resturlaub', value: formatDays(v.remaining) });
+
+  const wpw = v.workdaysPerWeek;
+  let foot: string;
+  if (v.fromContract && emp.contractVacationDays != null) {
+    foot =
+      `${wpw} Arbeitstage/Woche: Vertrag ${formatDays(emp.contractVacationDays)}; ` +
+      `gesetzliches Minimum 24 Werktage x ${wpw}/6 = ${formatDays(v.annualStatutory)}/Jahr. ` +
+      (v.isEntryYear
+        ? `Wartezeit § 4 erfuellt am ${formatDate(waitingPeriodEnd(emp))}; ` +
+          `${v.mode === 'prorata' ? 'anteilig n. § 5' : 'voller Jahresanspruch'}.`
+        : 'Bundesurlaubsgesetz.');
+  } else {
+    foot =
+      `${wpw} Arbeitstage/Woche: 24 Werktage x ${wpw}/6 = ${formatDays(v.annualFull)}/Jahr. ` +
+      (v.isEntryYear
+        ? `Wartezeit § 4 erfuellt am ${formatDate(waitingPeriodEnd(emp))}; ` +
+          `${v.mode === 'prorata' ? 'anteilig n. § 5' : 'voller Jahresanspruch'}.`
+        : 'Bundesurlaubsgesetz.');
+  }
+  return { rows, foot };
+}
+
 /** Zeichnet Arbeitszeitkonto (links) + Urlaub (rechts) nebeneinander. */
 function drawKontoUndUrlaub(
   doc: jsPDF,
@@ -312,29 +354,11 @@ function drawKontoUndUrlaub(
     `Beschaeftigt seit ${formatDate(emp.startDate)}. Ausgleich n. § 2 (4) Arbeitsvertrag.` +
     urlaubHinweis;
 
-  const urlaubRows: PanelRow[] = [
-    { label: `Jahresanspruch ${v.year} (§ 3 BUrlG)`, value: formatDays(v.annualFull) },
-  ];
-  if (v.isEntryYear && v.mode === 'both') {
-    urlaubRows.push({
-      label: `anteilig § 5 (${v.fullMonths}/12)`,
-      value: formatDays(v.prorataRounded),
-    });
-  }
-  urlaubRows.push({ label: `genommen ${v.year}`, value: formatDays(v.taken) });
-  urlaubRows.push({
-    label: 'Resturlaub',
-    value: formatDays(v.remaining),
-    color: v.remaining < 0 ? NEG : POS,
-    bold: true,
-  });
-  const wpw = v.workdaysPerWeek;
-  const urlaubFoot =
-    `${wpw} Arbeitstage/Woche: 24 Werktage x ${wpw}/6 = ${formatDays(v.annualFull)}/Jahr. ` +
-    (v.isEntryYear
-      ? `Wartezeit § 4 erfuellt am ${formatDate(waitingPeriodEnd(emp))}; ` +
-        `${v.mode === 'prorata' ? 'anteilig n. § 5' : 'voller Jahresanspruch'}.`
-      : 'Bundesurlaubsgesetz.');
+  const { rows: urlaubRowSrc, foot: urlaubFoot } = buildVacationPanelText(v, emp);
+  const urlaubRows: PanelRow[] = urlaubRowSrc.map((r) => ({ ...r }));
+  const rest = urlaubRows[urlaubRows.length - 1];
+  rest.color = v.remaining < 0 ? NEG : POS;
+  rest.bold = true;
 
   const leftB = drawInfoPanel(doc, MARGIN_X, top, colW, 'Arbeitszeitkonto', kontoRows, kontoFoot);
   const rightB = drawInfoPanel(

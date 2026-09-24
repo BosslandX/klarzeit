@@ -43,6 +43,8 @@ export interface Employment {
   vacationYearMode: VacationYearMode;
   /** Anfangssaldo in ms zum Start (uebernommene Ueber-/Minusstunden). Default 0. */
   openingBalanceMs: number;
+  /** Vertraglicher Jahresurlaub in Arbeitstagen; null = gesetzliches Minimum. */
+  contractVacationDays: number | null;
 }
 
 /**
@@ -88,6 +90,7 @@ export const defaultEmployment: Employment = {
   workdaysPerWeek: 5,
   vacationYearMode: 'both',
   openingBalanceMs: 0,
+  contractVacationDays: null,
 };
 
 // --- Monats-Soll (Arbeitszeitkonto) ---
@@ -342,6 +345,28 @@ export function annualVacationDays(workdaysPerWeek: number): number {
  * — das Gesetz ordnet nur die Aufrundung an; ein Abrunden waere eine unzulaessige
  * Kuerzung des unabdingbaren Mindesturlaubs (§ 13 Abs. 1 BUrlG).
  */
+
+/**
+ * Massgeblicher Jahresurlaub: Vertragswert, sofern gesetzt und nicht unter dem
+ * gesetzlichen Minimum — der Mindesturlaub ist unabdingbar (§ 13 Abs. 1 BUrlG,
+ * vgl. roundTeilurlaub).
+ */
+export function annualEntitlement(emp: Employment): {
+  days: number;
+  statutory: number;
+  fromContract: boolean;
+} {
+  const statutory = annualVacationDays(emp.workdaysPerWeek);
+  const contract = emp.contractVacationDays;
+  const fromContract =
+    contract != null && contract >= statutory;
+  return {
+    days: fromContract ? contract : statutory,
+    statutory,
+    fromContract,
+  };
+}
+
 export function roundTeilurlaub(days: number): number {
   const frac = days - Math.floor(days);
   return frac >= 0.5 ? Math.ceil(days) : days;
@@ -383,7 +408,9 @@ export function waitingFulfilledInYear(emp: Employment, year: number): boolean {
 export interface VacationStatus {
   year: number;
   workdaysPerWeek: number;
-  annualFull: number; // voller gesetzlicher Jahresanspruch (Arbeitstage)
+  annualFull: number; // voller Jahresanspruch (Vertrag oder gesetzlich)
+  annualStatutory: number; // gesetzlicher Mindestanspruch (Arbeitstage)
+  fromContract: boolean; // Jahresanspruch stammt aus Vertragsfeld
   fullMonths: number; // beschaeftigte volle Monate im Jahr
   prorataExact: number; // annualFull x fullMonths/12 (ungerundet)
   prorataRounded: number; // § 5 Abs. 2 gerundet
@@ -408,7 +435,10 @@ export function buildVacationStatus(
   takenDates: readonly number[],
   year: number,
 ): VacationStatus {
-  const annualFull = annualVacationDays(emp.workdaysPerWeek);
+  const entitlementBase = annualEntitlement(emp);
+  const annualFull = entitlementBase.days;
+  const annualStatutory = entitlementBase.statutory;
+  const fromContract = entitlementBase.fromContract;
   const fullMonths = fullMonthsEmployedInYear(emp, year);
   const prorataExact = (annualFull * fullMonths) / 12;
   const prorataRounded = roundTeilurlaub(prorataExact);
@@ -443,6 +473,8 @@ export function buildVacationStatus(
     year,
     workdaysPerWeek: emp.workdaysPerWeek,
     annualFull,
+    annualStatutory,
+    fromContract,
     fullMonths,
     prorataExact,
     prorataRounded,

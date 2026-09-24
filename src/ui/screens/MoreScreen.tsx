@@ -12,7 +12,7 @@ import {
 
 import type { Profile } from '../../domain/types';
 import {
-  annualVacationDays,
+  annualEntitlement,
   dailyTargetMs,
   fullMonthlyTargetMs,
   workdaysInRange,
@@ -339,7 +339,7 @@ export function MoreScreen() {
       <section className="card-section">
         <h2>Beschaeftigung &amp; Arbeitszeitkonto</h2>
         <p className="muted small">
-          Grundlage fuer den Soll/Ist-Saldo und den gesetzlichen Urlaub in den
+          Grundlage fuer den Soll/Ist-Saldo und den Urlaubsanspruch in den
           Monatsreports. Mehrere Beschaeftigungen sind moeglich; je Eintrag
           Vertragsdaten pflegen. Wird lokal gespeichert.
         </p>
@@ -457,6 +457,38 @@ export function MoreScreen() {
             ))}
           </select>
         </label>
+
+        <label className="field">
+          <span>Urlaubsanspruch laut Vertrag (Tage/Jahr)</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.5"
+            min="0"
+            placeholder={`leer = gesetzlich (${annualEntitlement(emp).statutory})`}
+            value={emp.contractVacationDays ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value.trim();
+              if (raw === '') {
+                setEmpField('contractVacationDays', null);
+                return;
+              }
+              const n = Number(raw);
+              setEmpField(
+                'contractVacationDays',
+                Number.isFinite(n) && n > 0 ? n : null,
+              );
+            }}
+          />
+        </label>
+        {emp.contractVacationDays != null &&
+          emp.contractVacationDays <
+            annualEntitlement({ ...emp, contractVacationDays: null }).statutory && (
+            <p className="muted small">
+              Unter dem gesetzlichen Minimum ({annualEntitlement({ ...emp, contractVacationDays: null }).statutory}{' '}
+              Tage/Jahr) gilt der gesetzliche Urlaubsanspruch.
+            </p>
+          )}
         <label className="field">
           <span>Urlaub im Eintrittsjahr ausweisen</span>
           <select
@@ -492,8 +524,20 @@ export function MoreScreen() {
           {decimalHours(fullMonthlyTargetMs(emp.weeklyHours))
             .toFixed(2)
             .replace('.', ',')}{' '}
-          Std. · gesetzl. Urlaub: {annualVacationDays(emp.workdaysPerWeek)}{' '}
-          Tage/Jahr (BUrlG).
+          Std. ·{' '}
+          {(() => {
+            const ent = annualEntitlement(emp);
+            return emp.contractVacationDays != null ? (
+              <>
+                Vertrag: {emp.contractVacationDays} Tage/Jahr · gesetzl. Minimum:{' '}
+                {ent.statutory} Tage/Jahr (BUrlG)
+              </>
+            ) : (
+              <>
+                gesetzl. Urlaub: {ent.statutory} Tage/Jahr (BUrlG)
+              </>
+            );
+          })()}
         </p>
             <button className="btn btn-primary" type="button" onClick={() => void handleSaveEmployment()}>
               {empFlash ? '✓ Gespeichert' : 'Aenderungen speichern'}

@@ -21,6 +21,7 @@ vi.mock('@capacitor/preferences', () => ({
 import {
   getActiveEmploymentId,
   getEmployments,
+  updateEmployment,
   INITIAL_EMPLOYMENT_ID,
 } from './employment';
 import { db } from './db';
@@ -201,6 +202,56 @@ describe('Backup Version 3 und Beschaeftigungen', () => {
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe('emp-y');
     expect(list[0].weeklyHours).toBe(15);
+  });
+
+
+  it('Version-2-Backup employment ohne contractVacationDays: nach replace null', async () => {
+    const legacyEmp = {
+      id: INITIAL_EMPLOYMENT_ID,
+      name: 'Legacy',
+      arbeitgeber: '',
+      personalnummer: '',
+      abteilung: '',
+      startDate: defaultEmployment.startDate,
+      endDate: null,
+      weeklyHours: 20,
+      workdaysPerWeek: 5,
+      vacationYearMode: 'both' as const,
+      openingBalanceMs: 0,
+    };
+    const backup = {
+      app: 'zeiterfassung',
+      version: 2,
+      exportedAt: 1,
+      profile: {
+        vorname: '',
+        nachname: '',
+        personalnummer: '',
+        arbeitgeber: '',
+        abteilung: '',
+      },
+      employment: legacyEmp,
+      entries: [],
+    };
+    await restoreBackup(JSON.stringify(backup), 'replace');
+    const list = await getEmployments();
+    expect(list[0].contractVacationDays).toBeNull();
+  });
+
+  it('Rundreise contractVacationDays 26 ueber Backup', async () => {
+    prefStore.set(
+      'employments',
+      JSON.stringify([emp(INITIAL_EMPLOYMENT_ID, 'H', 20)]),
+    );
+    await updateEmployment(INITIAL_EMPLOYMENT_ID, { contractVacationDays: 26 });
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const list = await getEmployments();
+    expect(list[0].contractVacationDays).toBe(26);
   });
 
   it('buildBackup schreibt version 3 und app zeiterfassung', async () => {

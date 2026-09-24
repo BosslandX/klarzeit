@@ -27,6 +27,7 @@ import {
   removeEmployment,
   saveVacationDays,
   updateEmployment,
+  cleanEmployment,
 } from './employment';
 import { db } from './db';
 import { addEntry } from './entries';
@@ -73,6 +74,19 @@ describe('Beschaeftigungs-Verwaltung', () => {
     expect(after[1].id).toBe(secondId);
     expect(after[1].name).toBe('Geaendert');
     expect(after[1].weeklyHours).toBe(12);
+  });
+
+
+  it('cleanEmployment normalisiert contractVacationDays', () => {
+    const base = { ...defaultEmployment, id: 'x' };
+    expect(cleanEmployment(base).contractVacationDays).toBeNull();
+    expect(cleanEmployment({ ...base, contractVacationDays: null }).contractVacationDays).toBeNull();
+    expect(cleanEmployment({ ...base, contractVacationDays: 0 }).contractVacationDays).toBeNull();
+    expect(cleanEmployment({ ...base, contractVacationDays: -5 }).contractVacationDays).toBeNull();
+    expect(cleanEmployment({ ...base, contractVacationDays: Number.NaN }).contractVacationDays).toBeNull();
+    expect(cleanEmployment({ ...base, contractVacationDays: '30' }).contractVacationDays).toBeNull();
+    expect(cleanEmployment({ ...base, contractVacationDays: 30 }).contractVacationDays).toBe(30);
+    expect(cleanEmployment({ ...base, contractVacationDays: 22.5 }).contractVacationDays).toBe(22.5);
   });
 
   it('removeEmployment verweigert Loeschen solange Zeiteintrag haengt, Meldung nennt Anzahl', async () => {
