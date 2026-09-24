@@ -66,6 +66,15 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
 - **Arbeitszeitkonto & gesetzlicher Urlaub:** Logik rein in `src/domain/employment.ts`
   (Soll/Saldo + BUrlG), getestet; nur Monatsreports erhalten die PDF-Blöcke via `ReportExtras`.
   Rechtsgrundlagen als Kommentar/Fußnote referenziert (BUrlG §§ 3–5).
+- **Vertraglicher Urlaub (AUF-009):** `Employment.contractVacationDays`, `null` = kein
+  Vertragswert. Entschieden wird **nur** in `annualEntitlement(emp)`: der Vertragswert gilt,
+  aber **nie unter dem gesetzlichen Minimum** (§ 13 Abs. 1 BUrlG) — ein kleinerer Wert fällt
+  auf das Minimum zurück, das Formular zeigt dazu einen Hinweis. Wartezeit, Zwölftelung und
+  Austrittsregeln laufen unverändert über diese Zahl; regelt ein Vertrag den Mehrurlaub
+  eigens, weicht die Anzeige im Eintritts-/Austrittsjahr ab. Ändern sich die Arbeitstage pro
+  Woche, wird der Vertragswert **nicht** umgerechnet. Backupformat bleibt Version 3
+  (`cleanEmployment` trägt das Feld, ältere Backups ergeben `null`). Der Text des
+  PDF-Urlaubsblocks entsteht in `buildVacationPanelText` (rein, getestet).
 - **Urlaub entlastet das Konto (seit 1.4):** `buildBalanceLedger(emp, entries, ref, vacationDates?)`
   weist je Monat `vacationDays` + `vacationCreditMs` aus; `saldoMs = istMs + vacationCreditMs − sollMs`.
   Ohne den 4. Parameter rechnet die Funktion unverändert. **Zwei Deckel nicht verwechseln:**
