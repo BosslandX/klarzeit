@@ -112,7 +112,7 @@ Safe-Area-Abstände geringfügig.
 - **PDF-Stundennachweis** — erzeugt und über das Android-Teilen-Menü direkt an die Mail-App.
 - **CSV-Export** — Semikolon-getrennt, für deutsches Excel vorbereitet.
 - **Arbeitszeitkonto** — Soll/Ist je Monat, Saldo, Übertrag aus Vormonaten, Gesamtsaldo.
-- **Gesetzlicher Urlaub** — Jahresanspruch, Zwölftelung, Wartezeit, genommene Tage, Resturlaub.
+- **Gesetzlicher und vertraglicher Urlaub** — Jahresanspruch, Zwölftelung, Wartezeit, genommene Tage, Resturlaub.
 - **Personendaten** — Name, Personalnummer, Arbeitgeber, Abteilung für den Berichtskopf.
 - **Backup** — JSON-Export/-Import sowie ein automatisches Backup in den Documents-Ordner, das eine Deinstallation überlebt.
 - **In-App-Update** — prüft die GitHub-Releases dieses Repos und installiert die neue Version auf Wunsch.
@@ -168,6 +168,12 @@ Die Rundungsregel ist die, die am häufigsten falsch gemacht wird: § 5 Abs. 2
 kennt nur das Aufrunden. Ein Anspruch von 13,33 Tagen bleibt 13,33 Tage — er
 wird nicht auf 13 abgerundet.
 
+**Vertraglicher Urlaub.** Gewährt dein Arbeitsvertrag mehr als das gesetzliche
+Minimum, trägst du den Jahresurlaub je Beschäftigung ein (Tab *Mehr* →
+Beschäftigung *bearbeiten* → „Urlaubsanspruch laut Vertrag"). Klarzeit rechnet
+dann mit diesem Wert, nie aber mit weniger als dem gesetzlichen Minimum.
+Wartezeit, Zwölftelung und Rundung gelten für den ganzen Anspruch.
+
 <details>
 <summary><b>Rechtsgrundlagen im Detail</b></summary>
 
@@ -181,8 +187,10 @@ UI- und Datenbankcode, damit sie prüfbar bleibt.
 
 - **Keine Feiertage und keine Krankheitstage.** Klarzeit kennt nur erfasste
   Arbeitszeit und selbst eingetragene Urlaubstage.
-- **Kein Tarif- oder Zusatzurlaub.** Berechnet wird der gesetzliche
-  Mindesturlaub. Vertragliche Ansprüche darüber hinaus musst du selbst kennen.
+- **Keine eigenen Regeln für Mehrurlaub.** Den vertraglichen oder tariflichen
+  Jahresurlaub trägst du als Zahl ein; Klarzeit wendet darauf die gesetzlichen
+  Regeln an. Sieht dein Vertrag für den Mehrurlaub etwas anderes vor, weicht die
+  Anzeige im Eintritts- und Austrittsjahr ab.
 - **Kein Schwerbehindertenzusatzurlaub** (§ 208 SGB IX).
 - **Keine Übertragung ins Folgejahr** (§ 7 Abs. 3 BUrlG) — der Resturlaub wird je
   Kalenderjahr ausgewiesen, nicht fortgeschrieben.
@@ -190,7 +198,7 @@ UI- und Datenbankcode, damit sie prüfbar bleibt.
   er beginnt (Stundenzettel-Konvention). Bei Nachtschichten ist das zu beachten.
 
 Die Rechenwege sind in
-[`src/domain/employment.test.ts`](src/domain/employment.test.ts) mit 22 Tests
+[`src/domain/employment.test.ts`](src/domain/employment.test.ts) mit 59 Tests
 belegt, die die Paragraphen einzeln durchgehen.
 
 </details>
@@ -406,7 +414,7 @@ Verfahren mit Prüfschritten:
 
 | Phase | Was passiert ist |
 |---|---|
-| **Rechtslogik zuerst** | Arbeitszeitkonto und BUrlG-Berechnung testgetrieben: erst die Testfälle je Paragraph, dann die Implementierung. Heute 22 Tests. |
+| **Rechtslogik zuerst** | Arbeitszeitkonto und BUrlG-Berechnung testgetrieben: erst die Testfälle je Paragraph, dann die Implementierung. Heute 59 Tests. |
 | **Review-Durchgang 1** | Adversariale Mehrdimensions-Review des Gesamtcodes durch 26 Agenten. 16 Befunde bestätigt, 6 nach Gegenprüfung verworfen. |
 | **Review-Durchgang 2** | Vier Dimensionen plus Gegenprüfung durch 19 Agenten, gezielt auf Arbeitszeitkonto und Urlaub. 12 Befunde, alle behoben. |
 | **Gegenprüfung** | Jeder Befund musste widerlegbar sein. Was der Gegenprüfung nicht standhielt, wurde verworfen statt „sicherheitshalber" gefixt. |
