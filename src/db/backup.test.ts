@@ -340,10 +340,13 @@ describe('Zusammenfuehren in eine vorhandene Beschaeftigung', () => {
   });
 
   it('v2 zusammenfuehren nach erstem Oeffnen: Beschaeftigung vollstaendig', async () => {
-    const before = await getEmployments();
-    expect(before).toHaveLength(1);
-    expect(before[0].id).toBe('emp-1');
-    expect(before[0].weeklyHours).toBe(0);
+    await getEmployments();
+    // Vorbedingung am Speicher, nicht am Rueckgabewert: ohne gespeicherte Liste liefe
+    // der Import ueber den Zweig "lokal nichts vorhanden" und saehe immer richtig aus.
+    const gespeichert = JSON.parse(prefStore.get('employments') ?? '[]');
+    expect(gespeichert).toHaveLength(1);
+    expect(gespeichert[0].id).toBe('emp-1');
+    expect(gespeichert[0].weeklyHours).toBe(0);
 
     const n = await restoreBackup(JSON.stringify(zeiterfassungV2), 'merge');
     expect(n).toBe(2);

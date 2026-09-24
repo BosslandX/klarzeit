@@ -142,11 +142,15 @@ function employmentFromLegacyBackup(data: BackupData): Employment {
   return employmentFromProfile(profile, contract);
 }
 
-
 /**
- * Fuellt leere Feldgruppen einer lokalen Beschaeftigung aus incoming.
- * Gruppen: Vertrag, Stammdaten, Name (nur mit Stammdaten + Default-Name), id bleibt lokal.
- * Ausgefuellte lokale Felder werden nie ueberschrieben.
+ * Zusammenfuehren: fuellt leere Feldgruppen der lokalen Beschaeftigung aus incoming.
+ * Eine Gruppe kommt nur als Ganzes und nur, wenn sie lokal leer ist:
+ * - Vertrag (Beginn, Ende, Wochenstunden, Arbeitstage, Urlaubsmodus, Anfangssaldo,
+ *   Vertragsurlaub): lokal 0 Wochenstunden und incoming mit mehr als 0. Der
+ *   brauchbare Vertrag ersetzt dann auch lokal gesetzte Einzelwerte wie die Arbeitstage.
+ * - Stammdaten (Arbeitgeber, Personalnummer, Abteilung): alle drei lokal leer.
+ * - Name: nur zusammen mit den Stammdaten und nur statt des Standardnamens.
+ * Die id bleibt lokal.
  */
 export function fillEmptyEmployment(
   local: Employment,
@@ -163,7 +167,7 @@ export function fillEmptyEmployment(
   const takeContract =
     localClean.weeklyHours <= 0 && incomingClean.weeklyHours > 0;
 
-  let result: Employment = { ...localClean, id: localClean.id };
+  let result: Employment = { ...localClean };
 
   if (takeContract) {
     result = {
