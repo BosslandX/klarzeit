@@ -58,6 +58,16 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   - **`Profile` behält `arbeitgeber`/`personalnummer`/`abteilung`**, obwohl sie in der
     Oberfläche nicht mehr vorkommen: ältere Backups tragen sie, `cleanProfile` liest
     sie, und aus ihnen entsteht beim Import die erste Beschäftigung.
+  - **Zusammenführen beim Backup-Import (AUF-010):** Eine Beschäftigung des Backups mit
+    gleicher `id` füllt nur **leere Feldgruppen** der lokalen (`fillEmptyEmployment` in
+    `src/db/backup.ts`): den Vertrag, wenn lokal 0 Wochenstunden stehen und das Backup mehr
+    bringt — dann als Ganzes, auch über lokal gesetzte Arbeitstage hinweg; Arbeitgeber,
+    Personalnummer und Abteilung, wenn alle drei leer sind; den Namen nur mit ihnen und nur
+    statt „Beschäftigung 1". Unbekannte IDs kommen hinzu. Ein v1/v2-Backup läuft als eine
+    Beschäftigung `emp-1` (Profil + `employment`) durch dieselbe Regel; fehlt `emp-1` lokal,
+    entsteht sie. Grund: Beim ersten Öffnen speichert die App eine leere
+    Standard-Beschäftigung. Vorher gewann sie beim Zusammenführen (v3), oder die erste
+    Beschäftigung wurde ganz überschrieben, samt Name und Arbeitgeber (v1/v2).
   - ⛔ **`isValidEntry` in `src/db/backup.ts` niemals um `employmentId` verschärfen.**
     Die Prüfung läuft in `restoreBackup` **vor** der Normalisierung — ein verschärftes
     `isValidEntry` weist jedes ältere Backup ab, auch das automatische beim Start mit
