@@ -245,62 +245,61 @@ describe('Urlaubsanspruch (BUrlG)', () => {
   });
 });
 
-
-  describe('annualEntitlement / Vertragsurlaub', () => {
-    it('ohne Vertragswert: days 16, statutory 16, fromContract false', () => {
-      const e = annualEntitlement(emp);
-      expect(e.days).toBe(16);
-      expect(e.statutory).toBe(16);
-      expect(e.fromContract).toBe(false);
-    });
-
-    it('Vertragswert 26: days 26, statutory 16, fromContract true', () => {
-      const e = annualEntitlement({ ...emp, contractVacationDays: 26 });
-      expect(e.days).toBe(26);
-      expect(e.statutory).toBe(16);
-      expect(e.fromContract).toBe(true);
-    });
-
-    it('Vertragswert 12 unter Minimum: days 16, fromContract false', () => {
-      const e = annualEntitlement({ ...emp, contractVacationDays: 12 });
-      expect(e.days).toBe(16);
-      expect(e.fromContract).toBe(false);
-    });
-
-    it('buildVacationStatus Folgejahr 2027, Vertrag 30, drei Tage: annualFull 30, annualStatutory 16, entitlement 30, remaining 27', () => {
-      const withContract = { ...emp, contractVacationDays: 30 };
-      const taken = [
-        new Date(2027, 0, 5).getTime(),
-        new Date(2027, 1, 10).getTime(),
-        new Date(2027, 2, 15).getTime(),
-      ];
-      const s = buildVacationStatus(withContract, taken, 2027);
-      expect(s.annualFull).toBe(30);
-      expect(s.annualStatutory).toBe(16);
-      expect(s.entitlement).toBe(30);
-      expect(s.remaining).toBe(27);
-    });
-
-    it('Eintrittsjahr 2026 prorata, Vertrag 25: prorataExact ~16,6667, prorataRounded 17, entitlement 17', () => {
-      const withContract = {
-        ...emp,
-        contractVacationDays: 25,
-        vacationYearMode: 'prorata' as const,
-      };
-      const s = buildVacationStatus(withContract, [], 2026);
-      expect(s.prorataExact).toBeCloseTo(16.6667, 3);
-      expect(s.prorataRounded).toBe(17);
-      expect(s.entitlement).toBe(17);
-    });
-
-    it('Austritt mit Vertrag 30: Ende 30.06.2027 entitlement 15; Ende 31.08.2027 entitlement 30', () => {
-      const base = { ...emp, contractVacationDays: 30 };
-      const exitH1 = { ...base, endDate: new Date(2027, 5, 30).getTime() };
-      expect(buildVacationStatus(exitH1, [], 2027).entitlement).toBe(15);
-      const exitH2 = { ...base, endDate: new Date(2027, 7, 31).getTime() };
-      expect(buildVacationStatus(exitH2, [], 2027).entitlement).toBe(30);
-    });
+describe('annualEntitlement / Vertragsurlaub', () => {
+  it('ohne Vertragswert: days 16, statutory 16, fromContract false', () => {
+    const e = annualEntitlement(emp);
+    expect(e.days).toBe(16);
+    expect(e.statutory).toBe(16);
+    expect(e.fromContract).toBe(false);
   });
+
+  it('Vertragswert 26: days 26, statutory 16, fromContract true', () => {
+    const e = annualEntitlement({ ...emp, contractVacationDays: 26 });
+    expect(e.days).toBe(26);
+    expect(e.statutory).toBe(16);
+    expect(e.fromContract).toBe(true);
+  });
+
+  it('Vertragswert 12 unter Minimum: days 16, fromContract false', () => {
+    const e = annualEntitlement({ ...emp, contractVacationDays: 12 });
+    expect(e.days).toBe(16);
+    expect(e.fromContract).toBe(false);
+  });
+
+  it('buildVacationStatus Folgejahr 2027, Vertrag 30, drei Tage: annualFull 30, annualStatutory 16, entitlement 30, remaining 27', () => {
+    const withContract = { ...emp, contractVacationDays: 30 };
+    const taken = [
+      new Date(2027, 0, 5).getTime(),
+      new Date(2027, 1, 10).getTime(),
+      new Date(2027, 2, 15).getTime(),
+    ];
+    const s = buildVacationStatus(withContract, taken, 2027);
+    expect(s.annualFull).toBe(30);
+    expect(s.annualStatutory).toBe(16);
+    expect(s.entitlement).toBe(30);
+    expect(s.remaining).toBe(27);
+  });
+
+  it('Eintrittsjahr 2026 prorata, Vertrag 25: prorataExact ~16,6667, prorataRounded 17, entitlement 17', () => {
+    const withContract = {
+      ...emp,
+      contractVacationDays: 25,
+      vacationYearMode: 'prorata' as const,
+    };
+    const s = buildVacationStatus(withContract, [], 2026);
+    expect(s.prorataExact).toBeCloseTo(16.6667, 3);
+    expect(s.prorataRounded).toBe(17);
+    expect(s.entitlement).toBe(17);
+  });
+
+  it('Austritt mit Vertrag 30: Ende 30.06.2027 entitlement 15; Ende 31.08.2027 entitlement 30', () => {
+    const base = { ...emp, contractVacationDays: 30 };
+    const exitH1 = { ...base, endDate: new Date(2027, 5, 30).getTime() };
+    expect(buildVacationStatus(exitH1, [], 2027).entitlement).toBe(15);
+    const exitH2 = { ...base, endDate: new Date(2027, 7, 31).getTime() };
+    expect(buildVacationStatus(exitH2, [], 2027).entitlement).toBe(30);
+  });
+});
 
 describe('Tagessoll', () => {
   it('Wochenstunden / Arbeitstage', () => {

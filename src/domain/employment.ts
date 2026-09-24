@@ -340,13 +340,6 @@ export function annualVacationDays(workdaysPerWeek: number): number {
 }
 
 /**
- * § 5 Abs. 2 BUrlG: Bruchteile von mind. einem halben Tag werden auf volle Tage
- * AUFgerundet. Bruchteile unter einem halben Tag bleiben als Bruchteil bestehen
- * — das Gesetz ordnet nur die Aufrundung an; ein Abrunden waere eine unzulaessige
- * Kuerzung des unabdingbaren Mindesturlaubs (§ 13 Abs. 1 BUrlG).
- */
-
-/**
  * Massgeblicher Jahresurlaub: Vertragswert, sofern gesetzt und nicht unter dem
  * gesetzlichen Minimum — der Mindesturlaub ist unabdingbar (§ 13 Abs. 1 BUrlG,
  * vgl. roundTeilurlaub).
@@ -367,6 +360,12 @@ export function annualEntitlement(emp: Employment): {
   };
 }
 
+/**
+ * § 5 Abs. 2 BUrlG: Bruchteile von mind. einem halben Tag werden auf volle Tage
+ * AUFgerundet. Bruchteile unter einem halben Tag bleiben als Bruchteil bestehen
+ * — das Gesetz ordnet nur die Aufrundung an; ein Abrunden waere eine unzulaessige
+ * Kuerzung des unabdingbaren Mindesturlaubs (§ 13 Abs. 1 BUrlG).
+ */
 export function roundTeilurlaub(days: number): number {
   const frac = days - Math.floor(days);
   return frac >= 0.5 ? Math.ceil(days) : days;

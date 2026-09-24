@@ -261,7 +261,6 @@ function drawInfoPanel(
   return top + h;
 }
 
-
 /** Urlaubsblock: Zeilen + Fussnote (reine Textlogik fuer Tests und PDF). */
 export function buildVacationPanelText(
   v: VacationStatus,
@@ -354,11 +353,12 @@ function drawKontoUndUrlaub(
     `Beschaeftigt seit ${formatDate(emp.startDate)}. Ausgleich n. § 2 (4) Arbeitsvertrag.` +
     urlaubHinweis;
 
-  const { rows: urlaubRowSrc, foot: urlaubFoot } = buildVacationPanelText(v, emp);
-  const urlaubRows: PanelRow[] = urlaubRowSrc.map((r) => ({ ...r }));
-  const rest = urlaubRows[urlaubRows.length - 1];
-  rest.color = v.remaining < 0 ? NEG : POS;
-  rest.bold = true;
+  const { rows: urlaubText, foot: urlaubFoot } = buildVacationPanelText(v, emp);
+  const urlaubRows: PanelRow[] = urlaubText.map((r) =>
+    r.label === 'Resturlaub'
+      ? { ...r, color: v.remaining < 0 ? NEG : POS, bold: true }
+      : r,
+  );
 
   const leftB = drawInfoPanel(doc, MARGIN_X, top, colW, 'Arbeitszeitkonto', kontoRows, kontoFoot);
   const rightB = drawInfoPanel(

@@ -22,6 +22,7 @@ import {
 import {
   decimalHours,
   formatDateWithWeekday,
+  formatDays,
   fromDateInput,
   HOUR,
 } from '../../domain/time';
@@ -457,7 +458,6 @@ export function MoreScreen() {
             ))}
           </select>
         </label>
-
         <label className="field">
           <span>Urlaubsanspruch laut Vertrag (Tage/Jahr)</span>
           <input
@@ -481,14 +481,12 @@ export function MoreScreen() {
             }}
           />
         </label>
-        {emp.contractVacationDays != null &&
-          emp.contractVacationDays <
-            annualEntitlement({ ...emp, contractVacationDays: null }).statutory && (
-            <p className="muted small">
-              Unter dem gesetzlichen Minimum ({annualEntitlement({ ...emp, contractVacationDays: null }).statutory}{' '}
-              Tage/Jahr) gilt der gesetzliche Urlaubsanspruch.
-            </p>
-          )}
+        {emp.contractVacationDays != null && !annualEntitlement(emp).fromContract && (
+          <p className="muted small">
+            Unter dem gesetzlichen Minimum ({annualEntitlement(emp).statutory} Tage/Jahr)
+            gilt der gesetzliche Urlaubsanspruch.
+          </p>
+        )}
         <label className="field">
           <span>Urlaub im Eintrittsjahr ausweisen</span>
           <select
@@ -525,19 +523,9 @@ export function MoreScreen() {
             .toFixed(2)
             .replace('.', ',')}{' '}
           Std. ·{' '}
-          {(() => {
-            const ent = annualEntitlement(emp);
-            return emp.contractVacationDays != null ? (
-              <>
-                Vertrag: {emp.contractVacationDays} Tage/Jahr · gesetzl. Minimum:{' '}
-                {ent.statutory} Tage/Jahr (BUrlG)
-              </>
-            ) : (
-              <>
-                gesetzl. Urlaub: {ent.statutory} Tage/Jahr (BUrlG)
-              </>
-            );
-          })()}
+          {emp.contractVacationDays != null
+            ? `Vertrag: ${formatDays(emp.contractVacationDays)}/Jahr · gesetzl. Minimum: ${annualEntitlement(emp).statutory} Tage/Jahr (BUrlG).`
+            : `gesetzl. Urlaub: ${annualEntitlement(emp).statutory} Tage/Jahr (BUrlG).`}
         </p>
             <button className="btn btn-primary" type="button" onClick={() => void handleSaveEmployment()}>
               {empFlash ? '✓ Gespeichert' : 'Aenderungen speichern'}
