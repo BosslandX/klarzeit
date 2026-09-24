@@ -176,11 +176,6 @@ export async function setActiveEmployment(id: string): Promise<void> {
   await Preferences.set({ key: KEY_ACTIVE, value: id });
 }
 
-export async function hasUsableEmployment(): Promise<boolean> {
-  const emp = await getEmployment();
-  return emp.weeklyHours > 0;
-}
-
 export async function saveEmployment(emp: Employment): Promise<void> {
   const list = await getEmployments();
   const cleaned = cleanEmployment(emp);

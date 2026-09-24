@@ -9,15 +9,13 @@ import {
   getVacationDays,
   hasEmploymentsListStored,
   hasLegacyEmploymentStored,
-  hasUsableEmployment,
   INITIAL_EMPLOYMENT_ID,
   replaceEmployments,
-  saveEmployment,
   saveVacationDays,
   setActiveEmployment,
 } from './employment';
 import type { Profile, TimeEntry } from '../domain/types';
-import { mergeVacationDays } from '../domain/employment';
+import { defaultEmployment, mergeVacationDays } from '../domain/employment';
 import type { Employment, VacationDay } from '../domain/employment';
 import { decimalHours, formatClock, formatDate, netMs } from '../domain/time';
 
@@ -144,15 +142,74 @@ function employmentFromLegacyBackup(data: BackupData): Employment {
   return employmentFromProfile(profile, contract);
 }
 
+
+/**
+ * Fuellt leere Feldgruppen einer lokalen Beschaeftigung aus incoming.
+ * Gruppen: Vertrag, Stammdaten, Name (nur mit Stammdaten + Default-Name), id bleibt lokal.
+ * Ausgefuellte lokale Felder werden nie ueberschrieben.
+ */
+export function fillEmptyEmployment(
+  local: Employment,
+  incoming: Employment,
+): Employment {
+  const localClean = cleanEmployment(local);
+  const incomingClean = cleanEmployment(incoming);
+
+  const stammdatenLeer =
+    localClean.arbeitgeber.trim() === '' &&
+    localClean.personalnummer.trim() === '' &&
+    localClean.abteilung.trim() === '';
+
+  const takeContract =
+    localClean.weeklyHours <= 0 && incomingClean.weeklyHours > 0;
+
+  let result: Employment = { ...localClean, id: localClean.id };
+
+  if (takeContract) {
+    result = {
+      ...result,
+      startDate: incomingClean.startDate,
+      endDate: incomingClean.endDate,
+      weeklyHours: incomingClean.weeklyHours,
+      workdaysPerWeek: incomingClean.workdaysPerWeek,
+      vacationYearMode: incomingClean.vacationYearMode,
+      openingBalanceMs: incomingClean.openingBalanceMs,
+      contractVacationDays: incomingClean.contractVacationDays,
+    };
+  }
+
+  if (stammdatenLeer) {
+    result = {
+      ...result,
+      arbeitgeber: incomingClean.arbeitgeber,
+      personalnummer: incomingClean.personalnummer,
+      abteilung: incomingClean.abteilung,
+    };
+    if (localClean.name === defaultEmployment.name) {
+      result = { ...result, name: incomingClean.name };
+    }
+  }
+
+  return result;
+}
+
 export function mergeEmployments(
   existing: readonly Employment[],
   incoming: readonly Employment[],
 ): Employment[] {
-  const localIds = new Set(existing.map((e) => e.id));
-  const added = incoming
-    .filter((e) => !localIds.has(e.id))
-    .map((e) => cleanEmployment(e));
-  return [...existing.map((e) => cleanEmployment(e)), ...added];
+  const incomingById = new Map(
+    incoming.map((e) => [e.id, cleanEmployment(e)] as const),
+  );
+  const merged = existing.map((e) => {
+    const inc = incomingById.get(e.id);
+    if (inc) {
+      incomingById.delete(e.id);
+      return fillEmptyEmployment(e, inc);
+    }
+    return cleanEmployment(e);
+  });
+  const added = [...incomingById.values()];
+  return [...merged, ...added];
 }
 
 async function applyActiveEmploymentFromBackup(
@@ -197,9 +254,9 @@ async function restoreEmployments(
     return;
   }
 
-  if (data.employment && !(await hasUsableEmployment())) {
-    await saveEmployment(cleanEmployment(data.employment));
-  }
+  await replaceEmployments(
+    mergeEmployments(await getEmployments(), [single]),
+  );
 }
 
 export async function restoreBackup(

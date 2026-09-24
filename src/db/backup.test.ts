@@ -21,11 +21,13 @@ vi.mock('@capacitor/preferences', () => ({
 import {
   getActiveEmploymentId,
   getEmployments,
+  getVacationDays,
   updateEmployment,
   INITIAL_EMPLOYMENT_ID,
 } from './employment';
 import { db } from './db';
 import { getAllEntries } from './entries';
+import { getProfile } from './profile';
 import {
   buildBackup,
   entriesToCsv,
@@ -278,5 +280,256 @@ describe('Backup Version 3 und Beschaeftigungen', () => {
     );
     expect(csv).toContain('Beschaeftigung');
     expect(csv).toContain("'=Firma");
+  });
+});
+
+const zeiterfassungV2 = {
+  app: 'zeiterfassung' as const,
+  version: 2 as const,
+  exportedAt: 1,
+  profile: {
+    vorname: 'Erika',
+    nachname: 'Mustermann',
+    personalnummer: 'P-77',
+    arbeitgeber: 'Alt AG',
+    abteilung: 'Lager',
+  },
+  entries: [
+    baseEntry({ activity: 'E1' }),
+    baseEntry({
+      activity: 'E2',
+      start: 1_700_001_000_000,
+      end: 1_700_001_360_000,
+    }),
+  ],
+  employment: {
+    startDate: new Date(2025, 2, 1).getTime(),
+    endDate: null,
+    weeklyHours: 30,
+    workdaysPerWeek: 4,
+    vacationYearMode: 'prorata' as const,
+    openingBalanceMs: 3_600_000,
+  },
+  vacations: [
+    { date: new Date(2026, 6, 6).getTime(), note: '' },
+    { date: new Date(2026, 6, 7).getTime(), note: '' },
+  ],
+};
+
+const erwartetAusV2 = {
+  id: 'emp-1',
+  name: 'Alt AG',
+  arbeitgeber: 'Alt AG',
+  personalnummer: 'P-77',
+  abteilung: 'Lager',
+  startDate: new Date(2025, 2, 1).getTime(),
+  endDate: null,
+  weeklyHours: 30,
+  workdaysPerWeek: 4,
+  vacationYearMode: 'prorata' as const,
+  openingBalanceMs: 3_600_000,
+  contractVacationDays: null,
+};
+
+describe('Zusammenfuehren in eine vorhandene Beschaeftigung', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+  });
+
+  it('v2 zusammenfuehren nach erstem Oeffnen: Beschaeftigung vollstaendig', async () => {
+    const before = await getEmployments();
+    expect(before).toHaveLength(1);
+    expect(before[0].id).toBe('emp-1');
+    expect(before[0].weeklyHours).toBe(0);
+
+    const n = await restoreBackup(JSON.stringify(zeiterfassungV2), 'merge');
+    expect(n).toBe(2);
+
+    const list = await getEmployments();
+    expect(list).toEqual([erwartetAusV2]);
+
+    const entries = await getAllEntries();
+    expect(entries).toHaveLength(2);
+    expect(entries.every((e) => e.employmentId === 'emp-1')).toBe(true);
+
+    const vacations = await getVacationDays();
+    expect(vacations).toHaveLength(2);
+    expect(vacations.every((v) => v.employmentId === 'emp-1')).toBe(true);
+
+    expect(await getProfile()).toEqual(zeiterfassungV2.profile);
+  });
+
+  it('v2 ersetzen nach erstem Oeffnen: dieselbe Beschaeftigung', async () => {
+    await getEmployments();
+    await restoreBackup(JSON.stringify(zeiterfassungV2), 'replace');
+    const list = await getEmployments();
+    expect(list).toEqual([erwartetAusV2]);
+  });
+
+  it('v1 zusammenfuehren: Stammdaten kommen, Vertrag ohne Wochenstunden bleibt', async () => {
+    prefStore.set(
+      'employments',
+      JSON.stringify([
+        {
+          ...defaultEmployment,
+          workdaysPerWeek: 3,
+          vacationYearMode: 'full',
+        },
+      ]),
+    );
+    const backup = {
+      app: 'zeiterfassung' as const,
+      version: 1 as const,
+      exportedAt: 1,
+      profile: zeiterfassungV2.profile,
+      entries: [baseEntry()],
+    };
+    await restoreBackup(JSON.stringify(backup), 'merge');
+    const list = await getEmployments();
+    expect(list).toHaveLength(1);
+    const e = list[0];
+    expect(e.name).toBe('Alt AG');
+    expect(e.arbeitgeber).toBe('Alt AG');
+    expect(e.personalnummer).toBe('P-77');
+    expect(e.abteilung).toBe('Lager');
+    expect(e.weeklyHours).toBe(0);
+    expect(e.workdaysPerWeek).toBe(3);
+    expect(e.vacationYearMode).toBe('full');
+  });
+
+  it('zusammenfuehren: eingerichtete Beschaeftigung bleibt unveraendert', async () => {
+    const local = {
+      ...defaultEmployment,
+      name: 'Mein Job',
+      arbeitgeber: 'Neu GmbH',
+      personalnummer: 'N-1',
+      abteilung: 'Kasse',
+      weeklyHours: 12,
+      workdaysPerWeek: 3,
+    };
+    prefStore.set('employments', JSON.stringify([local]));
+    await restoreBackup(JSON.stringify(zeiterfassungV2), 'merge');
+    const list = await getEmployments();
+    expect(list[0].name).toBe('Mein Job');
+    expect(list[0].arbeitgeber).toBe('Neu GmbH');
+    expect(list[0].personalnummer).toBe('N-1');
+    expect(list[0].abteilung).toBe('Kasse');
+    expect(list[0].weeklyHours).toBe(12);
+    expect(list[0].workdaysPerWeek).toBe(3);
+  });
+
+  it('zusammenfuehren: leerer Vertrag wird gefuellt, lokale Stammdaten bleiben', async () => {
+    prefStore.set(
+      'employments',
+      JSON.stringify([
+        {
+          ...defaultEmployment,
+          name: 'Mein Job',
+          arbeitgeber: 'Neu GmbH',
+        },
+      ]),
+    );
+    await restoreBackup(JSON.stringify(zeiterfassungV2), 'merge');
+    const e = (await getEmployments())[0];
+    expect(e.weeklyHours).toBe(30);
+    expect(e.workdaysPerWeek).toBe(4);
+    expect(e.vacationYearMode).toBe('prorata');
+    expect(e.name).toBe('Mein Job');
+    expect(e.arbeitgeber).toBe('Neu GmbH');
+    expect(e.personalnummer).toBe('');
+    expect(e.abteilung).toBe('');
+  });
+
+  it('zusammenfuehren: leere Stammdaten werden gefuellt, Vertrag und Name bleiben', async () => {
+    prefStore.set(
+      'employments',
+      JSON.stringify([
+        {
+          ...defaultEmployment,
+          name: 'Nebenjob',
+          weeklyHours: 12,
+          workdaysPerWeek: 3,
+        },
+      ]),
+    );
+    await restoreBackup(JSON.stringify(zeiterfassungV2), 'merge');
+    const e = (await getEmployments())[0];
+    expect(e.weeklyHours).toBe(12);
+    expect(e.workdaysPerWeek).toBe(3);
+    expect(e.arbeitgeber).toBe('Alt AG');
+    expect(e.personalnummer).toBe('P-77');
+    expect(e.abteilung).toBe('Lager');
+    expect(e.name).toBe('Nebenjob');
+  });
+
+  it('zusammenfuehren ohne lokale emp-1: Beschaeftigung aus dem Backup kommt hinzu', async () => {
+    prefStore.set(
+      'employments',
+      JSON.stringify([
+        {
+          ...defaultEmployment,
+          id: 'emp-x',
+          name: 'Nebenjob',
+          weeklyHours: 10,
+        },
+      ]),
+    );
+    await restoreBackup(JSON.stringify(zeiterfassungV2), 'merge');
+    const list = await getEmployments();
+    expect(list).toHaveLength(2);
+    const empX = list.find((e) => e.id === 'emp-x');
+    expect(empX?.name).toBe('Nebenjob');
+    expect(empX?.weeklyHours).toBe(10);
+    const emp1 = list.find((e) => e.id === 'emp-1');
+    expect(emp1).toEqual(erwartetAusV2);
+
+    const ids = new Set(list.map((e) => e.id));
+    const entries = await getAllEntries();
+    expect(entries.every((e) => ids.has(e.employmentId))).toBe(true);
+    const vacations = await getVacationDays();
+    expect(vacations.every((v) => ids.has(v.employmentId))).toBe(true);
+  });
+
+  it('v3 zusammenfuehren nach erstem Oeffnen: leere emp-1 wird aus dem Backup gefuellt', async () => {
+    await getEmployments();
+    const backup: BackupData = {
+      app: 'zeiterfassung',
+      version: 3,
+      exportedAt: 1,
+      profile: zeiterfassungV2.profile,
+      entries: [],
+      employments: [
+        {
+          ...defaultEmployment,
+          name: 'Hauptjob',
+          arbeitgeber: 'Alt AG',
+          personalnummer: 'P-77',
+          abteilung: 'Lager',
+          weeklyHours: 30,
+          workdaysPerWeek: 4,
+        },
+        {
+          ...defaultEmployment,
+          id: 'emp-b',
+          name: 'Nebenjob',
+          weeklyHours: 10,
+        },
+      ],
+    };
+    await restoreBackup(JSON.stringify(backup), 'merge');
+    const list = await getEmployments();
+    expect(list).toHaveLength(2);
+    const emp1 = list.find((e) => e.id === 'emp-1');
+    expect(emp1?.name).toBe('Hauptjob');
+    expect(emp1?.arbeitgeber).toBe('Alt AG');
+    expect(emp1?.personalnummer).toBe('P-77');
+    expect(emp1?.abteilung).toBe('Lager');
+    expect(emp1?.weeklyHours).toBe(30);
+    expect(emp1?.workdaysPerWeek).toBe(4);
+    const empB = list.find((e) => e.id === 'emp-b');
+    expect(empB?.weeklyHours).toBe(10);
   });
 });
