@@ -93,6 +93,9 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
 Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
 - `src/db/db.ts` → Dexie-DB-Name `'zeiterfassung'`
 - `src/db/backup.ts` + `src/db/auto-backup.ts` → Format-Kennung `app: 'zeiterfassung'`
+- `src/domain/employment.ts` → Feldname `contractVacationDays` (steht in Preferences
+  `employments` und in jedem Backup; umbenannt verwirft `cleanEmployment` den alten Wert,
+  und der Vertragsurlaub fällt still auf das gesetzliche Minimum zurück)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
