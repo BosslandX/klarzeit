@@ -29,7 +29,7 @@ export interface TimeEntry {
   breakMinutes: number; // Pause in Minuten (wird von der Dauer abgezogen)
   /** Clockodo-Kunde/Projekt/Leistung; fehlt/null = keine Auswahl. */
   clockodo?: ClockodoEntryRef | null;
-  /** Clockodo-Übertragungsstand; fehlt = nie übertragen. */
+  /** Clockodo-Uebertragungsstand; fehlt = nie uebertragen. */
   clockodoSync?: ClockodoSync;
   activity: string; // Taetigkeit / Beschreibung
   note: string; // optionale Notiz

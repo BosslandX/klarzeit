@@ -1,5 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import type { ClockodoLists } from '../domain/clockodo';
+import type { ClockodoEntryPayload } from '../domain/clockodo-transfer';
 
 export const CLOCKODO_API = 'https://my.clockodo.com/api';
 
@@ -269,7 +270,6 @@ export async function fetchLists(
   };
 }
 
-
 function positiveEntryId(v: unknown): number | null {
   if (typeof v !== 'number' || !Number.isFinite(v)) return null;
   const n = Math.trunc(v);
@@ -301,22 +301,25 @@ async function clockodoRequest(
     if (e instanceof ClockodoError) throw e;
     throw new ClockodoError('network', 'Keine Verbindung zu Clockodo.');
   }
-  return { status: res.status, data: parseData(res.data) };
+  return { status: res.status, data: res.data };
 }
 
 export async function createEntry(
   auth: ClockodoAuth,
-  payload: unknown,
+  payload: ClockodoEntryPayload,
   http?: ClockodoHttp,
 ): Promise<number> {
   const h = http ?? defaultHttp;
   const res = await clockodoRequest(auth, 'POST', '/v2/entries', payload, h);
   const err = mapStatus(res.status);
   if (err) throw err;
-  if (typeof res.data !== 'object' || res.data === null) {
+  // Erst der Status, dann die Form: ein Fehlerstatus mit Nicht-JSON-Antwort muss als
+  // dieser Fehler ankommen (401 -> auth, damit ein Lauf abbricht), nicht als 'format'.
+  const body = parseData(res.data);
+  if (typeof body !== 'object' || body === null) {
     throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
   }
-  const entry = (res.data as { entry?: unknown }).entry;
+  const entry = (body as { entry?: unknown }).entry;
   if (typeof entry !== 'object' || entry === null) {
     throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
   }

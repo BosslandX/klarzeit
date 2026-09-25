@@ -192,6 +192,25 @@ describe('clockodo client', () => {
       expect(m).not.toContain('KEY123');
     }
   });
+  it('Fehlerstatus kommt vor der Formpruefung bei POST und DELETE', async () => {
+    const { createEntry, deleteClockodoEntry } = await import('./client');
+    const payload = {
+      customers_id: 11,
+      services_id: 31,
+      time_since: '2026-07-06T06:00:00Z',
+      time_until: '2026-07-06T08:00:00Z',
+    };
+    const keinJson = (status: number): ClockodoHttp => async () => ({
+      status,
+      data: '<html>kein JSON</html>',
+    });
+    await expect(createEntry(AUTH, payload, keinJson(401))).rejects.toMatchObject({
+      kind: 'auth',
+    });
+    await expect(deleteClockodoEntry(AUTH, 501, keinJson(500))).rejects.toMatchObject({
+      kind: 'server',
+    });
+  });
 });
   it('createEntry sendet POST und liefert die id', async () => {
     const calls: ClockodoRequest[] = [];
@@ -228,7 +247,16 @@ describe('clockodo client', () => {
     });
     const { createEntry } = await import('./client');
     await expect(
-      createEntry(AUTH, { customers_id: 11, services_id: 31 }, http),
+      createEntry(
+        AUTH,
+        {
+          customers_id: 11,
+          services_id: 31,
+          time_since: '2026-07-06T06:00:00Z',
+          time_until: '2026-07-06T08:00:00Z',
+        },
+        http,
+      ),
     ).rejects.toMatchObject({ kind: 'format' });
   });
 
