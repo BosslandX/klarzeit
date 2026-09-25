@@ -7,6 +7,12 @@ export interface ClockodoConfig {
   billable: 0 | 1 | null;
 }
 
+export interface ClockodoEntryRef {
+  customersId: number;
+  projectsId: number | null;
+  servicesId: number;
+}
+
 export interface ClockodoLists {
   fetchedAt: number;
   customers: { id: number; name: string }[];
@@ -37,5 +43,31 @@ export function cleanClockodoConfig(raw: unknown): ClockodoConfig | null {
     defaultProjectsId: positiveInt(x.defaultProjectsId),
     defaultServicesId: positiveInt(x.defaultServicesId),
     billable,
+  };
+}
+
+export function cleanClockodoEntryRef(raw: unknown): ClockodoEntryRef | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const x = raw as Record<string, unknown>;
+  const customersId = positiveInt(x.customersId);
+  const servicesId = positiveInt(x.servicesId);
+  if (customersId === null || servicesId === null) return null;
+  if (x.projectsId === undefined || x.projectsId === null) {
+    return { customersId, projectsId: null, servicesId };
+  }
+  const projectsId = positiveInt(x.projectsId);
+  if (projectsId === null) return null;
+  return { customersId, projectsId, servicesId };
+}
+
+export function defaultEntryRef(config: ClockodoConfig | null): ClockodoEntryRef | null {
+  if (config === null) return null;
+  if (config.defaultCustomersId === null || config.defaultServicesId === null) {
+    return null;
+  }
+  return {
+    customersId: config.defaultCustomersId,
+    projectsId: config.defaultProjectsId,
+    servicesId: config.defaultServicesId,
   };
 }

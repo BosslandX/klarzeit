@@ -1,3 +1,5 @@
+import type { ClockodoEntryRef } from './clockodo';
+
 /** Personenbezogene Stammdaten (Single-User). Erscheint im Report-Kopf. */
 export interface Profile {
   vorname: string;
@@ -25,6 +27,8 @@ export interface TimeEntry {
   /** Pausen mit Uhrzeit; fehlt das Feld, sind keine Pausenzeiten bekannt (vor 1.7). */
   breaks?: BreakInterval[];
   breakMinutes: number; // Pause in Minuten (wird von der Dauer abgezogen)
+  /** Clockodo-Kunde/Projekt/Leistung; fehlt/null = keine Auswahl. */
+  clockodo?: ClockodoEntryRef | null;
   activity: string; // Taetigkeit / Beschreibung
   note: string; // optionale Notiz
   source: EntrySource;

@@ -40,6 +40,7 @@ function defaultManualDraft(): EntryDraft {
     activity: '',
     note: '',
     source: 'manual',
+    clockodo: null,
   };
 }
 
@@ -53,6 +54,7 @@ function entryToDraft(entry: TimeEntry): EntryDraft {
     note: entry.note,
     source: entry.source,
     employmentId: entry.employmentId,
+    clockodo: entry.clockodo ?? null,
   };
 }
 

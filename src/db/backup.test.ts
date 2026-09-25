@@ -678,3 +678,91 @@ describe('Pausen mit Uhrzeit im Backup', () => {
   });
 
 });
+
+describe('Clockodo-Auswahl im Backup', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+  });
+
+  const REF = { customersId: 11, projectsId: 21, servicesId: 31 };
+
+  function pauseDay(h1: number, m1: number, h2: number, m2: number) {
+    return {
+      start: new Date(2026, 6, 6, h1, m1).getTime(),
+      end: new Date(2026, 6, 6, h2, m2).getTime(),
+    };
+  }
+
+  it('Clockodo-Auswahl uebersteht die Backup-Rundreise', async () => {
+    const { addEntry } = await import('./entries');
+    const start = new Date(2026, 6, 6, 8, 0).getTime();
+    const end = new Date(2026, 6, 6, 16, 30).getTime();
+    await addEntry({
+      start,
+      end,
+      breakMinutes: 45,
+      breaks: [pauseDay(12, 0, 12, 30), pauseDay(10, 0, 10, 15)],
+      activity: 'a',
+      note: '',
+      source: 'manual',
+      clockodo: REF,
+    });
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const imported = await getAllEntries();
+    expect(imported).toHaveLength(1);
+    expect(imported[0].clockodo).toEqual(REF);
+  });
+
+  it('ungueltige Clockodo-Auswahl faellt beim Import weg', async () => {
+    const backup: BackupData = {
+      app: 'zeiterfassung',
+      version: 3,
+      exportedAt: 1,
+      profile: {
+        vorname: '',
+        nachname: '',
+        personalnummer: '',
+        arbeitgeber: '',
+        abteilung: '',
+      },
+      entries: [
+        {
+          ...baseEntry(),
+          clockodo: { customersId: 'x', servicesId: 31 },
+        } as unknown as import('../domain/types').TimeEntry,
+      ],
+    };
+    const n = await restoreBackup(JSON.stringify(backup), 'replace');
+    expect(n).toBe(1);
+    const imported = await getAllEntries();
+    expect(imported[0].clockodo).toBeUndefined();
+  });
+
+  it('Eintrag ohne Clockodo-Auswahl bleibt ohne', async () => {
+    const backup: BackupData = {
+      app: 'zeiterfassung',
+      version: 3,
+      exportedAt: 1,
+      profile: {
+        vorname: '',
+        nachname: '',
+        personalnummer: '',
+        arbeitgeber: '',
+        abteilung: '',
+      },
+      entries: [baseEntry() as import('../domain/types').TimeEntry],
+    };
+    await restoreBackup(JSON.stringify(backup), 'replace');
+    const imported = await getAllEntries();
+    expect(imported[0].clockodo).toBeUndefined();
+  });
+});
+

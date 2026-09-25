@@ -70,6 +70,7 @@ export function HomeScreen({ tracker }: Props) {
       note: '',
       source: 'tracked',
       employmentId: running.employmentId,
+      clockodo: null,
     });
   };
 

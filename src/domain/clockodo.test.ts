@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { cleanClockodoConfig } from './clockodo';
+import {
+  cleanClockodoConfig,
+  cleanClockodoEntryRef,
+  defaultEntryRef,
+} from './clockodo';
 
 const CFG = {
   apiUser: 'testnutzer',
@@ -9,6 +13,8 @@ const CFG = {
   defaultServicesId: 31,
   billable: 1 as const,
 };
+
+const REF = { customersId: 11, projectsId: 21, servicesId: 31 };
 
 describe('clockodo domain', () => {
   it('cleanClockodoConfig: gueltige Konfiguration bleibt', () => {
@@ -40,5 +46,45 @@ describe('clockodo domain', () => {
     expect(cleanClockodoConfig({ ...CFG, apiUser: 5 })).toMatchObject({
       apiUser: '',
     });
+  });
+
+  it('cleanClockodoEntryRef: gueltige Auswahl', () => {
+    expect(cleanClockodoEntryRef(REF)).toEqual(REF);
+    expect(cleanClockodoEntryRef({ customersId: 11, servicesId: 31 })).toEqual({
+      customersId: 11,
+      projectsId: null,
+      servicesId: 31,
+    });
+    expect(cleanClockodoEntryRef({ ...REF, projectsId: null })).toEqual({
+      customersId: 11,
+      projectsId: null,
+      servicesId: 31,
+    });
+  });
+
+  it('cleanClockodoEntryRef: ungueltige Auswahl', () => {
+    expect(cleanClockodoEntryRef(null)).toBeNull();
+    expect(cleanClockodoEntryRef('x')).toBeNull();
+    expect(cleanClockodoEntryRef({ servicesId: 31 })).toBeNull();
+    expect(cleanClockodoEntryRef({ customersId: 11, servicesId: 0 })).toBeNull();
+    expect(cleanClockodoEntryRef({ customersId: '11', servicesId: 31 })).toBeNull();
+    expect(
+      cleanClockodoEntryRef({ customersId: 11, projectsId: 1.5, servicesId: 31 }),
+    ).toBeNull();
+  });
+
+  it('defaultEntryRef aus den Vorgaben', () => {
+    expect(defaultEntryRef(CFG)).toEqual({
+      customersId: 11,
+      projectsId: null,
+      servicesId: 31,
+    });
+    expect(defaultEntryRef({ ...CFG, defaultProjectsId: 21 })).toEqual({
+      customersId: 11,
+      projectsId: 21,
+      servicesId: 31,
+    });
+    expect(defaultEntryRef({ ...CFG, defaultServicesId: null })).toBeNull();
+    expect(defaultEntryRef(null)).toBeNull();
   });
 });

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BreakInterval, EntrySource } from '../../domain/types';
+import type { ClockodoEntryRef, ClockodoLists } from '../../domain/clockodo';
+import { defaultEntryRef } from '../../domain/clockodo';
 import { resolveBreakMinutes, validateBreaks } from '../../domain/breaks';
 import {
   fromDatetimeLocal,
@@ -12,6 +14,7 @@ import {
   setActiveEmployment,
   useEmployments,
 } from '../../db/employment';
+import { getClockodoLists } from '../../db/clockodo-lists';
 
 export interface EntryDraft {
   start: number;
@@ -22,6 +25,7 @@ export interface EntryDraft {
   note: string;
   source: EntrySource;
   employmentId?: string;
+  clockodo: ClockodoEntryRef | null;
 }
 
 interface Props {
@@ -38,6 +42,16 @@ function breakInputValue(ms: number): string {
 
 function isCompleteBreak(b: BreakInterval): boolean {
   return Number.isFinite(b.start) && Number.isFinite(b.end);
+}
+
+function withStaleOption(
+  items: { id: number; name: string }[],
+  selectedId: number | null,
+): { id: number; name: string }[] {
+  if (selectedId == null || items.some((i) => i.id === selectedId)) {
+    return items;
+  }
+  return [...items, { id: selectedId, name: `ID ${selectedId}` }];
 }
 
 export function EntryFormModal({
@@ -61,6 +75,10 @@ export function EntryFormModal({
   const [activity, setActivity] = useState(initial.activity);
   const [note, setNote] = useState(initial.note);
   const [employmentId, setEmploymentId] = useState(initial.employmentId ?? '');
+  const [clockodoSel, setClockodoSel] = useState<ClockodoEntryRef | null>(
+    initial.clockodo,
+  );
+  const [clockodoLists, setClockodoLists] = useState<ClockodoLists | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +90,35 @@ export function EntryFormModal({
     if (empLoading) return;
     void getActiveEmploymentId().then((id) => setEmploymentId(id));
   }, [initial.employmentId, empLoading]);
+
+  const employmentConfig = useMemo(() => {
+    const emp = employments.find((e) => e.id === employmentId);
+    return emp?.clockodo ?? null;
+  }, [employments, employmentId]);
+
+  useEffect(() => {
+    if (!employmentId) return;
+    void getClockodoLists(employmentId).then(setClockodoLists);
+  }, [employmentId]);
+
+  useEffect(() => {
+    if (empLoading || !employmentId) return;
+    setClockodoSel(
+      initial.clockodo ??
+        defaultEntryRef(employmentConfig) ?? {
+          customersId: 0,
+          projectsId: null,
+          servicesId: 0,
+        },
+    );
+  }, [
+    initial.start,
+    initial.end,
+    initial.clockodo,
+    employmentConfig,
+    empLoading,
+    employmentId,
+  ]);
 
   const completeBreaks = useMemo(
     () => breaks.filter(isCompleteBreak),
@@ -92,9 +139,32 @@ export function EntryFormModal({
     legacyMinutes > 0 && completeBreaks.length === 0;
 
   const showEmploymentPick = employments.length > 1;
+  const showClockodo = employmentConfig != null;
+
+  const customerOptions = useMemo(() => {
+    const base = clockodoLists?.customers ?? [];
+    return withStaleOption(base, clockodoSel?.customersId ?? null);
+  }, [clockodoLists, clockodoSel?.customersId]);
+
+  const projectOptions = useMemo(() => {
+    if (clockodoSel == null) return [];
+    const base = clockodoLists
+      ? clockodoLists.projects.filter(
+          (p) => p.customersId === clockodoSel.customersId,
+        )
+      : [];
+    return withStaleOption(base, clockodoSel.projectsId);
+  }, [clockodoLists, clockodoSel]);
+
+  const serviceOptions = useMemo(() => {
+    const base = clockodoLists?.services ?? [];
+    return withStaleOption(base, clockodoSel?.servicesId ?? null);
+  }, [clockodoLists, clockodoSel?.servicesId]);
 
   const handleEmploymentChange = async (id: string) => {
     setEmploymentId(id);
+    const emp = employments.find((e) => e.id === id);
+    setClockodoSel(defaultEntryRef(emp?.clockodo ?? null));
     try {
       await setActiveEmployment(id);
     } catch {
@@ -139,7 +209,6 @@ export function EntryFormModal({
       setError(breakErr);
       return;
     }
-    // Deckt auch alte Eintraege ohne Pausenzeiten ab, die validateBreaks nicht sieht.
     const breakMinutes = resolveBreakMinutes(sorted, legacyMinutes);
     if (breakMinutes * 60_000 >= end - start) {
       setError('Die Pause ist laenger als die erfasste Zeitspanne.');
@@ -148,6 +217,19 @@ export function EntryFormModal({
     if (!employmentId) {
       setError('Bitte eine Beschaeftigung waehlen.');
       return;
+    }
+    let clockodoOut: ClockodoEntryRef | null = null;
+    if (
+      employmentConfig != null &&
+      clockodoSel != null &&
+      clockodoSel.customersId > 0 &&
+      clockodoSel.servicesId > 0
+    ) {
+      clockodoOut = {
+        customersId: clockodoSel.customersId,
+        projectsId: clockodoSel.projectsId,
+        servicesId: clockodoSel.servicesId,
+      };
     }
     setError(null);
     setSaving(true);
@@ -161,6 +243,7 @@ export function EntryFormModal({
         note: note.trim(),
         source: initial.source,
         employmentId,
+        clockodo: clockodoOut,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.');
@@ -266,6 +349,93 @@ export function EntryFormModal({
         <div className="modal-duration">
           Pause gesamt: {effectiveBreakMinutes} min
         </div>
+
+        {showClockodo && (
+          <div className="clockodo-entry-fields">
+            <h4 className="sub-head">Clockodo</h4>
+            {!clockodoLists && (
+              <p className="muted small">
+                {
+                  'Clockodo-Listen fehlen – in Mehr > Beschaeftigung > Verbindung testen.'
+                }
+              </p>
+            )}
+            {clockodoSel && (
+              <>
+                <label className="field">
+                  <span>Kunde</span>
+                  <select
+                    value={clockodoSel.customersId || ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const customersId = v ? Number(v) : 0;
+                      setClockodoSel((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              customersId,
+                              projectsId: null,
+                            }
+                          : null,
+                      );
+                    }}
+                  >
+                    <option value="">—</option>
+                    {customerOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Projekt</span>
+                  <select
+                    value={clockodoSel.projectsId ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setClockodoSel((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              projectsId: v ? Number(v) : null,
+                            }
+                          : null,
+                      );
+                    }}
+                  >
+                    <option value="">kein Projekt</option>
+                    {projectOptions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Leistung</span>
+                  <select
+                    value={clockodoSel.servicesId || ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const servicesId = v ? Number(v) : 0;
+                      setClockodoSel((prev) =>
+                        prev ? { ...prev, servicesId } : null,
+                      );
+                    }}
+                  >
+                    <option value="">—</option>
+                    {serviceOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+          </div>
+        )}
 
         <label className="field">
           <span>Taetigkeit</span>
