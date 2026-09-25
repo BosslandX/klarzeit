@@ -95,6 +95,14 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
 - **Nicht abgebildet:** Feiertage, Krankheit und sonstige bezahlte Freistellung erzeugen weiterhin
   Minusstunden; halbe Urlaubstage sind konstruktiv unmöglich (`taken` ist `.length`); kein
   Resturlaub-Übertrag (§ 7 III BUrlG); `VacationDay.note` existiert, ist in der UI aber tot.
+- **Pausen mit Uhrzeit (AUF-011):** `TimeEntry.breaks?: BreakInterval[]` (Beginn/Ende, epoch ms).
+  Fehlt das Feld, sind keine Pausenzeiten bekannt (Einträge vor 1.7) und allein `breakMinutes`
+  gilt. `breakMinutes` bleibt gespeichert und ist weiter die Rechengrundlage für `netMs`, PDF,
+  CSV und Konto; das Formular setzt es über `resolveBreakMinutes` aus den Pausen. Die Regeln
+  stehen je an einer Stelle in `validateBreaks` (`src/domain/breaks.ts`). Jeder `EntryDraft`
+  trägt `breaks` ausdrücklich, auch leer — `updateEntry` nutzt Dexies `update`, das ein
+  fehlendes Feld stehen ließe. **Keine vorbelegten Pausenzeiten** (Anlass: Übertragung an
+  Clockodo, das Pausen nur als Lücke zwischen Einträgen kennt).
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
@@ -106,6 +114,9 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
 - `src/domain/employment.ts` → Feldname `contractVacationDays` (steht in Preferences
   `employments` und in jedem Backup; umbenannt verwirft `cleanEmployment` den alten Wert,
   und der Vertragsurlaub fällt still auf das gesetzliche Minimum zurück)
+- `src/domain/types.ts` → Feld `breaks` mit `start`/`end` am `TimeEntry` (steht in der
+  Dexie-Datenbank und in jedem Backup; umbenannt verwirft `cleanBreaks` beim Import jede
+  Pausenzeit)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
