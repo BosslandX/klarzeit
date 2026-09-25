@@ -6,7 +6,7 @@
 - **Typ:** Capacitor-Android-App (lokale Zeiterfassung)
 - **Stack:** Vite + React 19 + TypeScript, Capacitor 8, Dexie (IndexedDB), jsPDF, date-fns
 - **App-ID:** `io.github.bosslandx.klarzeit` · webDir: `dist`
-- **Version:** 1.6.1 (`versionCode 9`)
+- **Version:** 1.7.0 (`versionCode 10`)
 
 ## Build & Run
 ```bash
@@ -120,6 +120,20 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   bei einer kaputten Projekt-ID). Das Formular zeigt die Auswahl nur bei Beschäftigungen mit
   Zugang, Startwert `defaultEntryRef` der Beschäftigung; `EntryDraft.clockodo` ist Pflicht
   (Dexie-`update`, wie `breaks`). Gespeichert wird nur eine vollständige Auswahl, sonst `null`.
+- **Übertragung an Clockodo (AUF-014/015), nur Klarzeit → Clockodo, nur auf Knopfdruck:**
+  `src/domain/clockodo-transfer.ts` (rein): je Arbeitsabschnitt zwischen den Pausen ein
+  Clockodo-Eintrag (`workSegments`, `buildEntryPayloads`), UTC ohne Millisekunden, Prüfsumme
+  `entrySyncHash` (FNV-1a über das Gesendete), `transferStatus` in fester Reihenfolge
+  (none, before-start, untimed-break, incomplete, pending, changed, synced).
+  `TimeEntry.clockodoSync` = IDs der angelegten Einträge + Prüfsumme; nicht im `EntryDraft`
+  (so bleibt ein bearbeiteter Eintrag als `changed` erkennbar), im Backup. Ablauf
+  `src/clockodo/transfer.ts`: Löschvermerke (`clockodoDeletes:<id>`) zuerst, geänderte
+  Einträge erst einzeln löschen, dann neu senden; scheitert ein Abschnitt, werden die schon
+  angelegten wieder gelöscht, und **scheitert auch das, wird der Abschnitt vermerkt** (sonst
+  Doppelbuchung). `auth`/`network`/`rate` brechen den ganzen Lauf ab. Client: erst Status,
+  dann JSON (ein 401 mit Nicht-JSON-Antwort muss als `auth` ankommen). „Alle Einträge
+  löschen" und Backup-Ersetzen vermerken nichts — nur das Löschen eines übertragenen
+  Eintrags in der Liste (`deleteEntryWithClockodo`).
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
@@ -141,6 +155,9 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
   gespeicherten API-Schlüssel nicht mehr)
 - `src/domain/types.ts` → Feld `clockodo` mit `customersId`/`projectsId`/`servicesId` am
   `TimeEntry` (Dexie und Backup; umbenannt verliert jeder Eintrag seine Clockodo-Auswahl)
+- `src/domain/types.ts` → Feld `clockodoSync` mit `ids`/`hash`/`at` am `TimeEntry` (Dexie
+  und Backup; umbenannt gelten alle Einträge als nie übertragen — der nächste Lauf bucht
+  **alles doppelt**); Preferences-Schlüssel `clockodoDeletes:<employmentId>`
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.

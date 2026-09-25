@@ -35,7 +35,8 @@ running working-time account (target vs. actual with carry-over) and calculates
 statutory leave under the German Federal Leave Act.
 
 No account, no sign-in, no server. Data lives in the app on the device and only
-leaves it when *you* share a PDF, a CSV file or a backup.
+leaves it when *you* share a PDF, a CSV file or a backup — or when you switch on
+the Clockodo transfer for an employment and trigger it yourself.
 
 ---
 
@@ -61,12 +62,14 @@ All screenshots show **made-up demo data**.
 |  | Cloud tracker | Spreadsheet | **Klarzeit** |
 |---|---|---|---|
 | Account required | yes | – | **no** |
-| Where data lives | someone's server | a file | **your device only** |
+| Where data lives | someone's server | a file | **your device only**¹ |
 | Recurring cost | usually monthly | – | **none** |
 | Works offline | rarely | yes | **always** |
 | Working-time account | sometimes | manual | **automatic, carried forward** |
 | Statutory leave | rarely | manual | **calculated, with statute references** |
 | Open source | rarely | – | **yes, MIT** |
+
+¹ Unless you explicitly send entries to Clockodo — see [Privacy](#privacy).
 
 ---
 
@@ -108,9 +111,14 @@ so night shifts are not split at midnight.
 - No analytics, no crash reporting, no ad IDs, no trackers.
 - The only outbound connection the app makes on its own is the update check
   against this repository's GitHub releases — and you trigger it yourself.
+- Optional, per employment: **transfer to Clockodo**. When you switch it on, the
+  app sends that employment's entries (times, breaks as gaps, activity, customer,
+  project, service) to your Clockodo account — only when you tap “An Clockodo
+  uebertragen”. The API key is kept encrypted in the Android KeyStore, excluded
+  from Google backup and device transfer, and never part of a Klarzeit backup.
 - PDF, CSV and backup leave the device only through the share sheet you operate.
 
-Permissions: `INTERNET` (update check), `WRITE_EXTERNAL_STORAGE` (automatic
+Permissions: `INTERNET` (update check; Clockodo transfer if switched on), `WRITE_EXTERNAL_STORAGE` (automatic
 backup, Android 10 and below only), `REQUEST_INSTALL_PACKAGES` (opens the system
 installer for in-app updates — you confirm the install).
 

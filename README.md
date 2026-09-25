@@ -38,7 +38,8 @@ gesetzlichen Urlaubsanspruch nach dem Bundesurlaubsgesetz.
 
 Ohne Konto, ohne Anmeldung, ohne Server. Die Daten liegen in der App auf dem
 Gerät und verlassen es nur, wenn du selbst ein PDF, eine CSV-Datei oder ein
-Backup teilst.
+Backup teilst — oder wenn du für eine Beschäftigung die Übertragung an Clockodo
+einschaltest und selbst auslöst.
 
 ---
 
@@ -91,7 +92,7 @@ Safe-Area-Abstände geringfügig.
 |  | Cloud-Zeiterfassung | Tabelle | **Klarzeit** |
 |---|---|---|---|
 | Konto / Registrierung | nötig | – | **nicht nötig** |
-| Wo die Daten liegen | fremder Server | Datei | **nur auf deinem Gerät** |
+| Wo die Daten liegen | fremder Server | Datei | **nur auf deinem Gerät**¹ |
 | Laufende Kosten | meist monatlich | – | **keine** |
 | Funktioniert ohne Netz | selten | ja | **immer** |
 | Stoppuhr auf dem Handy | ja | – | **ja** |
@@ -99,6 +100,8 @@ Safe-Area-Abstände geringfügig.
 | Gesetzlicher Urlaub (BUrlG) | selten | Handarbeit | **berechnet, mit Paragraphenbezug** |
 | PDF-Stundennachweis | ja | Handarbeit | **ja, direkt teilbar** |
 | Quelloffen | selten | – | **ja, MIT** |
+
+¹ Außer du überträgst Einträge ausdrücklich an Clockodo — siehe [Datenschutz](#datenschutz--was-nicht-passiert).
 
 ---
 
@@ -108,6 +111,7 @@ Safe-Area-Abstände geringfügig.
 - **Tätigkeit erfassen** — beim Start eingeben oder jederzeit nachträglich ändern.
 - **Manuelles Nachtragen** — vergessene Zeiten über „+" mit Datums- und Uhrzeit-Auswahl; im Bericht als nachgetragen gekennzeichnet.
 - **Bearbeiten und Löschen** — Start, Ende, Pause, Tätigkeit und Notiz jedes Eintrags änderbar.
+- **Pausen mit Uhrzeit** — jede Pause mit Beginn und Ende; die Pausensumme rechnet die App selbst.
 - **Berichte** — je Einzeleintrag, Tag, Woche (ISO), Monat oder frei gewähltem Zeitraum, mit Summen.
 - **PDF-Stundennachweis** — erzeugt und über das Android-Teilen-Menü direkt an die Mail-App.
 - **CSV-Export** — Semikolon-getrennt, für deutsches Excel vorbereitet.
@@ -115,6 +119,7 @@ Safe-Area-Abstände geringfügig.
 - **Gesetzlicher und vertraglicher Urlaub** — Jahresanspruch, Zwölftelung, Wartezeit, genommene Tage, Resturlaub.
 - **Personendaten** — Name, Personalnummer, Arbeitgeber, Abteilung für den Berichtskopf.
 - **Backup** — JSON-Export/-Import sowie ein automatisches Backup in den Documents-Ordner, das eine Deinstallation überlebt.
+- **Clockodo-Übertragung (optional)** — je Beschäftigung einschaltbar: Kunde, Projekt und Leistung aus deinem Clockodo-Konto wählen und Einträge per Knopf übertragen, je Arbeitsabschnitt zwischen den Pausen ein Clockodo-Eintrag. Geänderte und gelöschte Einträge zieht der nächste Lauf nach.
 - **In-App-Update** — prüft die GitHub-Releases dieses Repos und installiert die neue Version auf Wunsch.
 - **Hell und dunkel** — folgt dem Systemdesign.
 
@@ -207,13 +212,21 @@ belegt, die die Paragraphen einzeln durchgehen.
 
 ## Datenschutz — was *nicht* passiert
 
-Klarzeit verarbeitet Arbeitszeiten und Personendaten. Beides bleibt lokal.
+Klarzeit verarbeitet Arbeitszeiten und Personendaten. Beides bleibt lokal — außer
+du schaltest die Übertragung an Clockodo ein.
 
 - **Kein Konto, keine Anmeldung, keine Nutzerkennung.**
 - **Kein Analytics, kein Crash-Reporting, keine Werbe-IDs, keine Tracker.**
-- **Keine Datenübertragung im Betrieb.** Die einzige Netzverbindung, die die App
+- **Keine Datenübertragung im Betrieb, außer auf deinen Wunsch.** Die einzige
+  Netzverbindung, die die App
   von sich aus aufbaut, ist der Update-Check gegen die GitHub-Releases dieses
   Repos — und den stößt du im Tab „Mehr" selbst an.
+- **Clockodo nur, wenn du es einschaltest.** Schaltest du bei einer Beschäftigung
+  die Übertragung an Clockodo ein, sendet die App deren Einträge (Zeiten, Pausen als
+  Lücken, Tätigkeit, Kunde, Projekt, Leistung) an dein Clockodo-Konto — und zwar nur,
+  wenn du „An Clockodo uebertragen“ tippst. Der API-Schlüssel liegt verschlüsselt im
+  Android-Schlüsselspeicher, ist von Google-Backup und Geräteumzug ausgenommen und
+  steht in keinem Klarzeit-Backup.
 - **Weitergabe nur durch dich.** PDF, CSV und Backup verlassen das Gerät
   ausschließlich über das Teilen-Menü, das du bedienst.
 
@@ -221,12 +234,13 @@ Klarzeit verarbeitet Arbeitszeiten und Personendaten. Beides bleibt lokal.
 
 | Berechtigung | Wofür | Anmerkung |
 |---|---|---|
-| `INTERNET` | Update-Prüfung und Download der neuen APK | nur bei manuell ausgelöster Update-Prüfung |
+| `INTERNET` | Update-Prüfung und Download der neuen APK; Übertragung an Clockodo, wenn eingeschaltet | nur bei manuell ausgelöster Update-Prüfung bzw. Übertragung |
 | `WRITE_EXTERNAL_STORAGE` | automatisches Backup nach `Documents/Klarzeit/` | nur bis Android 10 (`maxSdkVersion=29`); ab Android 11 schreibt die App ihre eigenen Dateien ohne Berechtigung |
 | `REQUEST_INSTALL_PACKAGES` | Start des System-Installers für das In-App-Update | öffnet nur den Android-Dialog; die Installation bestätigst du |
 
 Gespeichert wird in IndexedDB (Zeiteinträge) und in den App-Preferences (Profil,
-Vertragsdaten, Urlaubstage) — beides im app-privaten Bereich des Geräts.
+Vertragsdaten, Urlaubstage) — beides im app-privaten Bereich des Geräts. Den
+Clockodo-Schlüssel verwahrt getrennt davon der Android-Schlüsselspeicher (KeyStore).
 
 ---
 
