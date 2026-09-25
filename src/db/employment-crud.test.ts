@@ -3,6 +3,26 @@ import Dexie from 'dexie';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prefStore = new Map<string, string>();
+const secureStore = new Map<string, string>();
+const MISSING_KEY = 'Item with given key does not exist';
+
+vi.mock('capacitor-secure-storage-plugin', () => ({
+  SecureStoragePlugin: {
+    get: async ({ key }: { key: string }) => {
+      if (!secureStore.has(key)) throw new Error(MISSING_KEY);
+      return { value: secureStore.get(key)! };
+    },
+    set: async ({ key, value }: { key: string; value: string }) => {
+      secureStore.set(key, value);
+    },
+    remove: async ({ key }: { key: string }) => {
+      if (!secureStore.has(key)) throw new Error(MISSING_KEY);
+      secureStore.delete(key);
+    },
+  },
+}));
+
+
 
 vi.mock('@capacitor/preferences', () => ({
   Preferences: {
@@ -76,6 +96,21 @@ describe('Beschaeftigungs-Verwaltung', () => {
     expect(after[1].weeklyHours).toBe(12);
   });
 
+
+  it('cleanEmployment traegt clockodo', () => {
+    const CFG = {
+      apiUser: 'testnutzer',
+      syncFrom: new Date(2026, 8, 1).getTime(),
+      defaultCustomersId: 11,
+      defaultProjectsId: null,
+      defaultServicesId: 31,
+      billable: 1 as const,
+    };
+    expect(cleanEmployment({ ...defaultEmployment, clockodo: CFG }).clockodo).toEqual(
+      CFG,
+    );
+    expect(cleanEmployment({ ...defaultEmployment }).clockodo).toBeNull();
+  });
 
   it('cleanEmployment normalisiert contractVacationDays', () => {
     const base = { ...defaultEmployment, id: 'x' };

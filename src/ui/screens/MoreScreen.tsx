@@ -34,6 +34,7 @@ import {
 } from '../../db/backup';
 import { clearAllEntries, getAllEntries, countEntries } from '../../db/entries';
 import { shareTextFile } from '../../pdf/share';
+import { ClockodoSettings } from '../components/ClockodoSettings';
 import {
   checkForUpdate,
   downloadAndInstall,
@@ -517,6 +518,13 @@ export function MoreScreen() {
             }
           />
         </label>
+        {editingId && editDraft && (
+          <ClockodoSettings
+            employmentId={editingId}
+            value={editDraft.clockodo}
+            onChange={(next) => setEmpField('clockodo', next)}
+          />
+        )}
         <p className="muted small">
           Monats-Soll:{' '}
           {decimalHours(fullMonthlyTargetMs(emp.weeklyHours))
@@ -684,6 +692,13 @@ export function MoreScreen() {
           nur lokal (Offline, kein Server, keine Cloud, keine Konten). Reports
           und Backups werden ausschliesslich dann weitergegeben, wenn du sie
           aktiv ueber die Teilen-Funktion versendest.
+        </p>
+        <p className="muted small">
+          Ausnahme: Schaltest du bei einer Beschaeftigung die Uebertragung an
+          Clockodo ein, verbindet sich die App mit deinem Clockodo-Konto und
+          uebertraegt die Eintraege dieser Beschaeftigung (Zeiten, Pausen als
+          Luecken, Taetigkeit, Kunde, Projekt, Leistung). Der API-Schluessel
+          liegt verschluesselt auf dem Geraet und steht in keinem Backup.
         </p>
       </section>
 

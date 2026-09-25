@@ -35,6 +35,7 @@ const emp: Employment = {
   vacationYearMode: 'both',
   openingBalanceMs: 0,
   contractVacationDays: null,
+  clockodo: null,
 };
 
 /** Volles Monats-Soll des Fixtures: 20 h x 52/12 = 86 h 40 min, minutengerundet. */

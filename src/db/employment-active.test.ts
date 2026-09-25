@@ -3,6 +3,26 @@ import Dexie from 'dexie';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prefStore = new Map<string, string>();
+const secureStore = new Map<string, string>();
+const MISSING_KEY = 'Item with given key does not exist';
+
+vi.mock('capacitor-secure-storage-plugin', () => ({
+  SecureStoragePlugin: {
+    get: async ({ key }: { key: string }) => {
+      if (!secureStore.has(key)) throw new Error(MISSING_KEY);
+      return { value: secureStore.get(key)! };
+    },
+    set: async ({ key, value }: { key: string; value: string }) => {
+      secureStore.set(key, value);
+    },
+    remove: async ({ key }: { key: string }) => {
+      if (!secureStore.has(key)) throw new Error(MISSING_KEY);
+      secureStore.delete(key);
+    },
+  },
+}));
+
+
 
 vi.mock('@capacitor/preferences', () => ({
   Preferences: {

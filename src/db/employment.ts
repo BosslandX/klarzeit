@@ -7,7 +7,10 @@ import {
   type VacationDay,
   type VacationYearMode,
 } from '../domain/employment';
+import { cleanClockodoConfig } from '../domain/clockodo';
 import { getProfile } from './profile';
+import { removeClockodoKey } from '../clockodo/key-store';
+import { removeClockodoLists } from './clockodo-lists';
 import { db } from './db';
 
 const KEY_EMP = 'employment';
@@ -75,6 +78,7 @@ export function cleanEmployment(raw: unknown): Employment {
     vacationYearMode: mode,
     openingBalanceMs: num(x.openingBalanceMs, 0),
     contractVacationDays,
+    clockodo: cleanClockodoConfig(x.clockodo),
   };
 }
 
@@ -252,6 +256,8 @@ export async function removeEmployment(id: string): Promise<Employment[]> {
       'Die letzte Beschaeftigung kann nicht geloescht werden.',
     );
   }
+  await removeClockodoKey(id);
+  await removeClockodoLists(id);
   const next = list.filter((e) => e.id !== id);
   await saveEmploymentsList(next);
   return next;

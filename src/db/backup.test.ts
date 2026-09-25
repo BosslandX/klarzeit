@@ -3,6 +3,8 @@ import Dexie from 'dexie';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prefStore = new Map<string, string>();
+const secureStore = new Map<string, string>();
+const MISSING_KEY = 'Item with given key does not exist';
 
 vi.mock('@capacitor/preferences', () => ({
   Preferences: {
@@ -14,6 +16,22 @@ vi.mock('@capacitor/preferences', () => ({
     },
     remove: async ({ key }: { key: string }) => {
       prefStore.delete(key);
+    },
+  },
+}));
+
+vi.mock('capacitor-secure-storage-plugin', () => ({
+  SecureStoragePlugin: {
+    get: async ({ key }: { key: string }) => {
+      if (!secureStore.has(key)) throw new Error(MISSING_KEY);
+      return { value: secureStore.get(key)! };
+    },
+    set: async ({ key, value }: { key: string; value: string }) => {
+      secureStore.set(key, value);
+    },
+    remove: async ({ key }: { key: string }) => {
+      if (!secureStore.has(key)) throw new Error(MISSING_KEY);
+      secureStore.delete(key);
     },
   },
 }));
@@ -329,6 +347,7 @@ const erwartetAusV2 = {
   vacationYearMode: 'prorata' as const,
   openingBalanceMs: 3_600_000,
   contractVacationDays: null,
+  clockodo: null,
 };
 
 describe('Zusammenfuehren in eine vorhandene Beschaeftigung', () => {
@@ -628,6 +647,34 @@ describe('Pausen mit Uhrzeit im Backup', () => {
     const imported = await getAllEntries();
     expect(imported[0].breaks).toBeUndefined();
     expect(imported[0].breakMinutes).toBe(30);
+  });
+
+  it('Backup traegt clockodo, aber nie den Schluessel', async () => {
+    const CFG = {
+      apiUser: 'testnutzer',
+      syncFrom: new Date(2026, 8, 1).getTime(),
+      defaultCustomersId: 11,
+      defaultProjectsId: null,
+      defaultServicesId: 31,
+      billable: 1 as const,
+    };
+    prefStore.set(
+      'employments',
+      JSON.stringify([{ ...defaultEmployment, clockodo: CFG }]),
+    );
+    const { setClockodoKey } = await import('../clockodo/key-store');
+    await setClockodoKey('emp-1', 'KEY123');
+    const json = JSON.stringify(await buildBackup());
+    expect(json).toContain('testnutzer');
+    expect(json).not.toContain('KEY123');
+    prefStore.clear();
+    secureStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const list = await getEmployments();
+    expect(list[0].clockodo).toEqual(CFG);
   });
 
 });

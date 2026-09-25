@@ -16,6 +16,7 @@ import {
 import { de } from 'date-fns/locale';
 import { HOUR, MINUTE, netMs } from './time';
 import type { TimeEntry } from './types';
+import type { ClockodoConfig } from './clockodo';
 
 /**
  * Beschaeftigungs-/Vertragsdaten fuer Arbeitszeitkonto und gesetzlichen Urlaub.
@@ -45,6 +46,8 @@ export interface Employment {
   openingBalanceMs: number;
   /** Vertraglicher Jahresurlaub in Arbeitstagen; null = gesetzliches Minimum. */
   contractVacationDays: number | null;
+  /** Clockodo-Uebertragung; null = aus. */
+  clockodo: ClockodoConfig | null;
 }
 
 /**
@@ -91,6 +94,7 @@ export const defaultEmployment: Employment = {
   vacationYearMode: 'both',
   openingBalanceMs: 0,
   contractVacationDays: null,
+  clockodo: null,
 };
 
 // --- Monats-Soll (Arbeitszeitkonto) ---
