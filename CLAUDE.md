@@ -103,6 +103,18 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   trägt `breaks` ausdrücklich, auch leer — `updateEntry` nutzt Dexies `update`, das ein
   fehlendes Feld stehen ließe. **Keine vorbelegten Pausenzeiten** (Anlass: Übertragung an
   Clockodo, das Pausen nur als Lücke zwischen Einträgen kennt).
+- **Clockodo-Zugang je Beschäftigung (AUF-012):** `Employment.clockodo: ClockodoConfig | null`
+  (`src/domain/clockodo.ts`; `null` = aus, `apiUser` darf leer sein). Client
+  `src/clockodo/client.ts` mit einsetzbarem HTTP (Standard `CapacitorHttp`, nur nativ),
+  Primärquelle `https://docs.clockodo.com/openapi.yaml`. **Der API-Schlüssel liegt nur im
+  Android KeyStore** (`src/clockodo/key-store.ts`, `capacitor-secure-storage-plugin`) — nie in
+  Preferences, `Employment`, Backup oder einer Meldung; seine Datei `cap_sec.xml` ist über
+  `res/xml/backup_rules.xml` + `data_extraction_rules.xml` aus Cloud-Backup und Geräteumzug
+  ausgenommen (nur `<exclude>` — ein `<include>` schaltete die übrige Sicherung ab).
+  Listen (Kunden/Projekte/Leistungen, nur aktive) im Zwischenspeicher
+  `src/db/clockodo-lists.ts`, nicht im Backup. Ausschalten löscht Schlüssel und Listen erst
+  beim **Speichern**; `removeEmployment` löscht sie mit. Firmendaten (Namen, IDs) gehören nie
+  in Code oder Tests — Testwerte ohne `@`, der Privacy-Scan meldet jede E-Mail-Form.
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
@@ -117,6 +129,11 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
 - `src/domain/types.ts` → Feld `breaks` mit `start`/`end` am `TimeEntry` (steht in der
   Dexie-Datenbank und in jedem Backup; umbenannt verwirft `cleanBreaks` beim Import jede
   Pausenzeit)
+- `src/domain/clockodo.ts` → Feld `clockodo` am `Employment` samt `apiUser`, `syncFrom`,
+  `defaultCustomersId`, `defaultProjectsId`, `defaultServicesId`, `billable` (Preferences
+  `employments` und Backup); Preferences-Schlüssel `clockodoLists:<employmentId>`;
+  KeyStore-Schlüssel `clockodo-key-<employmentId>` (umbenannt findet die App den
+  gespeicherten API-Schlüssel nicht mehr)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
