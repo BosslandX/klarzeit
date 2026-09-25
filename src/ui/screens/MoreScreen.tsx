@@ -35,6 +35,8 @@ import {
 import { clearAllEntries, getAllEntries, countEntries } from '../../db/entries';
 import { shareTextFile } from '../../pdf/share';
 import { ClockodoSettings } from '../components/ClockodoSettings';
+import { removeClockodoKey } from '../../clockodo/key-store';
+import { removeClockodoLists } from '../../db/clockodo-lists';
 import {
   checkForUpdate,
   downloadAndInstall,
@@ -128,7 +130,12 @@ export function MoreScreen() {
   const handleSaveEmployment = async () => {
     if (!editingId || !editDraft) return;
     const { id: _omit, ...patch } = editDraft;
+    const vorher = employments.find((e) => e.id === editingId);
     await updateEmployment(editingId, patch);
+    if (vorher?.clockodo && patch.clockodo === null) {
+      await removeClockodoKey(editingId);
+      await removeClockodoLists(editingId);
+    }
     await refreshEmps();
     closeEdit();
     setEmpFlash(true);

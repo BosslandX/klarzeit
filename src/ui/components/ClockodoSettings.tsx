@@ -5,16 +5,8 @@ import type { ClockodoConfig } from '../../domain/clockodo';
 import type { ClockodoLists } from '../../domain/clockodo';
 import { fromDateInput } from '../../domain/time';
 import { ClockodoError, fetchLists, fetchMe } from '../../clockodo/client';
-import {
-  getClockodoKey,
-  removeClockodoKey,
-  setClockodoKey,
-} from '../../clockodo/key-store';
-import {
-  getClockodoLists,
-  removeClockodoLists,
-  saveClockodoLists,
-} from '../../db/clockodo-lists';
+import { getClockodoKey, setClockodoKey } from '../../clockodo/key-store';
+import { getClockodoLists, saveClockodoLists } from '../../db/clockodo-lists';
 
 type Props = {
   employmentId: string;
@@ -47,8 +39,8 @@ export function ClockodoSettings({
 
   const onToggle = (next: boolean) => {
     if (!next) {
-      void removeClockodoKey(employmentId);
-      void removeClockodoLists(employmentId);
+      // Schluessel und Listen loescht erst das Speichern der Beschaeftigung
+      // (MoreScreen) -- ein Abbrechen darf nichts entfernt haben.
       setLists(null);
       setMsg('');
       setKeyDraft('');
@@ -69,7 +61,12 @@ export function ClockodoSettings({
   const saveKey = async () => {
     const trimmed = keyDraft.trim();
     if (!trimmed) return;
-    await setClockodoKey(employmentId, trimmed);
+    try {
+      await setClockodoKey(employmentId, trimmed);
+    } catch {
+      setMsg('Schluessel konnte nicht gespeichert werden.');
+      return;
+    }
     setKeyDraft('');
     setHasKey(true);
     setKeySavedFlash(true);
