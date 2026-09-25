@@ -9,10 +9,11 @@ export interface ClockodoAuth {
 }
 
 export interface ClockodoRequest {
-  method: 'GET';
+  method: 'GET' | 'POST' | 'DELETE';
   url: string;
   headers: Record<string, string>;
   params?: Record<string, string>;
+  data?: unknown;
 }
 
 export type ClockodoHttp = (
@@ -112,6 +113,7 @@ async function defaultHttp(
       url: req.url,
       headers: req.headers,
       params: req.params,
+      data: req.data,
     });
     return { status: res.status, data: res.data };
   } catch {
@@ -265,4 +267,80 @@ export async function fetchLists(
     projects,
     services,
   };
+}
+
+
+function positiveEntryId(v: unknown): number | null {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+  const n = Math.trunc(v);
+  if (n <= 0 || n !== v) return null;
+  return n;
+}
+
+async function clockodoRequest(
+  auth: ClockodoAuth,
+  method: 'POST' | 'DELETE',
+  path: string,
+  data?: unknown,
+  http: ClockodoHttp = defaultHttp,
+): Promise<{ status: number; data: unknown }> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await http({
+      method,
+      url: `${CLOCKODO_API}${path}`,
+      headers: {
+        ...clockodoHeaders(auth),
+        ...(method === 'POST'
+          ? { 'Content-Type': 'application/json' }
+          : {}),
+      },
+      data,
+    });
+  } catch (e) {
+    if (e instanceof ClockodoError) throw e;
+    throw new ClockodoError('network', 'Keine Verbindung zu Clockodo.');
+  }
+  return { status: res.status, data: parseData(res.data) };
+}
+
+export async function createEntry(
+  auth: ClockodoAuth,
+  payload: unknown,
+  http?: ClockodoHttp,
+): Promise<number> {
+  const h = http ?? defaultHttp;
+  const res = await clockodoRequest(auth, 'POST', '/v2/entries', payload, h);
+  const err = mapStatus(res.status);
+  if (err) throw err;
+  if (typeof res.data !== 'object' || res.data === null) {
+    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+  }
+  const entry = (res.data as { entry?: unknown }).entry;
+  if (typeof entry !== 'object' || entry === null) {
+    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+  }
+  const id = positiveEntryId((entry as { id?: unknown }).id);
+  if (id === null) {
+    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+  }
+  return id;
+}
+
+export async function deleteClockodoEntry(
+  auth: ClockodoAuth,
+  id: number,
+  http?: ClockodoHttp,
+): Promise<void> {
+  const h = http ?? defaultHttp;
+  const res = await clockodoRequest(
+    auth,
+    'DELETE',
+    `/v2/entries/${id}`,
+    undefined,
+    h,
+  );
+  if (res.status === 404) return;
+  const err = mapStatus(res.status);
+  if (err) throw err;
 }

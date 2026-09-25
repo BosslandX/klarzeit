@@ -60,6 +60,27 @@ export function cleanClockodoEntryRef(raw: unknown): ClockodoEntryRef | null {
   return { customersId, projectsId, servicesId };
 }
 
+export interface ClockodoSync {
+  ids: number[];
+  hash: string;
+  at: number;
+}
+
+export function cleanClockodoSync(raw: unknown): ClockodoSync | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const x = raw as Record<string, unknown>;
+  if (!Array.isArray(x.ids) || x.ids.length === 0) return null;
+  const ids: number[] = [];
+  for (const id of x.ids) {
+    const n = positiveInt(id);
+    if (n === null) return null;
+    ids.push(n);
+  }
+  if (typeof x.hash !== 'string' || x.hash.trim() === '') return null;
+  if (typeof x.at !== 'number' || !Number.isFinite(x.at)) return null;
+  return { ids, hash: x.hash, at: x.at };
+}
+
 export function defaultEntryRef(config: ClockodoConfig | null): ClockodoEntryRef | null {
   if (config === null) return null;
   if (config.defaultCustomersId === null || config.defaultServicesId === null) {

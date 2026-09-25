@@ -766,3 +766,63 @@ describe('Clockodo-Auswahl im Backup', () => {
   });
 });
 
+describe('Uebertragungsstand im Backup', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+  });
+
+  const REF = { customersId: 11, projectsId: 21, servicesId: 31 };
+
+  it('Uebertragungsstand uebersteht die Backup-Rundreise', async () => {
+    const { addEntry } = await import('./entries');
+    const sync = { ids: [101, 102], hash: 'abcd1234', at: 5 };
+    const start = new Date(2026, 6, 6, 8, 0).getTime();
+    const end = new Date(2026, 6, 6, 16, 30).getTime();
+    await addEntry({
+      start,
+      end,
+      breakMinutes: 0,
+      activity: 'a',
+      note: '',
+      source: 'manual',
+      clockodo: REF,
+      clockodoSync: sync,
+    });
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const imported = await getAllEntries();
+    expect(imported).toHaveLength(1);
+    expect(imported[0].clockodoSync).toEqual(sync);
+  });
+
+  it('ungueltiger Uebertragungsstand faellt beim Import weg', async () => {
+    const backup: BackupData = {
+      app: 'zeiterfassung',
+      version: 3,
+      exportedAt: 1,
+      profile: {
+        vorname: '',
+        nachname: '',
+        personalnummer: '',
+        arbeitgeber: '',
+        abteilung: '',
+      },
+      entries: [
+        {
+          ...baseEntry(),
+          clockodoSync: { ids: [], hash: 'x', at: 1 },
+        } as unknown as import('../domain/types').TimeEntry,
+      ],
+    };
+    await restoreBackup(JSON.stringify(backup), 'replace');
+    const imported = await getAllEntries();
+    expect(imported[0].clockodoSync).toBeUndefined();
+  });
+});

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cleanClockodoConfig,
+  cleanClockodoSync,
   cleanClockodoEntryRef,
   defaultEntryRef,
 } from './clockodo';
@@ -71,6 +72,18 @@ describe('clockodo domain', () => {
     expect(
       cleanClockodoEntryRef({ customersId: 11, projectsId: 1.5, servicesId: 31 }),
     ).toBeNull();
+  });
+
+
+  it('cleanClockodoSync prueft Stand', () => {
+    const ok = { ids: [101, 102], hash: 'abcd1234', at: 5 };
+    expect(cleanClockodoSync(ok)).toEqual(ok);
+    expect(cleanClockodoSync({ ids: [] })).toBeNull();
+    expect(cleanClockodoSync({ ids: [0], hash: 'a', at: 1 })).toBeNull();
+    expect(cleanClockodoSync({ ids: [1.5], hash: 'a', at: 1 })).toBeNull();
+    expect(cleanClockodoSync({ ids: [1], hash: '', at: 1 })).toBeNull();
+    expect(cleanClockodoSync({ ids: [1], hash: 'a', at: 'x' })).toBeNull();
+    expect(cleanClockodoSync(null)).toBeNull();
   });
 
   it('defaultEntryRef aus den Vorgaben', () => {

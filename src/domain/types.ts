@@ -1,4 +1,4 @@
-import type { ClockodoEntryRef } from './clockodo';
+import type { ClockodoEntryRef, ClockodoSync } from './clockodo';
 
 /** Personenbezogene Stammdaten (Single-User). Erscheint im Report-Kopf. */
 export interface Profile {
@@ -29,6 +29,8 @@ export interface TimeEntry {
   breakMinutes: number; // Pause in Minuten (wird von der Dauer abgezogen)
   /** Clockodo-Kunde/Projekt/Leistung; fehlt/null = keine Auswahl. */
   clockodo?: ClockodoEntryRef | null;
+  /** Clockodo-Übertragungsstand; fehlt = nie übertragen. */
+  clockodoSync?: ClockodoSync;
   activity: string; // Taetigkeit / Beschreibung
   note: string; // optionale Notiz
   source: EntrySource;

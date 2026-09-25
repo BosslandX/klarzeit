@@ -193,3 +193,55 @@ describe('clockodo client', () => {
     }
   });
 });
+  it('createEntry sendet POST und liefert die id', async () => {
+    const calls: ClockodoRequest[] = [];
+    const payload = {
+      customers_id: 11,
+      services_id: 31,
+      time_since: '2026-07-06T06:00:00Z',
+      time_until: '2026-07-06T07:00:00Z',
+    };
+    const http: ClockodoHttp = async (req) => {
+      calls.push(req);
+      return {
+        status: 200,
+        data: { entry: { id: 501 }, stopped: null },
+      };
+    };
+    const { createEntry } = await import('./client');
+    const id = await createEntry(AUTH, payload, http);
+    expect(id).toBe(501);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].url).toBe(`${CLOCKODO_API}/v2/entries`);
+    expect(calls[0].headers).toEqual({
+      ...clockodoHeaders(AUTH),
+      'Content-Type': 'application/json',
+    });
+    expect(calls[0].data).toEqual(payload);
+  });
+
+  it('createEntry ohne id ist ein Formatfehler', async () => {
+    const http: ClockodoHttp = async () => ({
+      status: 200,
+      data: { entry: {} },
+    });
+    const { createEntry } = await import('./client');
+    await expect(
+      createEntry(AUTH, { customers_id: 11, services_id: 31 }, http),
+    ).rejects.toMatchObject({ kind: 'format' });
+  });
+
+  it('deleteClockodoEntry: 404 heisst schon geloescht', async () => {
+    const { deleteClockodoEntry } = await import('./client');
+    const mk = (status: number): ClockodoHttp => async (req) => {
+      expect(req.method).toBe('DELETE');
+      expect(req.url).toBe(`${CLOCKODO_API}/v2/entries/501`);
+      return { status, data: { success: true } };
+    };
+    await deleteClockodoEntry(AUTH, 501, mk(200));
+    await deleteClockodoEntry(AUTH, 501, mk(404));
+    await expect(deleteClockodoEntry(AUTH, 501, mk(403))).rejects.toMatchObject({
+      kind: 'forbidden',
+    });
+  });

@@ -15,7 +15,7 @@ import {
   setActiveEmployment,
 } from './employment';
 import type { BreakInterval, Profile, TimeEntry } from '../domain/types';
-import { cleanClockodoEntryRef } from '../domain/clockodo';
+import { cleanClockodoEntryRef, cleanClockodoSync } from '../domain/clockodo';
 import { defaultEmployment, mergeVacationDays } from '../domain/employment';
 import type { Employment, VacationDay } from '../domain/employment';
 import { decimalHours, formatClock, formatDate, netMs } from '../domain/time';
@@ -119,6 +119,9 @@ function cleanEntry(e: TimeEntry): TimeEntry {
       : INITIAL_EMPLOYMENT_ID;
   const breaks = cleanBreaks((e as { breaks?: unknown }).breaks);
   const clockodo = cleanClockodoEntryRef((e as { clockodo?: unknown }).clockodo);
+  const clockodoSync = cleanClockodoSync(
+    (e as { clockodoSync?: unknown }).clockodoSync,
+  );
   return {
     id: e.id,
     employmentId,
@@ -127,6 +130,7 @@ function cleanEntry(e: TimeEntry): TimeEntry {
     breakMinutes: e.breakMinutes,
     ...(breaks !== undefined ? { breaks } : {}),
     ...(clockodo !== null ? { clockodo } : {}),
+    ...(clockodoSync !== null ? { clockodoSync } : {}),
     activity: e.activity,
     note: e.note,
     source: e.source,
