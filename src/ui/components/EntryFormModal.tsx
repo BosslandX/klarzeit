@@ -103,8 +103,12 @@ export function EntryFormModal({
 
   useEffect(() => {
     if (empLoading || !employmentId) return;
+    // Die gespeicherte Auswahl gehoert zur Beschaeftigung des Eintrags; nach einem
+    // Wechsel gilt die Vorgabe der neuen Beschaeftigung.
+    const eigene =
+      initial.employmentId === undefined || initial.employmentId === employmentId;
     setClockodoSel(
-      initial.clockodo ??
+      (eigene ? initial.clockodo : null) ??
         defaultEntryRef(employmentConfig) ?? {
           customersId: 0,
           projectsId: null,
@@ -115,6 +119,7 @@ export function EntryFormModal({
     initial.start,
     initial.end,
     initial.clockodo,
+    initial.employmentId,
     employmentConfig,
     empLoading,
     employmentId,
@@ -209,6 +214,7 @@ export function EntryFormModal({
       setError(breakErr);
       return;
     }
+    // Deckt auch alte Eintraege ohne Pausenzeiten ab, die validateBreaks nicht sieht.
     const breakMinutes = resolveBreakMinutes(sorted, legacyMinutes);
     if (breakMinutes * 60_000 >= end - start) {
       setError('Die Pause ist laenger als die erfasste Zeitspanne.');
