@@ -1,7 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { getActiveEmploymentId } from './employment';
+import type { ClockodoSync } from '../domain/clockodo';
 import type { TimeEntry } from '../domain/types';
+import { addClockodoDeletes } from './clockodo-deletes';
 
 export type NewEntry = Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -73,6 +75,28 @@ export async function clearAllEntries(): Promise<void> {
 
 export async function countEntries(): Promise<number> {
   return db.entries.count();
+}
+
+
+
+export async function setEntryClockodoSync(
+  id: number,
+  sync: ClockodoSync | null,
+): Promise<void> {
+  if (sync === null) {
+    await db.entries.update(id, { clockodoSync: undefined });
+  } else {
+    await db.entries.update(id, { clockodoSync: sync });
+  }
+}
+
+export async function deleteEntryWithClockodo(entry: TimeEntry): Promise<void> {
+  if (entry.id == null) return;
+  const sync = entry.clockodoSync;
+  if (sync && sync.ids.length > 0) {
+    await addClockodoDeletes(entry.employmentId, sync.ids);
+  }
+  await db.entries.delete(entry.id);
 }
 
 // --- React-Hooks (reaktiv via Dexie liveQuery) ---

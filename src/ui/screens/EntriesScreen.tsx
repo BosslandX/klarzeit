@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import {
   addEntry,
-  deleteEntry,
+  deleteEntryWithClockodo,
   updateEntry,
   useAllEntriesDesc,
 } from '../../db/entries';
 import { getEmployments, useEmployments } from '../../db/employment';
+import { transferEmployment, type TransferResult } from '../../clockodo/transfer';
+import { transferStatus } from '../../domain/clockodo-transfer';
+import type { ClockodoConfig } from '../../domain/clockodo';
 import { groupByDay } from '../../domain/aggregate';
 import type { Period } from '../../domain/aggregate';
 import type { TimeEntry } from '../../domain/types';
@@ -44,6 +48,39 @@ function defaultManualDraft(): EntryDraft {
   };
 }
 
+
+function clockodoStatusLabel(
+  entry: TimeEntry,
+  config: ClockodoConfig | null,
+): string | null {
+  if (!config) return null;
+  const s = transferStatus(entry, config);
+  if (s === 'synced') return 'in Clockodo';
+  if (s === 'changed') return 'geaendert';
+  if (s === 'pending') return 'noch nicht uebertragen';
+  if (s === 'untimed-break') return 'Pause ohne Uhrzeit';
+  if (s === 'incomplete') return 'Clockodo-Auswahl fehlt';
+  return null;
+}
+
+function countTransferBuckets(
+  list: TimeEntry[],
+  employmentId: string,
+  config: ClockodoConfig,
+) {
+  let open = 0;
+  let untimed = 0;
+  let incomplete = 0;
+  for (const e of list) {
+    if (e.employmentId !== employmentId) continue;
+    const s = transferStatus(e, config);
+    if (s === 'pending' || s === 'changed') open++;
+    else if (s === 'untimed-break') untimed++;
+    else if (s === 'incomplete') incomplete++;
+  }
+  return { open, untimed, incomplete };
+}
+
 function entryToDraft(entry: TimeEntry): EntryDraft {
   return {
     start: entry.start,
@@ -64,11 +101,20 @@ export function EntriesScreen() {
   const [modal, setModal] = useState<ModalState>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [filterEmploymentId, setFilterEmploymentId] = useState<string>('');
+  const [transferBusyId, setTransferBusyId] = useState<string | null>(null);
+  const [transferOutcome, setTransferOutcome] = useState<
+    Record<string, TransferResult | null>
+  >({});
 
   const showEmploymentInfo = employments.length > 1;
   const employmentName = (id: string) =>
     employments.find((e) => e.id === id)?.name ?? id;
 
+  const native = Capacitor.isNativePlatform();
+  const clockodoEmployments = useMemo(
+    () => employments.filter((e) => e.clockodo != null),
+    [employments],
+  );
   const filteredEntries = useMemo(() => {
     if (!entries) return undefined;
     if (!filterEmploymentId) return entries;
@@ -86,11 +132,14 @@ export function EntriesScreen() {
 
   const handleDelete = async (entry: TimeEntry) => {
     if (entry.id == null) return;
+    const clockodoHint = entry.clockodoSync
+      ? '\nEr wird beim naechsten Uebertragen auch in Clockodo geloescht.'
+      : '';
     const ok = window.confirm(
-      `Eintrag vom ${formatDateTime(entry.start)} wirklich loeschen?`,
+      `Eintrag vom ${formatDateTime(entry.start)} wirklich loeschen?${clockodoHint}`,
     );
     if (!ok) return;
-    await deleteEntry(entry.id);
+    await deleteEntryWithClockodo(entry);
   };
 
   const handleSharePdf = async (entry: TimeEntry) => {
@@ -114,6 +163,22 @@ export function EntriesScreen() {
       );
     } finally {
       setBusyId(null);
+    }
+  };
+
+
+  const handleTransfer = async (employmentId: string) => {
+    setTransferBusyId(employmentId);
+    setTransferOutcome((o) => ({ ...o, [employmentId]: null }));
+    try {
+      const result = await transferEmployment(employmentId);
+      setTransferOutcome((o) => ({ ...o, [employmentId]: result }));
+    } catch (e) {
+      window.alert(
+        `Uebertragen fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    } finally {
+      setTransferBusyId(null);
     }
   };
 
@@ -143,6 +208,64 @@ export function EntriesScreen() {
           </select>
         </label>
       )}
+
+
+      {entries &&
+        clockodoEmployments
+          .filter(
+            (emp) => !filterEmploymentId || emp.id === filterEmploymentId,
+          )
+          .map((emp) => {
+            const cfg = emp.clockodo!;
+            const buckets = countTransferBuckets(entries, emp.id, cfg);
+            const outcome = transferOutcome[emp.id];
+            return (
+              <section key={`clockodo-${emp.id}`} className="card-section">
+                <p>
+                  Clockodo – {emp.name}: {buckets.open} offen ·{' '}
+                  {buckets.untimed} Pause ohne Uhrzeit · {buckets.incomplete}{' '}
+                  ohne Auswahl
+                </p>
+                <button
+                  type="button"
+                  disabled={!native || transferBusyId === emp.id}
+                  title={
+                    native
+                      ? undefined
+                      : 'Clockodo-Uebertragung nur in der Android-App'
+                  }
+                  onClick={() => void handleTransfer(emp.id)}
+                >
+                  An Clockodo uebertragen
+                </button>
+                {!native && (
+                  <p className="muted">nur in der Android-App</p>
+                )}
+                {outcome && (
+                  <div className="clockodo-transfer-result">
+                    <p>
+                      {outcome.sent} uebertragen, {outcome.deleted} in
+                      Clockodo geloescht.
+                    </p>
+                    {outcome.errors.map((err, i) => (
+                      <p key={i} className="danger">
+                        {err.entryId != null
+                          ? formatDateTime(
+                              entries.find((x) => x.id === err.entryId)
+                                ?.start ?? 0,
+                            )
+                          : `Clockodo-Eintrag ${err.clockodoId}`}
+                        : {err.message}
+                      </p>
+                    ))}
+                    {outcome.stopped && (
+                      <p className="danger">Abgebrochen: {outcome.stopped}</p>
+                    )}
+                  </div>
+                )}
+              </section>
+            );
+          })}
 
       {filteredEntries === undefined ? (
         <div className="center muted">Lade…</div>
@@ -178,6 +301,18 @@ export function EntriesScreen() {
                       </span>
                     )}
                   </div>
+                  {(() => {
+                    const emp = employments.find(
+                      (x) => x.id === e.employmentId,
+                    );
+                    const label = clockodoStatusLabel(
+                      e,
+                      emp?.clockodo ?? null,
+                    );
+                    return label ? (
+                      <div className="muted entry-clockodo">{label}</div>
+                    ) : null;
+                  })()}
                   {e.note && <div className="entry-note">{e.note}</div>}
                 </div>
                 <div className="entry-side">
