@@ -340,14 +340,44 @@ describe('clockodo transfer', () => {
 
   it('setEntryClockodoSync laesst updatedAt stehen und entfernt bei null', async () => {
     const id = await addEntry(baseEntry(E_DAY));
-    const before = (await getEntry(id))!.updatedAt;
+    // Fester Altwert: sonst faellt eine Aenderung von updatedAt in derselben
+    // Millisekunde nicht auf, und der Test fuehre nur zufaellig rot.
+    await db.entries.update(id, { updatedAt: 1 });
+    const before = 1;
     await setEntryClockodoSync(id, { ids: [1], hash: 'h', at: 2 });
     let row = await getEntry(id);
     expect(row?.clockodoSync).toEqual({ ids: [1], hash: 'h', at: 2 });
     expect(row?.updatedAt).toBe(before);
     await setEntryClockodoSync(id, null);
     row = await getEntry(id);
-    expect(row && 'clockodoSync' in row && row.clockodoSync !== undefined).toBe(false);
+    expect(row).toBeDefined();
+    expect(Object.prototype.hasOwnProperty.call(row, 'clockodoSync')).toBe(false);
     expect(row?.updatedAt).toBe(before);
+  });
+  it('scheitert die Rueckabwicklung, wird der Abschnitt vermerkt', async () => {
+    const id = await addEntry(baseEntry(E_DAY));
+    postHandler = (n) => {
+      if (n === 1) return { status: 200, data: { entry: { id: 501 } } };
+      return { status: 422, data: {} };
+    };
+    delHandler = () => ({ status: 500, data: {} });
+    const r = await transferEmployment(EMP, { http, now: () => NOW });
+    expect((await getEntry(id))?.clockodoSync).toBeUndefined();
+    expect(r.errors).toHaveLength(1);
+    expect(await getClockodoDeletes(EMP)).toEqual([501]);
+  });
+
+  it('scheitert die Rueckabwicklung beim Abbruch, wird der Abschnitt vermerkt', async () => {
+    await addEntry(baseEntry(E_DAY));
+    postHandler = (n) => {
+      if (n === 1) return { status: 200, data: { entry: { id: 501 } } };
+      throw new Error('offline');
+    };
+    delHandler = () => {
+      throw new Error('offline');
+    };
+    const r = await transferEmployment(EMP, { http, now: () => NOW });
+    expect(r.stopped).toBe('Keine Verbindung zu Clockodo.');
+    expect(await getClockodoDeletes(EMP)).toEqual([501]);
   });
 });

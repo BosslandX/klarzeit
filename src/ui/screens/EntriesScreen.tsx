@@ -228,6 +228,7 @@ export function EntriesScreen() {
                 </p>
                 <button
                   type="button"
+                  className="btn btn-primary"
                   disabled={!native || transferBusyId === emp.id}
                   title={
                     native

@@ -13,6 +13,7 @@ import {
 } from '../domain/clockodo-transfer';
 import type { TimeEntry } from '../domain/types';
 import {
+  addClockodoDeletes,
   getClockodoDeletes,
   removeClockodoDelete,
 } from '../db/clockodo-deletes';
@@ -55,16 +56,22 @@ async function entriesForEmployment(
     .sortBy('start');
 }
 
+/**
+ * Loescht die in diesem Lauf schon angelegten Abschnitte wieder. Scheitert das (etwa
+ * ohne Netz), wird der Abschnitt als Loeschvermerk notiert -- sonst bliebe er in
+ * Clockodo stehen, Klarzeit wuesste nichts davon, und der naechste Lauf buchte doppelt.
+ */
 async function rollbackCreated(
   auth: { apiUser: string; apiKey: string },
   ids: number[],
-  http?: ClockodoHttp,
+  http: ClockodoHttp | undefined,
+  employmentId: string,
 ): Promise<void> {
   for (const id of ids) {
     try {
       await deleteClockodoEntry(auth, id, http);
     } catch {
-      /* still */
+      await addClockodoDeletes(employmentId, [id]);
     }
   }
 }
@@ -179,11 +186,11 @@ export async function transferEmployment(
         created.push(id);
       } catch (e) {
         if (e instanceof ClockodoError && isFatal(e)) {
-          await rollbackCreated(auth, created, http);
+          await rollbackCreated(auth, created, http, employmentId);
           result.stopped = e.message;
           return result;
         }
-        await rollbackCreated(auth, created, http);
+        await rollbackCreated(auth, created, http, employmentId);
         await setEntryClockodoSync(entry.id, null);
         result.errors.push({
           entryId: entry.id,
