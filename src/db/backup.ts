@@ -84,17 +84,43 @@ function isValidEntry(e: unknown): e is TimeEntry {
   );
 }
 
+
+function cleanBreaks(raw: unknown): import('../domain/types').BreakInterval[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const kept: import('../domain/types').BreakInterval[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) continue;
+    const x = item as Record<string, unknown>;
+    const s = x.start;
+    const en = x.end;
+    if (
+      typeof s === 'number' &&
+      Number.isFinite(s) &&
+      typeof en === 'number' &&
+      Number.isFinite(en) &&
+      en > s
+    ) {
+      kept.push({ start: s, end: en });
+    }
+  }
+  if (kept.length === 0) return undefined;
+  kept.sort((a, b) => a.start - b.start);
+  return kept;
+}
+
 function cleanEntry(e: TimeEntry): TimeEntry {
   const employmentId =
     typeof e.employmentId === 'string' && e.employmentId.trim() !== ''
       ? e.employmentId
       : INITIAL_EMPLOYMENT_ID;
+  const breaks = cleanBreaks((e as { breaks?: unknown }).breaks);
   return {
     id: e.id,
     employmentId,
     start: e.start,
     end: e.end,
     breakMinutes: e.breakMinutes,
+    ...(breaks !== undefined ? { breaks } : {}),
     activity: e.activity,
     note: e.note,
     source: e.source,

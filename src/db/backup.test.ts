@@ -535,4 +535,89 @@ describe('Zusammenfuehren in eine vorhandene Beschaeftigung', () => {
     const empB = list.find((e) => e.id === 'emp-b');
     expect(empB?.weeklyHours).toBe(10);
   });
+  function pauseDay(h1: number, m1: number, h2: number, m2: number) {
+    return {
+      start: new Date(2026, 6, 6, h1, m1).getTime(),
+      end: new Date(2026, 6, 6, h2, m2).getTime(),
+    };
+  }
+
+  it('Pausen mit Uhrzeit ueberstehen die Backup-Rundreise', async () => {
+    const { addEntry } = await import('./entries');
+    const start = new Date(2026, 6, 6, 8, 0).getTime();
+    const end = new Date(2026, 6, 6, 16, 30).getTime();
+    await addEntry({
+      start,
+      end,
+      breakMinutes: 45,
+      breaks: [pauseDay(12, 0, 12, 30), pauseDay(10, 0, 10, 15)],
+      activity: 'a',
+      note: '',
+      source: 'manual',
+    });
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const imported = await getAllEntries();
+    expect(imported).toHaveLength(1);
+    expect(imported[0].breaks).toEqual([
+      pauseDay(10, 0, 10, 15),
+      pauseDay(12, 0, 12, 30),
+    ]);
+    expect(imported[0].breakMinutes).toBe(45);
+  });
+
+  it('ungueltige Pausen fallen beim Import weg, gueltige bleiben', async () => {
+    const backup: BackupData = {
+      app: 'zeiterfassung',
+      version: 3,
+      exportedAt: 1,
+      profile: {
+        vorname: '',
+        nachname: '',
+        personalnummer: '',
+        arbeitgeber: '',
+        abteilung: '',
+      },
+      entries: [
+        {
+          ...baseEntry(),
+          breakMinutes: 0,
+          breaks: [
+            { start: 'x' as unknown as number, end: 5 },
+            pauseDay(12, 30, 12, 0),
+            pauseDay(12, 0, 12, 30),
+          ],
+        } as import('../domain/types').TimeEntry,
+      ],
+    };
+    const n = await restoreBackup(JSON.stringify(backup), 'replace');
+    expect(n).toBe(1);
+    const imported = await getAllEntries();
+    expect(imported[0].breaks).toEqual([pauseDay(12, 0, 12, 30)]);
+  });
+
+  it('aelterer Eintrag ohne Pausenzeiten bleibt wie er ist', async () => {
+    const backup: BackupData = {
+      app: 'zeiterfassung',
+      version: 3,
+      exportedAt: 1,
+      profile: {
+        vorname: '',
+        nachname: '',
+        personalnummer: '',
+        arbeitgeber: '',
+        abteilung: '',
+      },
+      entries: [baseEntry({ breakMinutes: 30 }) as import('../domain/types').TimeEntry],
+    };
+    await restoreBackup(JSON.stringify(backup), 'replace');
+    const imported = await getAllEntries();
+    expect(imported[0].breaks).toBeUndefined();
+    expect(imported[0].breakMinutes).toBe(30);
+  });
+
 });

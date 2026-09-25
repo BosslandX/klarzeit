@@ -10,12 +10,20 @@ export interface Profile {
 /** Herkunft eines Eintrags: per Stoppuhr erfasst oder manuell nachgetragen. */
 export type EntrySource = 'tracked' | 'manual';
 
+/** Eine Pause mit Uhrzeit (epoch ms). */
+export interface BreakInterval {
+  start: number;
+  end: number;
+}
+
 /** Ein abgeschlossener Arbeitszeit-Eintrag. Zeiten als Epoch-Millisekunden. */
 export interface TimeEntry {
   id?: number; // Dexie Auto-Increment Primaerschluessel
   employmentId: string; // Zugehoerige Beschaeftigung
   start: number; // Beginn (epoch ms)
   end: number; // Ende (epoch ms)
+  /** Pausen mit Uhrzeit; fehlt das Feld, sind keine Pausenzeiten bekannt (vor 1.7). */
+  breaks?: BreakInterval[];
   breakMinutes: number; // Pause in Minuten (wird von der Dauer abgezogen)
   activity: string; // Taetigkeit / Beschreibung
   note: string; // optionale Notiz

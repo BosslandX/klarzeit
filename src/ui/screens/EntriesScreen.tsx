@@ -35,7 +35,8 @@ function defaultManualDraft(): EntryDraft {
   return {
     start: start.getTime(),
     end: end.getTime(),
-    breakMinutes: 30,
+    breaks: [],
+    breakMinutes: 0,
     activity: '',
     note: '',
     source: 'manual',
@@ -46,6 +47,7 @@ function entryToDraft(entry: TimeEntry): EntryDraft {
   return {
     start: entry.start,
     end: entry.end,
+    breaks: entry.breaks ?? [],
     breakMinutes: entry.breakMinutes,
     activity: entry.activity,
     note: entry.note,

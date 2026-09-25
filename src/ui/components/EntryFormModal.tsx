@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { EntrySource } from '../../domain/types';
+import type { BreakInterval, EntrySource } from '../../domain/types';
+import { resolveBreakMinutes, validateBreaks } from '../../domain/breaks';
 import {
   fromDatetimeLocal,
   toDatetimeLocal,
@@ -15,6 +16,7 @@ import {
 export interface EntryDraft {
   start: number;
   end: number;
+  breaks: BreakInterval[];
   breakMinutes: number;
   activity: string;
   note: string;
@@ -30,6 +32,14 @@ interface Props {
   onSave: (draft: EntryDraft) => Promise<void> | void;
 }
 
+function breakInputValue(ms: number): string {
+  return Number.isNaN(ms) ? '' : toDatetimeLocal(ms);
+}
+
+function isCompleteBreak(b: BreakInterval): boolean {
+  return Number.isFinite(b.start) && Number.isFinite(b.end);
+}
+
 export function EntryFormModal({
   title,
   initial,
@@ -40,7 +50,14 @@ export function EntryFormModal({
   const { employments, loading: empLoading } = useEmployments();
   const [start, setStart] = useState(initial.start);
   const [end, setEnd] = useState(initial.end);
-  const [breakMinutes, setBreakMinutes] = useState(initial.breakMinutes);
+  const [breaks, setBreaks] = useState<BreakInterval[]>(
+    initial.breaks.length ? initial.breaks : [],
+  );
+  const [legacyMinutes, setLegacyMinutes] = useState(() =>
+    initial.breaks.length === 0 && initial.breakMinutes > 0
+      ? initial.breakMinutes
+      : 0,
+  );
   const [activity, setActivity] = useState(initial.activity);
   const [note, setNote] = useState(initial.note);
   const [employmentId, setEmploymentId] = useState(initial.employmentId ?? '');
@@ -56,10 +73,23 @@ export function EntryFormModal({
     void getActiveEmploymentId().then((id) => setEmploymentId(id));
   }, [initial.employmentId, empLoading]);
 
-  const dauerMs = useMemo(
-    () => netMs({ start, end, breakMinutes }),
-    [start, end, breakMinutes],
+  const completeBreaks = useMemo(
+    () => breaks.filter(isCompleteBreak),
+    [breaks],
   );
+
+  const effectiveBreakMinutes = useMemo(
+    () => resolveBreakMinutes(completeBreaks, legacyMinutes),
+    [completeBreaks, legacyMinutes],
+  );
+
+  const dauerMs = useMemo(
+    () => netMs({ start, end, breakMinutes: effectiveBreakMinutes }),
+    [start, end, effectiveBreakMinutes],
+  );
+
+  const showLegacyHint =
+    legacyMinutes > 0 && completeBreaks.length === 0;
 
   const showEmploymentPick = employments.length > 1;
 
@@ -72,6 +102,20 @@ export function EntryFormModal({
     }
   };
 
+  const addBreakRow = () => {
+    setBreaks((prev) => [...prev, { start: NaN, end: NaN }]);
+  };
+
+  const updateBreak = (index: number, patch: Partial<BreakInterval>) => {
+    setBreaks((prev) =>
+      prev.map((b, i) => (i === index ? { ...b, ...patch } : b)),
+    );
+  };
+
+  const removeBreak = (index: number) => {
+    setBreaks((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSave = async () => {
     if (Number.isNaN(start) || Number.isNaN(end)) {
       setError('Bitte Beginn und Ende vollstaendig angeben.');
@@ -81,8 +125,18 @@ export function EntryFormModal({
       setError('Das Ende muss nach dem Beginn liegen.');
       return;
     }
-    if (breakMinutes * 60_000 >= end - start) {
-      setError('Die Pause ist laenger als die erfasste Zeitspanne.');
+    for (const b of breaks) {
+      const hasStart = Number.isFinite(b.start);
+      const hasEnd = Number.isFinite(b.end);
+      if (hasStart !== hasEnd || (!hasStart && !hasEnd)) {
+        setError('Bitte Beginn und Ende jeder Pause angeben.');
+        return;
+      }
+    }
+    const sorted = [...completeBreaks].sort((a, b) => a.start - b.start);
+    const breakErr = validateBreaks({ start, end }, sorted);
+    if (breakErr) {
+      setError(breakErr);
       return;
     }
     if (!employmentId) {
@@ -92,10 +146,12 @@ export function EntryFormModal({
     setError(null);
     setSaving(true);
     try {
+      const breakMinutes = resolveBreakMinutes(sorted, legacyMinutes);
       await onSave({
         start,
         end,
-        breakMinutes: Math.max(0, breakMinutes || 0),
+        breaks: sorted,
+        breakMinutes,
         activity: activity.trim(),
         note: note.trim(),
         source: initial.source,
@@ -151,16 +207,60 @@ export function EntryFormModal({
           />
         </label>
 
-        <label className="field">
-          <span>Pause (Minuten)</span>
-          <input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            value={breakMinutes}
-            onChange={(e) => setBreakMinutes(Number(e.target.value) || 0)}
-          />
-        </label>
+        <div className="field">
+          <span>Pausen</span>
+          {breaks.map((b, i) => (
+            <div key={i} className="break-row">
+              <label>
+                Pause von
+                <input
+                  type="datetime-local"
+                  value={breakInputValue(b.start)}
+                  onChange={(e) =>
+                    updateBreak(i, { start: fromDatetimeLocal(e.target.value) })
+                  }
+                />
+              </label>
+              <label>
+                bis
+                <input
+                  type="datetime-local"
+                  value={breakInputValue(b.end)}
+                  onChange={(e) =>
+                    updateBreak(i, { end: fromDatetimeLocal(e.target.value) })
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => removeBreak(i)}
+              >
+                Entfernen
+              </button>
+            </div>
+          ))}
+          <button type="button" className="btn btn-ghost" onClick={addBreakRow}>
+            + Pause
+          </button>
+        </div>
+
+        {showLegacyHint && (
+          <div className="legacy-break-hint">
+            Pause: {legacyMinutes} min ohne Uhrzeit (aelterer Eintrag).{' '}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setLegacyMinutes(0)}
+            >
+              Entfernen
+            </button>
+          </div>
+        )}
+
+        <div className="modal-duration">
+          Pause gesamt: {effectiveBreakMinutes} min
+        </div>
 
         <label className="field">
           <span>Taetigkeit</span>

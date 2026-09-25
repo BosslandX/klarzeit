@@ -64,6 +64,7 @@ export function HomeScreen({ tracker }: Props) {
     setStopDraft({
       start: running.start,
       end: Date.now(),
+      breaks: [],
       breakMinutes: 0,
       activity: running.activity,
       note: '',
