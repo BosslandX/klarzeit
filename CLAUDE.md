@@ -115,6 +115,11 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   `src/db/clockodo-lists.ts`, nicht im Backup. Ausschalten löscht Schlüssel und Listen erst
   beim **Speichern**; `removeEmployment` löscht sie mit. Firmendaten (Namen, IDs) gehören nie
   in Code oder Tests — Testwerte ohne `@`, der Privacy-Scan meldet jede E-Mail-Form.
+- **Clockodo-Auswahl je Eintrag (AUF-013):** `TimeEntry.clockodo?: ClockodoEntryRef | null`
+  (Kunde + Leistung Pflicht, Projekt optional; `cleanClockodoEntryRef` verwirft den ganzen Ref
+  bei einer kaputten Projekt-ID). Das Formular zeigt die Auswahl nur bei Beschäftigungen mit
+  Zugang, Startwert `defaultEntryRef` der Beschäftigung; `EntryDraft.clockodo` ist Pflicht
+  (Dexie-`update`, wie `breaks`). Gespeichert wird nur eine vollständige Auswahl, sonst `null`.
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
@@ -134,6 +139,8 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
   `employments` und Backup); Preferences-Schlüssel `clockodoLists:<employmentId>`;
   KeyStore-Schlüssel `clockodo-key-<employmentId>` (umbenannt findet die App den
   gespeicherten API-Schlüssel nicht mehr)
+- `src/domain/types.ts` → Feld `clockodo` mit `customersId`/`projectsId`/`servicesId` am
+  `TimeEntry` (Dexie und Backup; umbenannt verliert jeder Eintrag seine Clockodo-Auswahl)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
