@@ -14,7 +14,7 @@ import {
   saveVacationDays,
   setActiveEmployment,
 } from './employment';
-import type { Profile, TimeEntry } from '../domain/types';
+import type { BreakInterval, Profile, TimeEntry } from '../domain/types';
 import { defaultEmployment, mergeVacationDays } from '../domain/employment';
 import type { Employment, VacationDay } from '../domain/employment';
 import { decimalHours, formatClock, formatDate, netMs } from '../domain/time';
@@ -84,10 +84,13 @@ function isValidEntry(e: unknown): e is TimeEntry {
   );
 }
 
-
-function cleanBreaks(raw: unknown): import('../domain/types').BreakInterval[] | undefined {
+/**
+ * Pausen aus einem Backup: nur endliche Zahlen mit end > start, nach Beginn
+ * sortiert. Bleibt keine gueltige uebrig, fehlt das Feld (undefined).
+ */
+function cleanBreaks(raw: unknown): BreakInterval[] | undefined {
   if (!Array.isArray(raw)) return undefined;
-  const kept: import('../domain/types').BreakInterval[] = [];
+  const kept: BreakInterval[] = [];
   for (const item of raw) {
     if (typeof item !== 'object' || item === null) continue;
     const x = item as Record<string, unknown>;

@@ -535,6 +535,16 @@ describe('Zusammenfuehren in eine vorhandene Beschaeftigung', () => {
     const empB = list.find((e) => e.id === 'emp-b');
     expect(empB?.weeklyHours).toBe(10);
   });
+});
+
+describe('Pausen mit Uhrzeit im Backup', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+  });
+
   function pauseDay(h1: number, m1: number, h2: number, m2: number) {
     return {
       start: new Date(2026, 6, 6, h1, m1).getTime(),

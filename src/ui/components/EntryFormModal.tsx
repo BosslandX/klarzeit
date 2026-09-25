@@ -139,6 +139,12 @@ export function EntryFormModal({
       setError(breakErr);
       return;
     }
+    // Deckt auch alte Eintraege ohne Pausenzeiten ab, die validateBreaks nicht sieht.
+    const breakMinutes = resolveBreakMinutes(sorted, legacyMinutes);
+    if (breakMinutes * 60_000 >= end - start) {
+      setError('Die Pause ist laenger als die erfasste Zeitspanne.');
+      return;
+    }
     if (!employmentId) {
       setError('Bitte eine Beschaeftigung waehlen.');
       return;
@@ -146,7 +152,6 @@ export function EntryFormModal({
     setError(null);
     setSaving(true);
     try {
-      const breakMinutes = resolveBreakMinutes(sorted, legacyMinutes);
       await onSave({
         start,
         end,

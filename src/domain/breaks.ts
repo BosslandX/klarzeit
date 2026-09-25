@@ -1,11 +1,18 @@
 import { MINUTE } from './time';
 import type { BreakInterval } from './types';
 
+/** Summe der Pausen in ganzen Minuten. */
 export function breakMinutesOf(breaks: readonly BreakInterval[]): number {
   const totalMs = breaks.reduce((sum, b) => sum + (b.end - b.start), 0);
   return Math.round(totalMs / MINUTE);
 }
 
+/**
+ * null, wenn die Pausen zum Eintrag passen; sonst die Meldung der ersten
+ * verletzten Regel. Jede Regel steht an genau einer Stelle: Laenge je Pause,
+ * Lage innerhalb von Beginn/Ende, Ueberschneidung, Summe unter der Dauer.
+ * Die Eingabe darf unsortiert sein und wird nicht veraendert.
+ */
 export function validateBreaks(
   entry: { start: number; end: number },
   breaks: readonly BreakInterval[],
@@ -33,6 +40,10 @@ export function validateBreaks(
   return null;
 }
 
+/**
+ * Pausenminuten eines Entwurfs: die Summe der Pausen mit Uhrzeit, sonst die
+ * alte Minutenangabe (Eintraege vor 1.7 kennen keine Pausenzeiten).
+ */
 export function resolveBreakMinutes(
   breaks: readonly BreakInterval[],
   legacyMinutes: number,

@@ -229,6 +229,24 @@ body {
   font-size: 13px;
   color: var(--muted);
 }
+.break-row {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.break-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.legacy-break-hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
 input,
 textarea,
 select {
