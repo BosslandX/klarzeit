@@ -365,9 +365,11 @@ export function buildKontoPanelText(
         ? `, in diesem Teilmonat anteilig ${dec(includedOvertimeCapMs(emp, t.monthStart))} Std.`
         : '.');
   }
+  const hinweis = emp.balanceNote.trim();
+  const kontohinweis = hinweis !== '' ? ` ${hinweis}` : '';
   const foot =
     `Basis: ${String(emp.weeklyHours).replace('.', ',')} Std./Woche x 52/12 = ${monatlSoll} Std./Monat. ` +
-    `Beschaeftigt seit ${formatDate(emp.startDate)}. Ausgleich n. § 2 (4) Arbeitsvertrag.` +
+    `Beschaeftigt seit ${formatDate(emp.startDate)}.${kontohinweis}` +
     abgeltungHinweis +
     urlaubHinweis;
   return { rows, foot };

@@ -22,6 +22,9 @@ export const INITIAL_EMPLOYMENT_ID = 'emp-1';
 
 const VALID_MODES: VacationYearMode[] = ['full', 'prorata', 'both'];
 
+/** Bis 1.7 druckte jedes PDF diesen Satz fest; Beschaeftigungen ohne das Feld behalten ihn, neue beginnen leer. */
+const LEGACY_BALANCE_NOTE = 'Ausgleich n. § 2 (4) Arbeitsvertrag.';
+
 /** Neue Beschaeftigung: Zeitstempel + Zufallsteil (kein crypto.randomUUID). */
 export function createEmploymentId(): string {
   return `emp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -62,6 +65,14 @@ export function cleanEmployment(raw: unknown): Employment {
   ) {
     includedOvertimeHoursPerMonth = x.includedOvertimeHoursPerMonth;
   }
+  let balanceNote: string;
+  if (!('balanceNote' in x)) {
+    balanceNote = LEGACY_BALANCE_NOTE;
+  } else if (typeof x.balanceNote === 'string') {
+    balanceNote = x.balanceNote;
+  } else {
+    balanceNote = '';
+  }
   const id =
     typeof x.id === 'string' && x.id.trim() !== ''
       ? x.id
@@ -87,6 +98,7 @@ export function cleanEmployment(raw: unknown): Employment {
     openingBalanceMs: num(x.openingBalanceMs, 0),
     contractVacationDays,
     includedOvertimeHoursPerMonth,
+    balanceNote,
     clockodo: cleanClockodoConfig(x.clockodo),
   };
 }

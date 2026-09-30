@@ -69,6 +69,7 @@ describe('Kontoblock PDF-Text (AUF-016)', () => {
     weeklyHours: 30,
     workdaysPerWeek: 5,
     includedOvertimeHoursPerMonth: null,
+    balanceNote: 'Ausgleich n. § 2 (4) Arbeitsvertrag.',
   };
 
   function entry(y: number, mo: number, d: number, fromH: number, toH: number): TimeEntry {
@@ -149,4 +150,40 @@ describe('Kontoblock PDF-Text (AUF-016)', () => {
       'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 16.09.2026. Ausgleich n. § 2 (4) Arbeitsvertrag. Bis 10 Std. Ueberstunden/Monat sind mit dem Gehalt abgegolten (Arbeitsvertrag), in diesem Teilmonat anteilig 5,00 Std.',
     );
   });
+  it('Kontoblock: leerer Hinweis druckt keinen Satz', () => {
+    const ref = new Date(2026, 4, 31).getTime();
+    const ledger = buildBalanceLedger({ ...empK, balanceNote: '' }, mai145(), ref)!;
+    const { foot } = buildKontoPanelText(ledger, { ...empK, balanceNote: '' });
+    expect(foot).toBe(
+      'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 01.05.2026.',
+    );
+  });
+
+  it('Kontoblock: eigener Hinweis steht nach dem Beschaeftigungsbeginn', () => {
+    const emp = {
+      ...empK,
+      balanceNote: 'Ausgleich n. § 9 (1) Arbeitsvertrag.',
+    };
+    const ref = new Date(2026, 4, 31).getTime();
+    const ledger = buildBalanceLedger(emp, mai145(), ref)!;
+    const { foot } = buildKontoPanelText(ledger, emp);
+    expect(foot).toBe(
+      'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 01.05.2026. Ausgleich n. § 9 (1) Arbeitsvertrag.',
+    );
+  });
+
+  it('Kontoblock: Hinweis wird getrimmt, nur Leerzeichen zaehlen als leer', () => {
+    const ref = new Date(2026, 4, 31).getTime();
+    const leer = { ...empK, balanceNote: '   ' };
+    const ledgerLeer = buildBalanceLedger(leer, mai145(), ref)!;
+    expect(buildKontoPanelText(ledgerLeer, leer).foot).toBe(
+      'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 01.05.2026.',
+    );
+    const mit = { ...empK, balanceNote: '  Testhinweis.  ' };
+    const ledgerMit = buildBalanceLedger(mit, mai145(), ref)!;
+    expect(buildKontoPanelText(ledgerMit, mit).foot).toBe(
+      'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 01.05.2026. Testhinweis.',
+    );
+  });
+
 });

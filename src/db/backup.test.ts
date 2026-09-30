@@ -304,6 +304,39 @@ describe('Backup Version 3 und Beschaeftigungen', () => {
     expect(fillEmptyEmployment(localMitStd, incoming).includedOvertimeHoursPerMonth).toBeNull();
   });
 
+
+  it('Rundreise balanceNote ueber Backup', async () => {
+    prefStore.set(
+      'employments',
+      JSON.stringify([emp(INITIAL_EMPLOYMENT_ID, 'H', 20)]),
+    );
+    await updateEmployment(INITIAL_EMPLOYMENT_ID, { balanceNote: 'Testhinweis' });
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const list = await getEmployments();
+    expect(list[0].balanceNote).toBe('Testhinweis');
+  });
+
+  it('fillEmptyEmployment uebernimmt den Kontohinweis nur mit dem Vertrag', () => {
+    const local = cleanEmployment({ id: 'emp-1', balanceNote: 'lokal' });
+    const incoming = cleanEmployment({
+      id: 'emp-1',
+      weeklyHours: 30,
+      balanceNote: 'Testhinweis',
+    });
+    expect(fillEmptyEmployment(local, incoming).balanceNote).toBe('Testhinweis');
+    const localMitStd = cleanEmployment({
+      id: 'emp-1',
+      weeklyHours: 20,
+      balanceNote: 'lokal',
+    });
+    expect(fillEmptyEmployment(localMitStd, incoming).balanceNote).toBe('lokal');
+  });
+
   it('buildBackup schreibt version 3 und app zeiterfassung', async () => {
     prefStore.set(
       'employments',
@@ -378,6 +411,7 @@ const erwartetAusV2 = {
   openingBalanceMs: 3_600_000,
   contractVacationDays: null,
   includedOvertimeHoursPerMonth: null,
+  balanceNote: 'Ausgleich n. § 2 (4) Arbeitsvertrag.',
   clockodo: null,
 };
 

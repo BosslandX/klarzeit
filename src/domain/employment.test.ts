@@ -37,6 +37,7 @@ const emp: Employment = {
   openingBalanceMs: 0,
   contractVacationDays: null,
   includedOvertimeHoursPerMonth: null,
+  balanceNote: '',
   clockodo: null,
 };
 

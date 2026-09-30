@@ -554,6 +554,20 @@ export function MoreScreen() {
           werden damit nicht verrechnet; im Eintritts- und Austrittsmonat gilt die
           Zahl anteilig.
         </p>
+        <label className="field">
+          <span>Hinweis im PDF-Kontoblock</span>
+          <input
+            type="text"
+            maxLength={120}
+            placeholder="leer = kein Hinweis"
+            value={emp.balanceNote}
+            onChange={(ev) => setEmpField('balanceNote', ev.target.value)}
+          />
+        </label>
+        <p className="muted small">
+          Erscheint im Monats-PDF in der Fussnote des Arbeitszeitkontos, z. B. die
+          Fundstelle der Ausgleichsregel im Arbeitsvertrag.
+        </p>
         {editingId && editDraft && (
           <ClockodoSettings
             employmentId={editingId}

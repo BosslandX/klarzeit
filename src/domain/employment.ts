@@ -48,6 +48,8 @@ export interface Employment {
   contractVacationDays: number | null;
   /** Mit dem Gehalt abgegoltene Ueberstunden je Monat (Stunden); null = keine solche Klausel. */
   includedOvertimeHoursPerMonth: number | null;
+  /** Hinweis in der Fussnote des PDF-Kontoblocks (z. B. Ausgleichsregel im Vertrag); leer = keiner. */
+  balanceNote: string;
   /** Clockodo-Uebertragung; null = aus. */
   clockodo: ClockodoConfig | null;
 }
@@ -97,6 +99,7 @@ export const defaultEmployment: Employment = {
   openingBalanceMs: 0,
   contractVacationDays: null,
   includedOvertimeHoursPerMonth: null,
+  balanceNote: '',
   clockodo: null,
 };
 

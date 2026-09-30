@@ -187,6 +187,42 @@ describe('Beschaeftigungs-Verwaltung', () => {
     expect(await countEntriesOfEmployment(secondId)).toBe(1);
   });
 
+
+  it('cleanEmployment: fehlender Kontohinweis wird der bisherige Satz, sonst nur Text', () => {
+    const { balanceNote: _weg, ...ohneFeld } = defaultEmployment;
+    expect('balanceNote' in ohneFeld).toBe(false);
+    expect(cleanEmployment(ohneFeld).balanceNote).toBe(
+      'Ausgleich n. § 2 (4) Arbeitsvertrag.',
+    );
+    const base = { ...defaultEmployment, id: 'x' };
+    expect(cleanEmployment({ ...base, balanceNote: null }).balanceNote).toBe('');
+    expect(cleanEmployment({ ...base, balanceNote: 123 }).balanceNote).toBe('');
+    expect(cleanEmployment({ ...base, balanceNote: '' }).balanceNote).toBe('');
+    expect(cleanEmployment({ ...base, balanceNote: 'Testhinweis' }).balanceNote).toBe(
+      'Testhinweis',
+    );
+    expect(
+      cleanEmployment({ ...base, balanceNote: '  Testhinweis  ' }).balanceNote,
+    ).toBe('  Testhinweis  ');
+  });
+
+  it('neue Beschaeftigung beginnt ohne Kontohinweis', async () => {
+    expect(defaultEmployment.balanceNote).toBe('');
+    const list = await addEmployment({ name: 'Neu', weeklyHours: 10 });
+    expect(list[1].balanceNote).toBe('');
+  });
+
+  it('gespeicherte Beschaeftigung ohne Kontohinweis behaelt den bisherigen Satz', async () => {
+    const { balanceNote: _weg, ...stored } = {
+      ...defaultEmployment,
+      id: INITIAL_EMPLOYMENT_ID,
+      weeklyHours: 40,
+    };
+    prefStore.set('employments', JSON.stringify([stored]));
+    const list = await getEmployments();
+    expect(list[0].balanceNote).toBe('Ausgleich n. § 2 (4) Arbeitsvertrag.');
+  });
+
   it('Urlaubstag wird mit employmentId gespeichert und gelesen', async () => {
     const list = await addEmployment({ name: 'Zweit', weeklyHours: 5 });
     const secondId = list[1].id;
