@@ -304,12 +304,12 @@ export function buildVacationPanelText(
   return { rows, foot };
 }
 
-export type KontoPanelRow = {
+export interface KontoPanelRow {
   label: string;
   value: string;
   tone?: 'pos' | 'neg';
   bold?: boolean;
-};
+}
 
 /** Kontoblock: Zeilen + Fussnote (reine Textlogik fuer Tests und PDF). */
 export function buildKontoPanelText(
@@ -358,14 +358,12 @@ export function buildKontoPanelText(
   let abgeltungHinweis = '';
   if (emp.includedOvertimeHoursPerMonth != null) {
     const h = String(emp.includedOvertimeHoursPerMonth).replace('.', ',');
-    const frac = employedFractionOfMonth(emp, t.monthStart);
-    if (frac < 1) {
-      abgeltungHinweis =
-        ` Bis ${h} Std. Ueberstunden/Monat sind mit dem Gehalt abgegolten (Arbeitsvertrag), in diesem Teilmonat anteilig ${dec(includedOvertimeCapMs(emp, t.monthStart))} Std.`;
-    } else {
-      abgeltungHinweis =
-        ` Bis ${h} Std. Ueberstunden/Monat sind mit dem Gehalt abgegolten (Arbeitsvertrag).`;
-    }
+    const teilmonat = employedFractionOfMonth(emp, t.monthStart) < 1;
+    abgeltungHinweis =
+      ` Bis ${h} Std. Ueberstunden/Monat sind mit dem Gehalt abgegolten (Arbeitsvertrag)` +
+      (teilmonat
+        ? `, in diesem Teilmonat anteilig ${dec(includedOvertimeCapMs(emp, t.monthStart))} Std.`
+        : '.');
   }
   const foot =
     `Basis: ${String(emp.weeklyHours).replace('.', ',')} Std./Woche x 52/12 = ${monatlSoll} Std./Monat. ` +

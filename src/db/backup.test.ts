@@ -276,7 +276,6 @@ describe('Backup Version 3 und Beschaeftigungen', () => {
     expect(list[0].contractVacationDays).toBe(26);
   });
 
-
   it('Rundreise includedOvertimeHoursPerMonth 12 ueber Backup', async () => {
     prefStore.set(
       'employments',

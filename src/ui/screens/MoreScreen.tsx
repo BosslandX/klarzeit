@@ -549,7 +549,10 @@ export function MoreScreen() {
           />
         </label>
         <p className="muted small">
-          Ueberstunden bis zu dieser Zahl je Monat sind mit dem Gehalt abgegolten und zaehlen nicht ins Arbeitszeitkonto. Minusstunden aus Vormonaten werden damit nicht verrechnet; im Eintritts- und Austrittsmonat gilt die Zahl anteilig.
+          Ueberstunden bis zu dieser Zahl je Monat sind mit dem Gehalt abgegolten
+          und zaehlen nicht ins Arbeitszeitkonto. Minusstunden aus Vormonaten
+          werden damit nicht verrechnet; im Eintritts- und Austrittsmonat gilt die
+          Zahl anteilig.
         </p>
         {editingId && editDraft && (
           <ClockodoSettings

@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { buildEmployeePanelFields, buildKontoPanelText, buildVacationPanelText } from './report-pdf';
-import type { Profile } from '../domain/types';
+import type { Profile, TimeEntry } from '../domain/types';
 import {
   buildBalanceLedger,
   buildVacationStatus,
   defaultEmployment,
   type Employment,
 } from '../domain/employment';
-import type { TimeEntry } from '../domain/types';
 
 describe('PDF-Kopf je Beschaeftigung', () => {
   it('buildEmployeePanelFields traegt Vertragsfelder der Beschaeftigung, nicht des Profils', () => {

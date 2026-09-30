@@ -179,9 +179,9 @@ export interface MonthBalance {
 export interface BalanceLedger {
   months: MonthBalance[]; // Eintrittsmonat .. Zielmonat (inkl.)
   opening: number; // Anfangssaldo zum Beschaeftigungsbeginn
-  carryIn: number; // Uebertrag VOR dem Zielmonat (opening + Σ Vormonate (saldoMs − includedOvertimeMs))
+  carryIn: number; // Uebertrag VOR dem Zielmonat (opening + Salden der Vormonate abzgl. Abgeltung)
   target: MonthBalance; // der Zielmonat selbst
-  closing: number; // Gesamtsaldo NACH dem Zielmonat (carryIn + target.saldoMs − target.includedOvertimeMs)
+  closing: number; // Gesamtsaldo NACH dem Zielmonat (carryIn + target.saldoMs - target.includedOvertimeMs)
 }
 
 /**

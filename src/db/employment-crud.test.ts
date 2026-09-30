@@ -124,6 +124,21 @@ describe('Beschaeftigungs-Verwaltung', () => {
     expect(cleanEmployment({ ...base, contractVacationDays: 22.5 }).contractVacationDays).toBe(22.5);
   });
 
+  it('cleanEmployment normalisiert includedOvertimeHoursPerMonth', () => {
+    // defaultEmployment traegt das Feld mit null; "fehlt" heisst hier: Schluessel weg.
+    const { includedOvertimeHoursPerMonth: _weg, ...ohneFeld } = defaultEmployment;
+    expect('includedOvertimeHoursPerMonth' in ohneFeld).toBe(false);
+    expect(cleanEmployment(ohneFeld).includedOvertimeHoursPerMonth).toBeNull();
+    const base = { ...defaultEmployment, id: 'x' };
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: null }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: 0 }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: -5 }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: Number.NaN }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: '10' }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: 10 }).includedOvertimeHoursPerMonth).toBe(10);
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: 7.5 }).includedOvertimeHoursPerMonth).toBe(7.5);
+  });
+
   it('removeEmployment verweigert Loeschen solange Zeiteintrag haengt, Meldung nennt Anzahl', async () => {
     await addEntry({
       start: 1_700_000_000_000,
@@ -182,15 +197,3 @@ describe('Beschaeftigungs-Verwaltung', () => {
     expect(days[0].employmentId).toBe(secondId);
   });
 });
-
-  it('cleanEmployment normalisiert includedOvertimeHoursPerMonth', () => {
-    const base = { ...defaultEmployment };
-    expect(cleanEmployment(base).includedOvertimeHoursPerMonth).toBeNull();
-    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: null }).includedOvertimeHoursPerMonth).toBeNull();
-    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: 0 }).includedOvertimeHoursPerMonth).toBeNull();
-    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: -5 }).includedOvertimeHoursPerMonth).toBeNull();
-    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: Number.NaN }).includedOvertimeHoursPerMonth).toBeNull();
-    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: '10' }).includedOvertimeHoursPerMonth).toBeNull();
-    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: 10 }).includedOvertimeHoursPerMonth).toBe(10);
-    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: 7.5 }).includedOvertimeHoursPerMonth).toBe(7.5);
-  });
