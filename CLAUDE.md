@@ -103,6 +103,14 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   Zeile „mit Gehalt abgegolten" in Auswertung und PDF; der Text des Kontoblocks entsteht in
   `buildKontoPanelText` (rein, getestet). Das Feld gehört zur Feldgruppe Vertrag von
   `fillEmptyEmployment`; Backupformat bleibt Version 3.
+- **Kontohinweis je Beschäftigung (AUF-017):** `Employment.balanceNote` (leer = kein Satz)
+  ersetzt den bis 1.7 festen Satz „Ausgleich n. § 2 (4) Arbeitsvertrag." in der Fußnote des
+  PDF-Kontoblocks; gedruckt getrimmt direkt nach „Beschaeftigt seit …". **Fehlt der
+  Schlüssel** (ältere Daten und Backups), setzt `cleanEmployment` den bisherigen Satz
+  (`LEGACY_BALANCE_NOTE`), damit sich ohne Zutun kein Nachweis ändert; neue Beschäftigungen
+  beginnen leer — die App erfindet keine Fundstelle. Feldgruppe Vertrag in
+  `fillEmptyEmployment`: Eine frisch geöffnete App trägt eine Standard-Beschäftigung mit
+  leerem Hinweis, den Satz eines v1/v2-Backups bringt beim Zusammenführen nur diese Gruppe.
 - **Nicht abgebildet:** Feiertage, Krankheit und sonstige bezahlte Freistellung erzeugen weiterhin
   Minusstunden; halbe Urlaubstage sind konstruktiv unmöglich (`taken` ist `.length`); kein
   Resturlaub-Übertrag (§ 7 III BUrlG); `VacationDay.note` existiert, ist in der UI aber tot.
@@ -161,6 +169,9 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
 - `src/domain/employment.ts` → Feldname `includedOvertimeHoursPerMonth` (Preferences
   `employments` und Backup; umbenannt verwirft `cleanEmployment` den Wert, und das Konto
   schreibt wieder jedes Monatsplus voll gut)
+- `src/domain/employment.ts` → Feldname `balanceNote` (Preferences `employments` und Backup;
+  umbenannt gilt das Feld als fehlend — `cleanEmployment` setzt wieder den alten festen Satz,
+  jeder eingetragene Hinweis ist weg)
 - `src/domain/types.ts` → Feld `breaks` mit `start`/`end` am `TimeEntry` (steht in der
   Dexie-Datenbank und in jedem Backup; umbenannt verwirft `cleanBreaks` beim Import jede
   Pausenzeit)
