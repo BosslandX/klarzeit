@@ -116,6 +116,7 @@ Safe-Area-Abstände geringfügig.
 - **PDF-Stundennachweis** — erzeugt und über das Android-Teilen-Menü direkt an die Mail-App.
 - **CSV-Export** — Semikolon-getrennt, für deutsches Excel vorbereitet.
 - **Arbeitszeitkonto** — Soll/Ist je Monat, Saldo, Übertrag aus Vormonaten, Gesamtsaldo.
+- **Abgegoltene Überstunden** — sind laut Vertrag bis zu einer Zahl Überstunden im Monat mit dem Gehalt abgegolten, zählt das Konto nur das Plus darüber; Auswertung und PDF zeigen die abgegoltenen Stunden. Den Vertragshinweis unter dem Konto im PDF trägst du je Beschäftigung ein.
 - **Gesetzlicher und vertraglicher Urlaub** — Jahresanspruch, Zwölftelung, Wartezeit, genommene Tage, Resturlaub.
 - **Personendaten** — Name, Personalnummer, Arbeitgeber, Abteilung für den Berichtskopf.
 - **Backup** — JSON-Export/-Import sowie ein automatisches Backup in den Documents-Ordner, das eine Deinstallation überlebt.
@@ -148,6 +149,18 @@ Der Saldo wird Monat für Monat fortgeschrieben:
 | Mai | 86:40 | 85:00 | −1:40 | 0:00 | −1:40 |
 | Juni | 86:40 | 91:40 | +5:00 | −1:40 | +3:20 |
 | Juli | 86:40 | 90:00 | +3:20 | +3:20 | **+6:40** |
+
+**Mit dem Gehalt abgegoltene Überstunden.** Regelt dein Arbeitsvertrag, dass bis zu
+einer bestimmten Zahl Überstunden im Monat mit dem Gehalt abgegolten sind, trägst du
+diese Zahl je Beschäftigung ein (Tab *Mehr* → Beschäftigung *bearbeiten*). Klarzeit
+zieht sie Monat für Monat vom Plus ab und schreibt nur den Rest ins Konto; Auswertung
+und Monats-PDF zeigen die abgegoltenen Stunden als eigene Zeile. Jeder Monat zählt für
+sich — Minusstunden aus Vormonaten mindern die Abgeltung nicht. Im Eintritts- und
+Austrittsmonat gilt die Zahl anteilig, wie das Soll.
+
+**Hinweis im PDF-Kontoblock.** Den Satz unter dem Arbeitszeitkonto im PDF — etwa die
+Fundstelle der Ausgleichsregel in deinem Arbeitsvertrag — trägst du je Beschäftigung
+ein; leer bleibt er weg.
 
 ### Gesetzlicher Urlaub
 
@@ -203,7 +216,7 @@ UI- und Datenbankcode, damit sie prüfbar bleibt.
   er beginnt (Stundenzettel-Konvention). Bei Nachtschichten ist das zu beachten.
 
 Die Rechenwege sind in
-[`src/domain/employment.test.ts`](src/domain/employment.test.ts) mit 59 Tests
+[`src/domain/employment.test.ts`](src/domain/employment.test.ts) mit 67 Tests
 belegt, die die Paragraphen einzeln durchgehen.
 
 </details>
@@ -428,7 +441,7 @@ Verfahren mit Prüfschritten:
 
 | Phase | Was passiert ist |
 |---|---|
-| **Rechtslogik zuerst** | Arbeitszeitkonto und BUrlG-Berechnung testgetrieben: erst die Testfälle je Paragraph, dann die Implementierung. Heute 59 Tests. |
+| **Rechtslogik zuerst** | Arbeitszeitkonto und BUrlG-Berechnung testgetrieben: erst die Testfälle je Paragraph, dann die Implementierung. Heute 67 Tests. |
 | **Review-Durchgang 1** | Adversariale Mehrdimensions-Review des Gesamtcodes durch 26 Agenten. 16 Befunde bestätigt, 6 nach Gegenprüfung verworfen. |
 | **Review-Durchgang 2** | Vier Dimensionen plus Gegenprüfung durch 19 Agenten, gezielt auf Arbeitszeitkonto und Urlaub. 12 Befunde, alle behoben. |
 | **Gegenprüfung** | Jeder Befund musste widerlegbar sein. Was der Gegenprüfung nicht standhielt, wurde verworfen statt „sicherheitshalber" gefixt. |

@@ -90,13 +90,22 @@ and the rounding rule of § 5 (2) — which only ever rounds **up**: an entitlem
 of 13.33 days stays 13.33 days, it is not rounded down to 13.
 
 The logic lives in [`src/domain/employment.ts`](src/domain/employment.ts), is
-free of UI and database code, and is covered by 59 tests that walk through the
+free of UI and database code, and is covered by 67 tests that walk through the
 statutes one by one.
 
 If your contract grants more than the statutory minimum, you enter your annual
 leave per employment. Klarzeit then works with that figure — never with less
 than the statutory minimum — and applies the rules above to the whole
 entitlement.
+
+If your contract says that up to a certain number of overtime hours per month are
+covered by your salary, you enter that number per employment as well. Klarzeit
+deducts it month by month from the surplus, books only the rest to the working-time
+account, and shows the covered hours as a separate line in the report and the PDF.
+Each month stands on its own — a deficit from earlier months does not reduce it — and
+the number is prorated in the first and last month of employment. The sentence below
+the working-time account in the PDF, such as the clause of your contract that governs
+overtime compensation, is also set per employment.
 
 It does **not** handle public holidays, sick days, special rules a contract or
 collective agreement sets for extra leave, additional leave for severe
