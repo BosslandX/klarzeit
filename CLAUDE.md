@@ -92,9 +92,22 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   wenn derselbe Tag zusätzlich als Zeiteintrag erfasst wurde; monatlich via `min(credit, sollMs)`,
   damit reiner Urlaub keine Überstunden erzeugt. Nicht gegen das Monats-`istMs` deckeln — das zöge
   das Ist zweimal ab und entwertete Arbeit an urlaubsfreien Tagen.
+- **Mit dem Gehalt abgegoltene Überstunden (AUF-016):** `Employment.includedOvertimeHoursPerMonth`,
+  `null` = keine Klausel. `buildBalanceLedger` weist je Monat
+  `includedOvertimeMs = min(includedOvertimeCapMs, max(0, saldoMs))` aus; `saldoMs` bleibt roh,
+  Übertrag und Gesamtsaldo ziehen die Abgeltung ab. **Jeder Monat für sich:** Minusstunden aus
+  Vormonaten mindern die Abgeltung nicht — der zugrunde liegende Vertrag zählt Überstunden pro
+  Monat und kennt kein Arbeitszeitkonto, und verrechnet werden darf nur, was die Vereinbarung
+  vorsieht (BAG, Urteil vom 21.03.2012 – 5 AZR 676/11, Leitsatz). Im Teilmonat gilt die Grenze
+  anteilig wie das Soll (`employedFractionOfMonth`, aus `monthSollMs` herausgezogen). Anzeige:
+  Zeile „mit Gehalt abgegolten" in Auswertung und PDF; der Text des Kontoblocks entsteht in
+  `buildKontoPanelText` (rein, getestet). Das Feld gehört zur Feldgruppe Vertrag von
+  `fillEmptyEmployment`; Backupformat bleibt Version 3.
 - **Nicht abgebildet:** Feiertage, Krankheit und sonstige bezahlte Freistellung erzeugen weiterhin
   Minusstunden; halbe Urlaubstage sind konstruktiv unmöglich (`taken` ist `.length`); kein
   Resturlaub-Übertrag (§ 7 III BUrlG); `VacationDay.note` existiert, ist in der UI aber tot.
+  Ausgezahlte Überstunden lassen sich nicht buchen (das Konto behält sie als Guthaben), eine
+  Genehmigung von Überstunden kennt die App nicht.
 - **Pausen mit Uhrzeit (AUF-011):** `TimeEntry.breaks?: BreakInterval[]` (Beginn/Ende, epoch ms).
   Fehlt das Feld, sind keine Pausenzeiten bekannt (Einträge vor 1.7) und allein `breakMinutes`
   gilt. `breakMinutes` bleibt gespeichert und ist weiter die Rechengrundlage für `netMs`, PDF,
@@ -145,6 +158,9 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
 - `src/domain/employment.ts` → Feldname `contractVacationDays` (steht in Preferences
   `employments` und in jedem Backup; umbenannt verwirft `cleanEmployment` den alten Wert,
   und der Vertragsurlaub fällt still auf das gesetzliche Minimum zurück)
+- `src/domain/employment.ts` → Feldname `includedOvertimeHoursPerMonth` (Preferences
+  `employments` und Backup; umbenannt verwirft `cleanEmployment` den Wert, und das Konto
+  schreibt wieder jedes Monatsplus voll gut)
 - `src/domain/types.ts` → Feld `breaks` mit `start`/`end` am `TimeEntry` (steht in der
   Dexie-Datenbank und in jedem Backup; umbenannt verwirft `cleanBreaks` beim Import jede
   Pausenzeit)
