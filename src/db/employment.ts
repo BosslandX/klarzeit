@@ -22,7 +22,10 @@ export const INITIAL_EMPLOYMENT_ID = 'emp-1';
 
 const VALID_MODES: VacationYearMode[] = ['full', 'prorata', 'both'];
 
-/** Bis 1.7 druckte jedes PDF diesen Satz fest; Beschaeftigungen ohne das Feld behalten ihn, neue beginnen leer. */
+/**
+ * Bis 1.7 druckte jedes PDF diesen Satz fest. Beschaeftigungen ohne das Feld (aeltere
+ * Daten und Backups) behalten ihn, neue beginnen leer.
+ */
 const LEGACY_BALANCE_NOTE = 'Ausgleich n. § 2 (4) Arbeitsvertrag.';
 
 /** Neue Beschaeftigung: Zeitstempel + Zufallsteil (kein crypto.randomUUID). */

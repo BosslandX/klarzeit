@@ -150,6 +150,7 @@ describe('Kontoblock PDF-Text (AUF-016)', () => {
       'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 16.09.2026. Ausgleich n. § 2 (4) Arbeitsvertrag. Bis 10 Std. Ueberstunden/Monat sind mit dem Gehalt abgegolten (Arbeitsvertrag), in diesem Teilmonat anteilig 5,00 Std.',
     );
   });
+
   it('Kontoblock: leerer Hinweis druckt keinen Satz', () => {
     const ref = new Date(2026, 4, 31).getTime();
     const ledger = buildBalanceLedger({ ...empK, balanceNote: '' }, mai145(), ref)!;
@@ -185,5 +186,4 @@ describe('Kontoblock PDF-Text (AUF-016)', () => {
       'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 01.05.2026. Testhinweis.',
     );
   });
-
 });

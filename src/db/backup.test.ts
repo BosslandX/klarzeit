@@ -304,7 +304,6 @@ describe('Backup Version 3 und Beschaeftigungen', () => {
     expect(fillEmptyEmployment(localMitStd, incoming).includedOvertimeHoursPerMonth).toBeNull();
   });
 
-
   it('Rundreise balanceNote ueber Backup', async () => {
     prefStore.set(
       'employments',

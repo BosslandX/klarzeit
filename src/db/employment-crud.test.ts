@@ -187,7 +187,6 @@ describe('Beschaeftigungs-Verwaltung', () => {
     expect(await countEntriesOfEmployment(secondId)).toBe(1);
   });
 
-
   it('cleanEmployment: fehlender Kontohinweis wird der bisherige Satz, sonst nur Text', () => {
     const { balanceNote: _weg, ...ohneFeld } = defaultEmployment;
     expect('balanceNote' in ohneFeld).toBe(false);
