@@ -10,6 +10,7 @@ import {
   fullMonthsEmployedInYear,
   mergeVacationDays,
   monthSollMs,
+  includedOvertimeCapMs,
   roundTeilurlaub,
   waitingFulfilledInYear,
   waitingPeriodEnd,
@@ -35,6 +36,7 @@ const emp: Employment = {
   vacationYearMode: 'both',
   openingBalanceMs: 0,
   contractVacationDays: null,
+  includedOvertimeHoursPerMonth: null,
   clockodo: null,
 };
 
@@ -619,5 +621,106 @@ describe('Auswertung getrennt je Beschaeftigung (AUF-007)', () => {
     const faelschlichAlle = buildVacationStatus(empB, alle, 2026);
     expect(statusB.taken).toBe(2);
     expect(faelschlichAlle.taken).toBe(4);
+  });
+});
+
+describe('Mit dem Gehalt abgegoltene Ueberstunden (AUF-016)', () => {
+  const empU: Employment = {
+    ...emp,
+    weeklyHours: 30,
+    workdaysPerWeek: 5,
+    includedOvertimeHoursPerMonth: 10,
+  };
+
+  it('includedOvertimeCapMs: volle Grenze, keine Klausel, Teilmonat anteilig, vor Beginn 0', () => {
+    const mai = new Date(2026, 4, 1).getTime();
+    expect(includedOvertimeCapMs(empU, mai)).toBe(10 * HOUR);
+    expect(includedOvertimeCapMs({ ...empU, includedOvertimeHoursPerMonth: null }, mai)).toBe(0);
+    const teil = { ...empU, startDate: new Date(2026, 8, 16).getTime() };
+    const sep = new Date(2026, 8, 1).getTime();
+    expect(includedOvertimeCapMs(teil, sep)).toBe(5 * HOUR);
+    const apr = new Date(2026, 3, 1).getTime();
+    expect(includedOvertimeCapMs(empU, apr)).toBe(0);
+  });
+
+  function monthEntries(mo: number, n: number, restH = 0, restDay = 20) {
+    const list: TimeEntry[] = [];
+    for (let d = 1; d <= n; d++) list.push(entry(2026, mo, d, 8, 18));
+    if (restH > 0) list.push(entry(2026, mo, restDay, 8, 8 + restH));
+    return list;
+  }
+
+  function maiEntries(n: number, restH = 0, restDay = 20) {
+    return monthEntries(5, n, restH, restDay);
+  }
+
+  it('Abgeltung: Plus unter der Grenze wird ganz abgegolten', () => {
+    const ref = new Date(2026, 4, 31).getTime();
+    const l = buildBalanceLedger(empU, maiEntries(13, 6), ref)!;
+    expect(l.target.saldoMs).toBe(6 * HOUR);
+    expect(l.target.includedOvertimeMs).toBe(6 * HOUR);
+    expect(l.closing).toBe(0);
+  });
+
+  it('Abgeltung: Plus ueber der Grenze, der Rest geht ins Konto', () => {
+    const ref = new Date(2026, 4, 31).getTime();
+    const l = buildBalanceLedger(empU, maiEntries(14, 5), ref)!;
+    expect(l.target.saldoMs).toBe(15 * HOUR);
+    expect(l.target.includedOvertimeMs).toBe(10 * HOUR);
+    expect(l.closing).toBe(5 * HOUR);
+  });
+
+  it('Abgeltung: ohne Klausel rechnet das Konto wie bisher', () => {
+    const ref = new Date(2026, 4, 31).getTime();
+    const e = { ...empU, includedOvertimeHoursPerMonth: null };
+    const l = buildBalanceLedger(e, maiEntries(14, 5), ref)!;
+    expect(l.target.includedOvertimeMs).toBe(0);
+    expect(l.target.saldoMs).toBe(15 * HOUR);
+    expect(l.closing).toBe(15 * HOUR);
+  });
+
+  it('Abgeltung: Minus aus dem Vormonat mindert die Abgeltung nicht', () => {
+    const mai = maiEntries(12);
+    const juni = monthEntries(6, 14, 5);
+    const ref = new Date(2026, 5, 30).getTime();
+    const l = buildBalanceLedger(empU, [...mai, ...juni], ref)!;
+    expect(l.months[0].includedOvertimeMs).toBe(0);
+    expect(l.target.saldoMs).toBe(15 * HOUR);
+    expect(l.target.includedOvertimeMs).toBe(10 * HOUR);
+    expect(l.carryIn).toBe(-10 * HOUR);
+    expect(l.closing).toBe(-5 * HOUR);
+  });
+
+  it('Abgeltung: abgegoltene Stunden eines Vormonats fehlen im Uebertrag', () => {
+    const ref = new Date(2026, 5, 30).getTime();
+    const l = buildBalanceLedger(empU, maiEntries(14, 5), ref)!;
+    expect(l.months[0].includedOvertimeMs).toBe(10 * HOUR);
+    expect(l.carryIn).toBe(5 * HOUR);
+    expect(l.target.saldoMs).toBe(-130 * HOUR);
+    expect(l.target.includedOvertimeMs).toBe(0);
+    expect(l.closing).toBe(-125 * HOUR);
+  });
+
+  it('Abgeltung: im Eintrittsmonat gilt die Grenze anteilig', () => {
+    const teil = { ...empU, startDate: new Date(2026, 8, 16).getTime() };
+    const ents: TimeEntry[] = [];
+    for (let d = 16; d <= 22; d++) ents.push(entry(2026, 9, d, 8, 18));
+    ents.push(entry(2026, 9, 23, 8, 11));
+    const ref = new Date(2026, 8, 30).getTime();
+    const l = buildBalanceLedger(teil, ents, ref)!;
+    expect(l.target.sollMs).toBe(65 * HOUR);
+    expect(l.target.saldoMs).toBe(8 * HOUR);
+    expect(l.target.includedOvertimeMs).toBe(5 * HOUR);
+    expect(l.closing).toBe(3 * HOUR);
+  });
+
+  it('Abgeltung: Urlaubsgutschrift zaehlt zum Monatsplus', () => {
+    const ref = new Date(2026, 4, 31).getTime();
+    const vac = new Date(2026, 4, 25).getTime();
+    const l = buildBalanceLedger(empU, maiEntries(13), ref, [vac])!;
+    expect(l.target.vacationCreditMs).toBe(6 * HOUR);
+    expect(l.target.saldoMs).toBe(6 * HOUR);
+    expect(l.target.includedOvertimeMs).toBe(6 * HOUR);
+    expect(l.closing).toBe(0);
   });
 });

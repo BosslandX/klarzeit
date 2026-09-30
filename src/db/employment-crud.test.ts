@@ -182,3 +182,15 @@ describe('Beschaeftigungs-Verwaltung', () => {
     expect(days[0].employmentId).toBe(secondId);
   });
 });
+
+  it('cleanEmployment normalisiert includedOvertimeHoursPerMonth', () => {
+    const base = { ...defaultEmployment };
+    expect(cleanEmployment(base).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: null }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: 0 }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: -5 }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: Number.NaN }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: '10' }).includedOvertimeHoursPerMonth).toBeNull();
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: 10 }).includedOvertimeHoursPerMonth).toBe(10);
+    expect(cleanEmployment({ ...base, includedOvertimeHoursPerMonth: 7.5 }).includedOvertimeHoursPerMonth).toBe(7.5);
+  });

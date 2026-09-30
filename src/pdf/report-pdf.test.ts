@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildEmployeePanelFields, buildVacationPanelText } from './report-pdf';
+import { buildEmployeePanelFields, buildKontoPanelText, buildVacationPanelText } from './report-pdf';
 import type { Profile } from '../domain/types';
 import {
+  buildBalanceLedger,
   buildVacationStatus,
   defaultEmployment,
   type Employment,
 } from '../domain/employment';
+import type { TimeEntry } from '../domain/types';
 
 describe('PDF-Kopf je Beschaeftigung', () => {
   it('buildEmployeePanelFields traegt Vertragsfelder der Beschaeftigung, nicht des Profils', () => {
@@ -61,3 +63,91 @@ describe('Urlaubsblock PDF-Text', () => {
   });
 });
 
+describe('Kontoblock PDF-Text (AUF-016)', () => {
+  const empK: Employment = {
+    ...defaultEmployment,
+    startDate: new Date(2026, 4, 1).getTime(),
+    weeklyHours: 30,
+    workdaysPerWeek: 5,
+    includedOvertimeHoursPerMonth: null,
+  };
+
+  function entry(y: number, mo: number, d: number, fromH: number, toH: number): TimeEntry {
+    const start = new Date(y, mo - 1, d, fromH, 0).getTime();
+    const end = new Date(y, mo - 1, d, toH, 0).getTime();
+    return {
+      employmentId: 'emp-1',
+      start,
+      end,
+      breakMinutes: 0,
+      activity: 'Test',
+      note: '',
+      source: 'manual',
+      createdAt: start,
+      updatedAt: start,
+    };
+  }
+
+  function mai145() {
+    const list: TimeEntry[] = [];
+    for (let d = 1; d <= 14; d++) list.push(entry(2026, 5, d, 8, 18));
+    list.push(entry(2026, 5, 20, 8, 13));
+    return list;
+  }
+
+  it('Kontoblock ohne Abgeltung: Zeilen und Fussnote wie bisher', () => {
+    const ref = new Date(2026, 4, 31).getTime();
+    const ledger = buildBalanceLedger(empK, mai145(), ref)!;
+    const { rows, foot } = buildKontoPanelText(ledger, empK);
+    expect(rows.map((r) => [r.label, r.value])).toEqual([
+      ['Soll (Monat)', '130:00 h  (130,00)'],
+      ['Ist (Monat)', '145:00 h  (145,00)'],
+      ['Saldo (Monat)', '+15:00 h'],
+      ['Uebertrag (Vormonate)', '0:00 h'],
+      ['Saldo gesamt (Monatsende)', '+15:00 h'],
+    ]);
+    expect(foot).toBe(
+      'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 01.05.2026. Ausgleich n. § 2 (4) Arbeitsvertrag.',
+    );
+  });
+
+  it('Kontoblock mit Abgeltung: Zeile mit Gehalt abgegolten und Fussnote', () => {
+    const withClause = { ...empK, includedOvertimeHoursPerMonth: 10 };
+    const ref = new Date(2026, 4, 31).getTime();
+    const ledger = buildBalanceLedger(withClause, mai145(), ref)!;
+    const { rows, foot } = buildKontoPanelText(ledger, withClause);
+    const mapped = rows.map((r) => [r.label, r.value]);
+    const idx = mapped.findIndex((r) => r[0] === 'Saldo (Monat)');
+    expect(mapped[idx + 1]).toEqual(['mit Gehalt abgegolten', '-10:00 h']);
+    expect(rows[idx + 1].tone).toBe('neg');
+    expect(mapped[mapped.length - 1]).toEqual(['Saldo gesamt (Monatsende)', '+5:00 h']);
+    expect(foot).toBe(
+      'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 01.05.2026. Ausgleich n. § 2 (4) Arbeitsvertrag. Bis 10 Std. Ueberstunden/Monat sind mit dem Gehalt abgegolten (Arbeitsvertrag).',
+    );
+  });
+
+  it('Kontoblock im Teilmonat: anteilige Grenze in der Fussnote', () => {
+    const teil = {
+      ...empK,
+      startDate: new Date(2026, 8, 16).getTime(),
+      includedOvertimeHoursPerMonth: 10,
+    };
+    const ents: TimeEntry[] = [];
+    for (let d = 16; d <= 22; d++) ents.push(entry(2026, 9, d, 8, 18));
+    ents.push(entry(2026, 9, 23, 8, 11));
+    const ref = new Date(2026, 8, 30).getTime();
+    const ledger = buildBalanceLedger(teil, ents, ref)!;
+    const { rows, foot } = buildKontoPanelText(ledger, teil);
+    expect(rows.map((r) => [r.label, r.value])).toEqual([
+      ['Soll (Monat)', '65:00 h  (65,00)'],
+      ['Ist (Monat)', '73:00 h  (73,00)'],
+      ['Saldo (Monat)', '+8:00 h'],
+      ['mit Gehalt abgegolten', '-5:00 h'],
+      ['Uebertrag (Vormonate)', '0:00 h'],
+      ['Saldo gesamt (Monatsende)', '+3:00 h'],
+    ]);
+    expect(foot).toBe(
+      'Basis: 30 Std./Woche x 52/12 = 130,00 Std./Monat. Beschaeftigt seit 16.09.2026. Ausgleich n. § 2 (4) Arbeitsvertrag. Bis 10 Std. Ueberstunden/Monat sind mit dem Gehalt abgegolten (Arbeitsvertrag), in diesem Teilmonat anteilig 5,00 Std.',
+    );
+  });
+});

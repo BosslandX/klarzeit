@@ -525,6 +525,32 @@ export function MoreScreen() {
             }
           />
         </label>
+        <label className="field">
+          <span>Mit dem Gehalt abgegoltene Ueberstunden (Std./Monat)</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.5"
+            min="0"
+            placeholder="leer = keine"
+            value={emp.includedOvertimeHoursPerMonth ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value.trim();
+              if (raw === '') {
+                setEmpField('includedOvertimeHoursPerMonth', null);
+                return;
+              }
+              const n = Number(raw);
+              setEmpField(
+                'includedOvertimeHoursPerMonth',
+                Number.isFinite(n) && n > 0 ? n : null,
+              );
+            }}
+          />
+        </label>
+        <p className="muted small">
+          Ueberstunden bis zu dieser Zahl je Monat sind mit dem Gehalt abgegolten und zaehlen nicht ins Arbeitszeitkonto. Minusstunden aus Vormonaten werden damit nicht verrechnet; im Eintritts- und Austrittsmonat gilt die Zahl anteilig.
+        </p>
         {editingId && editDraft && (
           <ClockodoSettings
             employmentId={editingId}

@@ -54,6 +54,14 @@ export function cleanEmployment(raw: unknown): Employment {
   ) {
     contractVacationDays = x.contractVacationDays;
   }
+  let includedOvertimeHoursPerMonth: number | null = null;
+  if (
+    typeof x.includedOvertimeHoursPerMonth === 'number' &&
+    Number.isFinite(x.includedOvertimeHoursPerMonth) &&
+    x.includedOvertimeHoursPerMonth > 0
+  ) {
+    includedOvertimeHoursPerMonth = x.includedOvertimeHoursPerMonth;
+  }
   const id =
     typeof x.id === 'string' && x.id.trim() !== ''
       ? x.id
@@ -78,6 +86,7 @@ export function cleanEmployment(raw: unknown): Employment {
     vacationYearMode: mode,
     openingBalanceMs: num(x.openingBalanceMs, 0),
     contractVacationDays,
+    includedOvertimeHoursPerMonth,
     clockodo: cleanClockodoConfig(x.clockodo),
   };
 }

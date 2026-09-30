@@ -311,6 +311,14 @@ export function ReportsScreen() {
                 {formatSignedDuration(ledger.target.saldoMs)}
               </strong>
             </div>
+            {ledger.target.includedOvertimeMs > 0 && (
+              <div className="konto-row">
+                <span>mit Gehalt abgegolten</span>
+                <strong className="neg">
+                  {formatSignedDuration(-ledger.target.includedOvertimeMs)}
+                </strong>
+              </div>
+            )}
             <div className="konto-row">
               <span>Uebertrag (Vormonate)</span>
               <strong className={ledger.carryIn >= 0 ? 'pos' : 'neg'}>

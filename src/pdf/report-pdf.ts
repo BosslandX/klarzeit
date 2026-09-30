@@ -14,7 +14,9 @@ import {
 } from '../domain/time';
 import {
   dailyTargetMs,
+  employedFractionOfMonth,
   fullMonthlyTargetMs,
+  includedOvertimeCapMs,
   waitingPeriodEnd,
   type BalanceLedger,
   type Employment,
@@ -302,6 +304,77 @@ export function buildVacationPanelText(
   return { rows, foot };
 }
 
+export type KontoPanelRow = {
+  label: string;
+  value: string;
+  tone?: 'pos' | 'neg';
+  bold?: boolean;
+};
+
+/** Kontoblock: Zeilen + Fussnote (reine Textlogik fuer Tests und PDF). */
+export function buildKontoPanelText(
+  ledger: BalanceLedger,
+  emp: Employment,
+): { rows: KontoPanelRow[]; foot: string } {
+  const t = ledger.target;
+  const saldoTone: 'pos' | 'neg' = t.saldoMs >= 0 ? 'pos' : 'neg';
+  const carryTone: 'pos' | 'neg' = ledger.carryIn >= 0 ? 'pos' : 'neg';
+  const closeTone: 'pos' | 'neg' = ledger.closing >= 0 ? 'pos' : 'neg';
+  const rows: KontoPanelRow[] = [
+    { label: 'Soll (Monat)', value: `${formatDuration(t.sollMs)}  (${dec(t.sollMs)})` },
+    { label: 'Ist (Monat)', value: `${formatDuration(t.istMs)}  (${dec(t.istMs)})` },
+  ];
+  if (t.vacationDays > 0) {
+    rows.push({
+      label: `Urlaub (${formatDays(t.vacationDays)})`,
+      value: formatSignedDuration(t.vacationCreditMs),
+      tone: 'pos',
+    });
+  }
+  rows.push({ label: 'Saldo (Monat)', value: formatSignedDuration(t.saldoMs), tone: saldoTone });
+  if (t.includedOvertimeMs > 0) {
+    rows.push({
+      label: 'mit Gehalt abgegolten',
+      value: formatSignedDuration(-t.includedOvertimeMs),
+      tone: 'neg',
+    });
+  }
+  rows.push(
+    { label: 'Uebertrag (Vormonate)', value: formatSignedDuration(ledger.carryIn), tone: carryTone },
+    {
+      label: 'Saldo gesamt (Monatsende)',
+      value: formatSignedDuration(ledger.closing),
+      tone: closeTone,
+      bold: true,
+    },
+  );
+  const monatlSoll = dec(fullMonthlyTargetMs(emp.weeklyHours));
+  const urlaubHinweis =
+    t.vacationDays > 0
+      ? ` Urlaub ist bezahlte Freistellung (§ 1 BUrlG) und entlastet das Soll um ` +
+        `bis zu ${dec(dailyTargetMs(emp))} Std./Tag, abzueglich am selben Tag ` +
+        `bereits erfasster Zeit.`
+      : '';
+  let abgeltungHinweis = '';
+  if (emp.includedOvertimeHoursPerMonth != null) {
+    const h = String(emp.includedOvertimeHoursPerMonth).replace('.', ',');
+    const frac = employedFractionOfMonth(emp, t.monthStart);
+    if (frac < 1) {
+      abgeltungHinweis =
+        ` Bis ${h} Std. Ueberstunden/Monat sind mit dem Gehalt abgegolten (Arbeitsvertrag), in diesem Teilmonat anteilig ${dec(includedOvertimeCapMs(emp, t.monthStart))} Std.`;
+    } else {
+      abgeltungHinweis =
+        ` Bis ${h} Std. Ueberstunden/Monat sind mit dem Gehalt abgegolten (Arbeitsvertrag).`;
+    }
+  }
+  const foot =
+    `Basis: ${String(emp.weeklyHours).replace('.', ',')} Std./Woche x 52/12 = ${monatlSoll} Std./Monat. ` +
+    `Beschaeftigt seit ${formatDate(emp.startDate)}. Ausgleich n. § 2 (4) Arbeitsvertrag.` +
+    abgeltungHinweis +
+    urlaubHinweis;
+  return { rows, foot };
+}
+
 /** Zeichnet Arbeitszeitkonto (links) + Urlaub (rechts) nebeneinander. */
 function drawKontoUndUrlaub(
   doc: jsPDF,
@@ -316,42 +389,13 @@ function drawKontoUndUrlaub(
   const emp = employment;
   const { ledger, vacation: v } = extras;
 
-  const t = ledger.target;
-  const saldoCol = t.saldoMs >= 0 ? POS : NEG;
-  const carryCol = ledger.carryIn >= 0 ? POS : NEG;
-  const closeCol = ledger.closing >= 0 ? POS : NEG;
-  const kontoRows: PanelRow[] = [
-    { label: 'Soll (Monat)', value: `${formatDuration(t.sollMs)}  (${dec(t.sollMs)})` },
-    { label: 'Ist (Monat)', value: `${formatDuration(t.istMs)}  (${dec(t.istMs)})` },
-  ];
-  if (t.vacationDays > 0) {
-    kontoRows.push({
-      label: `Urlaub (${formatDays(t.vacationDays)})`,
-      value: formatSignedDuration(t.vacationCreditMs),
-      color: POS,
-    });
-  }
-  kontoRows.push(
-    { label: 'Saldo (Monat)', value: formatSignedDuration(t.saldoMs), color: saldoCol },
-    { label: 'Uebertrag (Vormonate)', value: formatSignedDuration(ledger.carryIn), color: carryCol },
-    {
-      label: 'Saldo gesamt (Monatsende)',
-      value: formatSignedDuration(ledger.closing),
-      color: closeCol,
-      bold: true,
-    },
-  );
-  const monatlSoll = dec(fullMonthlyTargetMs(emp.weeklyHours));
-  const urlaubHinweis =
-    t.vacationDays > 0
-      ? ` Urlaub ist bezahlte Freistellung (§ 1 BUrlG) und entlastet das Soll um ` +
-        `bis zu ${dec(dailyTargetMs(emp))} Std./Tag, abzueglich am selben Tag ` +
-        `bereits erfasster Zeit.`
-      : '';
-  const kontoFoot =
-    `Basis: ${String(emp.weeklyHours).replace('.', ',')} Std./Woche x 52/12 = ${monatlSoll} Std./Monat. ` +
-    `Beschaeftigt seit ${formatDate(emp.startDate)}. Ausgleich n. § 2 (4) Arbeitsvertrag.` +
-    urlaubHinweis;
+  const { rows: kontoText, foot: kontoFoot } = buildKontoPanelText(ledger, emp);
+  const kontoRows: PanelRow[] = kontoText.map((r) => ({
+    label: r.label,
+    value: r.value,
+    color: r.tone === 'pos' ? POS : r.tone === 'neg' ? NEG : undefined,
+    bold: r.bold,
+  }));
 
   const { rows: urlaubText, foot: urlaubFoot } = buildVacationPanelText(v, emp);
   const urlaubRows: PanelRow[] = urlaubText.map((r) =>

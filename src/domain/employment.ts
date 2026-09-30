@@ -46,6 +46,8 @@ export interface Employment {
   openingBalanceMs: number;
   /** Vertraglicher Jahresurlaub in Arbeitstagen; null = gesetzliches Minimum. */
   contractVacationDays: number | null;
+  /** Mit dem Gehalt abgegoltene Ueberstunden je Monat (Stunden); null = keine solche Klausel. */
+  includedOvertimeHoursPerMonth: number | null;
   /** Clockodo-Uebertragung; null = aus. */
   clockodo: ClockodoConfig | null;
 }
@@ -94,14 +96,43 @@ export const defaultEmployment: Employment = {
   vacationYearMode: 'both',
   openingBalanceMs: 0,
   contractVacationDays: null,
+  includedOvertimeHoursPerMonth: null,
   clockodo: null,
 };
 
 // --- Monats-Soll (Arbeitszeitkonto) ---
 
+/** Anteil der beschaeftigten Kalendertage am Monat (0 … 1). */
+export function employedFractionOfMonth(emp: Employment, monthRef: number): number {
+  const mStartMs = startOfMonth(monthRef).getTime();
+  const mEndMs = endOfMonth(monthRef).getTime();
+  const startMs = Math.max(mStartMs, startOfDay(emp.startDate).getTime());
+  const endLimitMs =
+    emp.endDate != null ? endOfDay(emp.endDate).getTime() : mEndMs;
+  const endMs = Math.min(mEndMs, endLimitMs);
+  if (endMs < startMs) return 0;
+
+  const daysInMonth = getDaysInMonth(mStartMs);
+  const employedDays = differenceInCalendarDays(endMs, startMs) + 1;
+  return employedDays / daysInMonth;
+}
+
 /** Volles Monats-Soll in ms: Wochenstunden x (52/12). */
 export function fullMonthlyTargetMs(weeklyHours: number): number {
   return weeklyHours * WEEKS_PER_MONTH * HOUR;
+}
+
+/** Mit dem Gehalt abgegoltene Ueberstunden-Obergrenze des Monats in ms. */
+export function includedOvertimeCapMs(emp: Employment, monthRef: number): number {
+  if (emp.includedOvertimeHoursPerMonth == null) return 0;
+  return (
+    Math.round(
+      (emp.includedOvertimeHoursPerMonth *
+        HOUR *
+        employedFractionOfMonth(emp, monthRef)) /
+        MINUTE,
+    ) * MINUTE
+  );
 }
 
 /**
@@ -121,19 +152,13 @@ export function dailyTargetMs(emp: Employment): number {
  * ergeben 0.
  */
 export function monthSollMs(emp: Employment, monthRef: number): number {
-  const mStartMs = startOfMonth(monthRef).getTime();
-  const mEndMs = endOfMonth(monthRef).getTime();
-  const startMs = Math.max(mStartMs, startOfDay(emp.startDate).getTime());
-  const endLimitMs =
-    emp.endDate != null ? endOfDay(emp.endDate).getTime() : mEndMs;
-  const endMs = Math.min(mEndMs, endLimitMs);
-  if (endMs < startMs) return 0;
-
-  const daysInMonth = getDaysInMonth(mStartMs);
-  const employedDays = differenceInCalendarDays(endMs, startMs) + 1;
-  const fraction = employedDays / daysInMonth;
   // Auf volle Minuten runden, damit Soll/Ist/Saldo in der Anzeige aufgehen.
-  return Math.round((fullMonthlyTargetMs(emp.weeklyHours) * fraction) / MINUTE) * MINUTE;
+  return (
+    Math.round(
+      (fullMonthlyTargetMs(emp.weeklyHours) * employedFractionOfMonth(emp, monthRef)) /
+        MINUTE,
+    ) * MINUTE
+  );
 }
 
 // --- Saldo-Fortschreibung (Ueber-/Unterstunden) ---
@@ -147,15 +172,16 @@ export interface MonthBalance {
   vacationDays: number; // im Monat genommene Urlaubstage (im Beschaeftigungsfenster)
   vacationCreditMs: number; // Gutschrift dafuer, gedeckelt auf sollMs
   saldoMs: number; // istMs + vacationCreditMs - sollMs (positiv = Ueberstunden)
+  includedOvertimeMs: number; // mit Gehalt abgegolten dieses Monats (ms), nie negativ
 }
 
 /** Fortgeschriebenes Arbeitszeitkonto bis zu einem Zielmonat. */
 export interface BalanceLedger {
   months: MonthBalance[]; // Eintrittsmonat .. Zielmonat (inkl.)
   opening: number; // Anfangssaldo zum Beschaeftigungsbeginn
-  carryIn: number; // Uebertrag VOR dem Zielmonat (opening + Salden der Vormonate)
+  carryIn: number; // Uebertrag VOR dem Zielmonat (opening + Σ Vormonate (saldoMs − includedOvertimeMs))
   target: MonthBalance; // der Zielmonat selbst
-  closing: number; // Gesamtsaldo NACH dem Zielmonat (carryIn + target.saldo)
+  closing: number; // Gesamtsaldo NACH dem Zielmonat (carryIn + target.saldoMs − target.includedOvertimeMs)
 }
 
 /**
@@ -240,6 +266,10 @@ function vacationOfMonth(
  * Report nachvollziehbar bleiben. Bereits erfasste Zeit am Urlaubstag wird
  * dabei angerechnet, ein Tag zaehlt also nie doppelt. Ohne Urlaubstage rechnet
  * die Funktion exakt wie zuvor.
+ *
+ * Mit Klausel fuer abgegoltene Ueberstunden: jeder Monat fuer sich — der Vertrag zaehlt
+ * Ueberstunden pro Monat und kennt kein Konto; Minusstunden aus Vormonaten mindern die
+ * Abgeltung nicht.
  */
 export function buildBalanceLedger(
   emp: Employment,
@@ -265,6 +295,11 @@ export function buildBalanceLedger(
     // vacationOfMonth bereits TAGGENAU erledigt; ein zweiter Abzug auf
     // Monatsebene wuerde Arbeit an urlaubsfreien Tagen entwerten.
     const vacationCreditMs = Math.min(vac.creditMs, sollMs);
+    const saldoMs = istMs + vacationCreditMs - sollMs;
+    const includedOvertimeMs = Math.min(
+      includedOvertimeCapMs(emp, m.getTime()),
+      Math.max(0, saldoMs),
+    );
     return {
       monthStart: m.getTime(),
       label: format(m, 'MMMM yyyy', { locale: de }),
@@ -272,15 +307,17 @@ export function buildBalanceLedger(
       istMs,
       vacationDays,
       vacationCreditMs,
-      saldoMs: istMs + vacationCreditMs - sollMs,
+      saldoMs,
+      includedOvertimeMs,
     };
   });
 
   const opening = emp.openingBalanceMs;
   const target = months[months.length - 1];
+  const monthNet = (mb: MonthBalance) => mb.saldoMs - mb.includedOvertimeMs;
   const carryIn =
-    opening + months.slice(0, -1).reduce((s, mb) => s + mb.saldoMs, 0);
-  const closing = carryIn + target.saldoMs;
+    opening + months.slice(0, -1).reduce((s, mb) => s + monthNet(mb), 0);
+  const closing = carryIn + target.saldoMs - target.includedOvertimeMs;
   return { months, opening, carryIn, target, closing };
 }
 
