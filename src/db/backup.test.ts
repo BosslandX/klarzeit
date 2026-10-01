@@ -41,6 +41,7 @@ import {
   cleanEmployment,
   getEmployments,
   getVacationDays,
+  saveVacationDays,
   updateEmployment,
   INITIAL_EMPLOYMENT_ID,
 } from './employment';
@@ -295,6 +296,27 @@ describe('Backup Version 3 und Beschaeftigungen', () => {
     await restoreBackup(json, 'replace');
     const list = await getEmployments();
     expect(list[0].contractVacationDays).toBe(26);
+  });
+
+  it('Rundreise clockodoAbsence am Urlaubstag ueber Backup', async () => {
+    const tag = new Date(2026, 9, 5).getTime();
+    await saveVacationDays([
+      {
+        employmentId: INITIAL_EMPLOYMENT_ID,
+        date: tag,
+        note: '',
+        clockodoAbsence: { id: 42, status: 1, at: 1_700_000_000_000 },
+      },
+    ]);
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const days = await getVacationDays();
+    expect(days).toHaveLength(1);
+    expect(days[0].clockodoAbsence).toEqual({ id: 42, status: 1, at: 1_700_000_000_000 });
   });
 
   it('Rundreise includedOvertimeHoursPerMonth 12 ueber Backup', async () => {

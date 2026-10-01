@@ -92,3 +92,29 @@ export function defaultEntryRef(config: ClockodoConfig | null): ClockodoEntryRef
     servicesId: config.defaultServicesId,
   };
 }
+
+/** openapi AbsenceStatus: 0 beantragt, 1 genehmigt, 2 abgelehnt, 3 Genehmigung zurueckgenommen, 4 storniert */
+export type ClockodoAbsenceStatus = 0 | 1 | 2 | 3 | 4;
+
+/** Clockodo-Antrag: ID, zuletzt bekannter Status, Zeitpunkt des Abgleichs */
+export interface ClockodoAbsenceRef {
+  id: number;
+  status: ClockodoAbsenceStatus;
+  at: number;
+}
+
+export function isClockodoAbsenceStatus(v: unknown): v is ClockodoAbsenceStatus {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return false;
+  const n = Math.trunc(v);
+  return n === v && n >= 0 && n <= 4;
+}
+
+export function cleanClockodoAbsenceRef(raw: unknown): ClockodoAbsenceRef | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const x = raw as Record<string, unknown>;
+  const id = positiveInt(x.id);
+  if (id === null) return null;
+  if (!isClockodoAbsenceStatus(x.status)) return null;
+  if (typeof x.at !== 'number' || !Number.isFinite(x.at)) return null;
+  return { id, status: x.status, at: x.at };
+}

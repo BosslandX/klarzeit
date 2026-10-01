@@ -5,6 +5,8 @@ import {
   clockodoHeaders,
   fetchLists,
   fetchMe,
+  createAbsence,
+  fetchAbsences,
   type ClockodoHttp,
   type ClockodoRequest,
 } from './client';
@@ -211,6 +213,136 @@ describe('clockodo client', () => {
       kind: 'server',
     });
   });
+
+  it('createAbsence sendet POST mit Typ 1 und Status 0 und liest die Abwesenheit', async () => {
+    const calls: ClockodoRequest[] = [];
+    const http: ClockodoHttp = async (req) => {
+      calls.push(req);
+      return {
+        status: 200,
+        data: {
+          data: {
+            id: 99,
+            users_id: 7,
+            date_since: '2026-10-05',
+            date_until: '2026-10-09',
+            status: 0,
+            count_days: 5,
+            note: null,
+            public_note: null,
+          },
+        },
+      };
+    };
+    const a = await createAbsence(
+      AUTH,
+      { usersId: 7, dateSince: '2026-10-05', dateUntil: '2026-10-09' },
+      http,
+    );
+    expect(a).toEqual({
+      id: 99,
+      dateSince: '2026-10-05',
+      dateUntil: '2026-10-09',
+      status: 0,
+      countDays: 5,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].url).toBe(`${CLOCKODO_API}/v4/absences`);
+    expect(calls[0].data).toEqual({
+      users_id: 7,
+      date_since: '2026-10-05',
+      date_until: '2026-10-09',
+      type: 1,
+      status: 0,
+    });
+    expect(calls[0].headers['Content-Type']).toBe('application/json');
+  });
+
+  it('createAbsence: Ueberschneidung wird collision, aus 409 und aus dem Fehlertyp', async () => {
+    const mit = (status: number, data: unknown): ClockodoHttp => async () => ({ status, data });
+    const req = { usersId: 7, dateSince: '2026-10-05', dateUntil: '2026-10-09' };
+    await expect(
+      createAbsence(AUTH, req, mit(409, { errors: [{ type: 'General', message: 'x' }] })),
+    ).rejects.toMatchObject({ kind: 'collision', status: 409 });
+    await expect(
+      createAbsence(
+        AUTH,
+        req,
+        mit(422, {
+          errors: [{ error: { type: 'AbsenceCollision', details: { colliding_absences: [3] } } }],
+        }),
+      ),
+    ).rejects.toMatchObject({ kind: 'collision', status: 422 });
+  });
+
+  it('createAbsence: verbotener Status wird forbidden, 401 bleibt auth', async () => {
+    const mit = (status: number, data: unknown): ClockodoHttp => async () => ({ status, data });
+    const req = { usersId: 7, dateSince: '2026-10-05', dateUntil: '2026-10-09' };
+    await expect(
+      createAbsence(AUTH, req, mit(403, { errors: [{ type: 'StatusIsForbidden' }] })),
+    ).rejects.toMatchObject({ kind: 'forbidden', status: 403 });
+    await expect(
+      createAbsence(AUTH, req, mit(422, { errors: [{ error: { type: 'StatusIsForbidden' } }] })),
+    ).rejects.toMatchObject({ kind: 'forbidden', status: 422 });
+    await expect(createAbsence(AUTH, req, mit(401, 'nicht erlaubt'))).rejects.toMatchObject({
+      kind: 'auth',
+      status: 401,
+    });
+  });
+
+  it('fetchAbsences fragt Person, Jahr und Typ 1 ab und liest die Liste', async () => {
+    const calls: ClockodoRequest[] = [];
+    const http: ClockodoHttp = async (req) => {
+      calls.push(req);
+      return {
+        status: 200,
+        data: {
+          data: [
+            {
+              id: 3,
+              users_id: 7,
+              date_since: '2026-10-05',
+              date_until: '2026-10-06',
+              status: 1,
+              count_days: 2,
+            },
+            {
+              id: 4,
+              users_id: 7,
+              date_since: '2026-12-30',
+              date_until: '2026-12-31',
+              status: 0,
+              count_days: null,
+            },
+          ],
+        },
+      };
+    };
+    const list = await fetchAbsences(AUTH, { usersId: 7, year: 2026 }, http);
+    expect(list).toEqual([
+      { id: 3, dateSince: '2026-10-05', dateUntil: '2026-10-06', status: 1, countDays: 2 },
+      { id: 4, dateSince: '2026-12-30', dateUntil: '2026-12-31', status: 0, countDays: null },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('GET');
+    expect(calls[0].url).toBe(`${CLOCKODO_API}/v4/absences`);
+    expect(calls[0].params).toEqual({
+      'filter[users_id]': '7',
+      'filter[year]': '2026',
+      'filter[type]': '1',
+    });
+  });
+
+  it('fetchAbsences: kaputter Eintrag oder fehlende Liste ist ein Formatfehler', async () => {
+    const mit = (data: unknown): ClockodoHttp => async () => ({ status: 200, data });
+    const req = { usersId: 7, year: 2026 };
+    const gut = { id: 3, date_since: '2026-10-05', date_until: '2026-10-06', status: 1 };
+    await expect(fetchAbsences(AUTH, req, mit({ data: [{ ...gut, status: 9 }] }))).rejects.toMatchObject({ kind: 'format' });
+    await expect(fetchAbsences(AUTH, req, mit({ data: [{ ...gut, date_since: '05.10.2026' }] }))).rejects.toMatchObject({ kind: 'format' });
+    await expect(fetchAbsences(AUTH, req, mit({ data: {} }))).rejects.toMatchObject({ kind: 'format' });
+  });
+
 });
   it('createEntry sendet POST und liefert die id', async () => {
     const calls: ClockodoRequest[] = [];

@@ -267,6 +267,27 @@ describe('Beschaeftigungs-Verwaltung', () => {
     );
   });
 
+  it('cleanVacationDays traegt clockodoAbsence, ein kaputter Verweis faellt weg', () => {
+    const out = cleanVacationDays([
+      {
+        date: 1_700_100_000_000,
+        note: '',
+        employmentId: 'emp-1',
+        clockodoAbsence: { id: 5, status: 0, at: 1 },
+      },
+      {
+        date: 1_700_200_000_000,
+        note: '',
+        employmentId: 'emp-1',
+        clockodoAbsence: { id: 0, status: 0, at: 1 },
+      },
+      { date: 1_700_300_000_000, note: '', employmentId: 'emp-1' },
+    ]);
+    expect(out[0].clockodoAbsence).toEqual({ id: 5, status: 0, at: 1 });
+    expect('clockodoAbsence' in out[1]).toBe(false);
+    expect('clockodoAbsence' in out[2]).toBe(false);
+  });
+
   it('removeVacationDay entfernt nur den Tag der genannten Beschaeftigung', async () => {
     const list = await addEmployment({ name: 'Zweit', weeklyHours: 5 });
     const secondId = list[1].id;

@@ -16,7 +16,7 @@ import {
 import { de } from 'date-fns/locale';
 import { HOUR, MINUTE, netMs } from './time';
 import type { TimeEntry } from './types';
-import type { ClockodoConfig } from './clockodo';
+import type { ClockodoAbsenceRef, ClockodoConfig } from './clockodo';
 
 /**
  * Beschaeftigungs-/Vertragsdaten fuer Arbeitszeitkonto und gesetzlichen Urlaub.
@@ -67,6 +67,8 @@ export interface VacationDay {
   employmentId: string;
   date: number; // lokale Mitternacht des Urlaubstags
   note: string;
+  /** Clockodo-Antrag, zu dem der Tag gehoert; fehlt = nie beantragt. */
+  clockodoAbsence?: ClockodoAbsenceRef;
 }
 
 // --- Konstanten (gesetzliche Grundlagen) ---

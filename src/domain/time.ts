@@ -100,3 +100,8 @@ export function fromDateInput(value: string): number {
   if (!y || !m || !d) return Number.NaN;
   return new Date(y, m - 1, d).getTime();
 }
+
+/** Gegenstueck zu fromDateInput: lokales Tagesdatum als "yyyy-MM-dd" (auch das Datumsformat der Clockodo-Abwesenheiten). */
+export function toDateInput(epoch: number): string {
+  return format(epoch, 'yyyy-MM-dd');
+}

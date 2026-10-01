@@ -8,7 +8,7 @@ import {
   type VacationDay,
   type VacationYearMode,
 } from '../domain/employment';
-import { cleanClockodoConfig } from '../domain/clockodo';
+import { cleanClockodoAbsenceRef, cleanClockodoConfig } from '../domain/clockodo';
 import { getProfile } from './profile';
 import { removeClockodoKey } from '../clockodo/key-store';
 import { removeClockodoLists } from './clockodo-lists';
@@ -309,11 +309,13 @@ export function cleanVacationDays(raw: unknown): VacationDay[] {
     const key = vacationDayKey(employmentId, x.date);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({
-      employmentId,
-      date: x.date,
-      note: typeof x.note === 'string' ? x.note : '',
-    });
+    const note = typeof x.note === 'string' ? x.note : '';
+    const absence = cleanClockodoAbsenceRef(x.clockodoAbsence);
+    if (absence) {
+      out.push({ employmentId, date: x.date, note, clockodoAbsence: absence });
+    } else {
+      out.push({ employmentId, date: x.date, note });
+    }
   }
   return out.sort((a, b) => a.date - b.date);
 }

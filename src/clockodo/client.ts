@@ -26,6 +26,7 @@ export type ClockodoErrorKind =
   | 'forbidden'
   | 'rate'
   | 'validation'
+  | 'collision'
   | 'server'
   | 'network'
   | 'format';
@@ -346,4 +347,177 @@ export async function deleteClockodoEntry(
   if (res.status === 404) return;
   const err = mapStatus(res.status);
   if (err) throw err;
+}
+
+import {
+  isClockodoAbsenceStatus,
+  type ClockodoAbsenceStatus,
+} from '../domain/clockodo';
+
+/** openapi: type 1 = Holiday from the quota */
+const ABSENCE_TYPE_HOLIDAY_QUOTA = 1;
+/** openapi AbsenceStatus: 0 = Enquired (beantragt) */
+const ABSENCE_STATUS_ENQUIRED = 0;
+
+const DATE_INPUT = /^\d{4}-\d{2}-\d{2}$/;
+
+export interface ClockodoAbsence {
+  id: number;
+  dateSince: string;
+  dateUntil: string;
+  status: ClockodoAbsenceStatus;
+  countDays: number | null;
+}
+
+function absenceDateString(v: unknown): string | null {
+  if (typeof v !== 'string' || !DATE_INPUT.test(v)) return null;
+  return v;
+}
+
+function readAbsence(raw: unknown): ClockodoAbsence | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const x = raw as Record<string, unknown>;
+  const id = positiveEntryId(x.id);
+  const dateSince = absenceDateString(x.date_since);
+  const dateUntil = absenceDateString(x.date_until);
+  if (id === null || dateSince === null || dateUntil === null) return null;
+  if (!isClockodoAbsenceStatus(x.status)) return null;
+  let countDays: number | null = null;
+  if (typeof x.count_days === 'number' && Number.isFinite(x.count_days)) {
+    countDays = x.count_days;
+  }
+  return { id, dateSince, dateUntil, status: x.status, countDays };
+}
+
+function extractErrorTypes(data: unknown): string[] {
+  if (typeof data !== 'object' || data === null) return [];
+  const errors = (data as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) return [];
+  const types: string[] = [];
+  for (const item of errors) {
+    if (typeof item !== 'object' || item === null) continue;
+    const rec = item as Record<string, unknown>;
+    if (typeof rec.type === 'string') types.push(rec.type);
+    const inner = rec.error;
+    if (
+      typeof inner === 'object' &&
+      inner !== null &&
+      typeof (inner as { type?: unknown }).type === 'string'
+    ) {
+      types.push((inner as { type: string }).type);
+    }
+  }
+  return types;
+}
+
+function mapAbsenceError(status: number, data: unknown): ClockodoError | null {
+  if (status >= 200 && status < 300) return null;
+  const mapped = mapStatus(status);
+  if (mapped && (mapped.kind === 'auth' || mapped.kind === 'rate')) return mapped;
+  const types = extractErrorTypes(data);
+  if (status === 409 || types.includes('AbsenceCollision')) {
+    return new ClockodoError(
+      'collision',
+      'Der Zeitraum ueberschneidet sich mit einer Abwesenheit in Clockodo.',
+      status,
+    );
+  }
+  if (
+    types.includes('StatusIsForbidden') ||
+    types.includes('CannotManageAbsencesOfUser')
+  ) {
+    return new ClockodoError(
+      'forbidden',
+      'Clockodo laesst einen Urlaubsantrag fuer diesen Zugang nicht zu.',
+      status,
+    );
+  }
+  if (types.includes('UntilMustBeInSameYear')) {
+    return new ClockodoError(
+      'validation',
+      'Ein Urlaubsantrag darf nicht ueber den Jahreswechsel gehen.',
+      status,
+    );
+  }
+  return mapStatus(status);
+}
+
+export async function createAbsence(
+  auth: ClockodoAuth,
+  request: { usersId: number; dateSince: string; dateUntil: string },
+  http?: ClockodoHttp,
+): Promise<ClockodoAbsence> {
+  const h = http ?? defaultHttp;
+  const res = await clockodoRequest(
+    auth,
+    'POST',
+    '/v4/absences',
+    {
+      users_id: request.usersId,
+      date_since: request.dateSince,
+      date_until: request.dateUntil,
+      type: ABSENCE_TYPE_HOLIDAY_QUOTA,
+      status: ABSENCE_STATUS_ENQUIRED,
+    },
+    h,
+  );
+  const err = mapAbsenceError(res.status, res.data);
+  if (err) throw err;
+  let body: unknown = res.data;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+    }
+  }
+  if (typeof body !== 'object' || body === null) {
+    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+  }
+  const data = (body as { data?: unknown }).data;
+  const absence = readAbsence(data);
+  if (absence === null) {
+    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+  }
+  return absence;
+}
+
+export async function fetchAbsences(
+  auth: ClockodoAuth,
+  request: { usersId: number; year: number },
+  http?: ClockodoHttp,
+): Promise<ClockodoAbsence[]> {
+  const h = http ?? defaultHttp;
+  let body: unknown;
+  try {
+    body = await clockodoGet(
+      auth,
+      '/v4/absences',
+      {
+        'filter[users_id]': String(request.usersId),
+        'filter[year]': String(request.year),
+        'filter[type]': '1',
+      },
+      h,
+    );
+  } catch (e) {
+    if (e instanceof ClockodoError) throw e;
+    throw new ClockodoError('network', 'Keine Verbindung zu Clockodo.');
+  }
+  if (typeof body !== 'object' || body === null) {
+    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+  }
+  const data = (body as { data?: unknown }).data;
+  if (!Array.isArray(data)) {
+    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+  }
+  const out: ClockodoAbsence[] = [];
+  for (const item of data) {
+    const a = readAbsence(item);
+    if (a === null) {
+      throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+    }
+    out.push(a);
+  }
+  return out;
 }

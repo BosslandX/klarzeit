@@ -3,6 +3,7 @@ import {
   cleanClockodoConfig,
   cleanClockodoSync,
   cleanClockodoEntryRef,
+  cleanClockodoAbsenceRef,
   defaultEntryRef,
 } from './clockodo';
 
@@ -99,5 +100,22 @@ describe('clockodo domain', () => {
     });
     expect(defaultEntryRef({ ...CFG, defaultServicesId: null })).toBeNull();
     expect(defaultEntryRef(null)).toBeNull();
+  });
+
+  it('cleanClockodoAbsenceRef: ganze positive id, Status 0 bis 4, endliche Zeit', () => {
+    expect(cleanClockodoAbsenceRef({ id: 5, status: 0, at: 1 })).toEqual({ id: 5, status: 0, at: 1 });
+    expect(cleanClockodoAbsenceRef({ id: 5, status: 4, at: 1 })).toEqual({ id: 5, status: 4, at: 1 });
+    for (const id of [0, -1, 1.5, '5']) {
+      expect(cleanClockodoAbsenceRef({ id, status: 0, at: 1 })).toBeNull();
+    }
+    for (const status of [5, -1, 1.5, '0', null]) {
+      expect(cleanClockodoAbsenceRef({ id: 5, status, at: 1 })).toBeNull();
+    }
+    for (const at of [Number.NaN, 'x', undefined]) {
+      expect(cleanClockodoAbsenceRef({ id: 5, status: 0, at })).toBeNull();
+    }
+    for (const raw of [null, undefined, 7, 'x']) {
+      expect(cleanClockodoAbsenceRef(raw)).toBeNull();
+    }
   });
 });
