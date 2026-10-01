@@ -117,3 +117,31 @@ export function syncAbsenceStatus(
   });
   return { days: out, updated, missing };
 }
+/** Anzeige des Clockodo-Stands eines Urlaubstags; ohne Verweis "nicht beantragt". */
+const ABSENCE_STATUS_LABELS: Record<ClockodoAbsenceStatus, string> = {
+  0: 'beantragt',
+  1: 'genehmigt',
+  2: 'abgelehnt',
+  3: 'Genehmigung zurueckgenommen',
+  4: 'storniert',
+};
+
+export function absenceStatusLabel(ref: ClockodoAbsenceRef | undefined): string {
+  if (ref === undefined) return 'nicht beantragt';
+  return ABSENCE_STATUS_LABELS[ref.status];
+}
+
+/**
+ * Ein beantragter oder genehmigter Urlaubstag laesst sich in Klarzeit nicht entfernen, er
+ * stuende sonst weiter in Clockodo; abgelehnte, zurueckgenommene und stornierte darf der
+ * Nutzer entfernen, die App tut es nie selbst.
+ */
+export function isVacationDayRemovable(day: VacationDay): boolean {
+  if (day.clockodoAbsence === undefined) return true;
+  return day.clockodoAbsence.status >= 2;
+}
+
+/** Zahl der offenen Urlaubstage einer Beschaeftigung (Summe ueber vacationRequestRanges). */
+export function openVacationDayCount(days: readonly VacationDay[], emp: Employment): number {
+  return vacationRequestRanges(days, emp).reduce((sum, range) => sum + range.dates.length, 0);
+}

@@ -21,7 +21,6 @@ import {
 } from '../../domain/employment';
 import {
   decimalHours,
-  formatDateWithWeekday,
   formatDays,
   fromDateInput,
   HOUR,
@@ -35,6 +34,8 @@ import {
 import { clearAllEntries, getAllEntries, countEntries } from '../../db/entries';
 import { shareTextFile } from '../../pdf/share';
 import { ClockodoSettings } from '../components/ClockodoSettings';
+import { VacationClockodo } from '../components/VacationClockodo';
+import { VacationDayRow } from '../components/VacationDayRow';
 import { removeClockodoKey } from '../../clockodo/key-store';
 import { removeClockodoLists } from '../../db/clockodo-lists';
 import {
@@ -80,6 +81,7 @@ export function MoreScreen() {
     add: addVac,
     addMany: addVacMany,
     remove: removeVac,
+    refresh: refreshVac,
   } = useVacationDays();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Employment | null>(null);
@@ -680,24 +682,21 @@ export function MoreScreen() {
               'Sonntage werden immer uebersprungen, Samstage ab 6 Arbeitstagen/Woche mitgezaehlt. Feiertage kennt die App nicht — einzelne Tage danach gegebenenfalls wieder entfernen.'}
         </p>
 
+        <VacationClockodo employment={vacEmp} days={vacDays} onDone={refreshVac} />
         {vacDays.length === 0 ? (
           <p className="muted small">Noch keine Urlaubstage erfasst.</p>
         ) : (
           <ul className="vac-list">
             {vacDays.map((d) => (
-              <li key={`${d.employmentId}-${d.date}`}>
-                <span>
-                  {formatDateWithWeekday(d.date)}
-                  <span className="muted small"> ({empLabel(d.employmentId)})</span>
-                </span>
-                <button
-                  className="link-btn danger"
-                  type="button"
-                  onClick={() => void removeVac(d.date, d.employmentId)}
-                >
-                  entfernen
-                </button>
-              </li>
+              <VacationDayRow
+                key={`${d.employmentId}-${d.date}`}
+                day={d}
+                employmentLabel={empLabel(d.employmentId)}
+                showClockodo={
+                  employments.find((e) => e.id === d.employmentId)?.clockodo != null
+                }
+                onRemove={() => void removeVac(d.date, d.employmentId)}
+              />
             ))}
           </ul>
         )}

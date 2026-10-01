@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { applyAbsenceRef, syncAbsenceStatus, vacationRequestRanges } from './clockodo-absence';
+import {
+  absenceStatusLabel,
+  applyAbsenceRef,
+  isVacationDayRemovable,
+  openVacationDayCount,
+  syncAbsenceStatus,
+  vacationRequestRanges,
+} from './clockodo-absence';
 import {
   defaultEmployment,
   type Employment,
@@ -141,5 +148,32 @@ describe('Urlaubsantraege: Verweise (AUF-020)', () => {
       { id: 1, status: 0, at: 1 },
       undefined,
     ]);
+  });
+});
+
+describe('Urlaubsantraege: Anzeige (AUF-021)', () => {
+  it('absenceStatusLabel nennt den Clockodo-Stand', () => {
+    expect(absenceStatusLabel(undefined)).toBe('nicht beantragt');
+    expect([0, 1, 2, 3, 4].map((status) =>
+      absenceStatusLabel({ id: 1, status: status as 0 | 1 | 2 | 3 | 4, at: 1 }),
+    )).toEqual(['beantragt', 'genehmigt', 'abgelehnt', 'Genehmigung zurueckgenommen', 'storniert']);
+  });
+
+  it('isVacationDayRemovable: beantragt und genehmigt bleiben, der Rest darf weg', () => {
+    expect(isVacationDayRemovable(tag(2026, 10, 5))).toBe(true);
+    expect([0, 1, 2, 3, 4].map((status) =>
+      isVacationDayRemovable(
+        tag(2026, 10, 5, { clockodoAbsence: { id: 1, status: status as 0 | 1 | 2 | 3 | 4, at: 1 } }),
+      ),
+    )).toEqual([false, false, true, true, true]);
+  });
+
+  it('openVacationDayCount zaehlt offene Tage, nicht Zeitraeume', () => {
+    const days = [
+      ...[5, 6, 7, 8, 9, 14].map((d) => tag(2026, 10, d)),
+      tag(2026, 10, 12, { clockodoAbsence: { id: 3, status: 0, at: 1 } }),
+    ];
+    expect(openVacationDayCount(days, empMit())).toBe(6);
+    expect(openVacationDayCount(days, empMit({ clockodo: null }))).toBe(0);
   });
 });

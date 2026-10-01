@@ -44,7 +44,11 @@ import {
   INITIAL_EMPLOYMENT_ID,
 } from '../db/employment';
 import { setClockodoKey } from './key-store';
-import { transferVacations } from './vacation-transfer';
+import {
+  transferVacations,
+  vacationTransferSummary,
+  type VacationTransferResult,
+} from './vacation-transfer';
 
 const EMP = INITIAL_EMPLOYMENT_ID;
 const CFG = {
@@ -293,5 +297,53 @@ describe('Urlaubsantraege an Clockodo (AUF-020)', () => {
     const firstPost = calls.findIndex((c) => c.method === 'POST');
     const lastGet = calls.map((c) => c.method).lastIndexOf('GET');
     expect(lastGet).toBeLessThan(firstPost);
+  });
+});
+
+describe('Abgleich: Anzeige (AUF-021)', () => {
+  const leer: VacationTransferResult = {
+    requested: 0,
+    adopted: 0,
+    updated: 0,
+    missing: 0,
+    mismatches: [],
+    errors: [],
+    stopped: null,
+  };
+
+  it('vacationTransferSummary nennt Zahlen, Fehlende, Abweichungen und Fehler', () => {
+    expect(
+      vacationTransferSummary({
+        ...leer,
+        requested: 2,
+        adopted: 1,
+        updated: 3,
+        missing: 1,
+        mismatches: [
+          { dateSince: '2026-10-05', dateUntil: '2026-10-09', klarzeitDays: 5, clockodoDays: 4 },
+        ],
+        errors: [
+          {
+            dateSince: '2026-10-14',
+            dateUntil: '2026-10-14',
+            message: 'Der Zeitraum ueberschneidet sich mit einer Abwesenheit in Clockodo.',
+          },
+        ],
+      }),
+    ).toEqual({
+      info: ['2 beantragt, 1 uebernommen, 3 Status aktualisiert.'],
+      problems: [
+        '1 Urlaubstag(e): Antrag in Clockodo nicht gefunden.',
+        '05.10.2026–09.10.2026: Clockodo zaehlt 4 Tag(e), Klarzeit 5.',
+        '14.10.2026: Der Zeitraum ueberschneidet sich mit einer Abwesenheit in Clockodo.',
+      ],
+    });
+  });
+
+  it('vacationTransferSummary meldet den Abbruch', () => {
+    expect(vacationTransferSummary({ ...leer, stopped: 'Clockodo-Login fehlt.' })).toEqual({
+      info: ['0 beantragt, 0 uebernommen, 0 Status aktualisiert.'],
+      problems: ['Abgebrochen: Clockodo-Login fehlt.'],
+    });
   });
 });

@@ -13,6 +13,7 @@ import {
   vacationRequestRanges,
 } from '../domain/clockodo-absence';
 import type { VacationDay } from '../domain/employment';
+import { formatDate, fromDateInput } from '../domain/time';
 import {
   getEmployments,
   getVacationDays,
@@ -206,4 +207,35 @@ export async function transferVacations(
   }
 
   return result;
+}
+/** Text fuer die Anzeige eines Abgleichs, `info` neutral, `problems` hervorgehoben. */
+export function vacationTransferSummary(r: VacationTransferResult): {
+  info: string[];
+  problems: string[];
+} {
+  const info = [
+    `${r.requested} beantragt, ${r.adopted} uebernommen, ${r.updated} Status aktualisiert.`,
+  ];
+  const problems: string[] = [];
+  if (r.missing > 0) {
+    problems.push(`${r.missing} Urlaubstag(e): Antrag in Clockodo nicht gefunden.`);
+  }
+  for (const m of r.mismatches) {
+    problems.push(
+      `${spanne(m.dateSince, m.dateUntil)}: Clockodo zaehlt ${m.clockodoDays} Tag(e), Klarzeit ${m.klarzeitDays}.`,
+    );
+  }
+  for (const e of r.errors) {
+    problems.push(`${spanne(e.dateSince, e.dateUntil)}: ${e.message}`);
+  }
+  if (r.stopped !== null) {
+    problems.push(`Abgebrochen: ${r.stopped}`);
+  }
+  return { info, problems };
+}
+
+function spanne(dateSince: string, dateUntil: string): string {
+  const from = formatDate(fromDateInput(dateSince));
+  if (dateSince === dateUntil) return from;
+  return `${from}–${formatDate(fromDateInput(dateUntil))}`;
 }

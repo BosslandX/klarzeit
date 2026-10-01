@@ -435,6 +435,7 @@ export function useEmployments(): {
 export function useVacationDays(): {
   days: VacationDay[];
   loading: boolean;
+  refresh: () => Promise<void>;
   add: (date: number, note?: string, employmentId?: string) => Promise<void>;
   addMany: (dates: readonly number[], employmentId?: string) => Promise<number>;
   remove: (date: number, employmentId: string) => Promise<void>;
@@ -442,18 +443,15 @@ export function useVacationDays(): {
   const [days, setDays] = useState<VacationDay[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    getVacationDays().then((d) => {
-      if (active) {
-        setDays(d);
-        setLoading(false);
-      }
-    });
-    return () => {
-      active = false;
-    };
+  const refresh = useCallback(async () => {
+    const d = await getVacationDays();
+    setDays(d);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const add = useCallback(
     async (date: number, note = '', employmentId?: string) => {
@@ -485,5 +483,5 @@ export function useVacationDays(): {
     setDays(await removeVacationDay(date, employmentId));
   }, []);
 
-  return { days, loading, add, addMany, remove };
+  return { days, loading, refresh, add, addMany, remove };
 }
