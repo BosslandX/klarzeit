@@ -164,6 +164,17 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   dann JSON (ein 401 mit Nicht-JSON-Antwort muss als `auth` ankommen). „Alle Einträge
   löschen" und Backup-Ersetzen vermerken nichts — nur das Löschen eines übertragenen
   Eintrags in der Liste (`deleteEntryWithClockodo`).
+- **Urlaubsanträge an Clockodo — Bausteine (AUF-019):** `VacationDay.clockodoAbsence?` =
+  `{ id, status, at }` des Clockodo-Antrags (Status 0 beantragt … 4 storniert, openapi
+  `AbsenceStatus`); fehlt = nie beantragt, `cleanVacationDays` trägt einen gültigen Verweis,
+  sonst fehlt der Schlüssel ganz. `vacationRequestRanges` (`src/domain/clockodo-absence.ts`,
+  rein): offene Tage (ohne Verweis, ab `syncFrom`) werden zu Zeiträumen gebündelt, solange kein
+  Arbeitstag dazwischen liegt (Regel von `workdaysInRange`); der Jahreswechsel trennt (Clockodo
+  verlangt `date_until` im Jahr von `date_since`). Client `createAbsence` (`POST /v4/absences`,
+  ausdrücklich `users_id`, Typ 1, **Status 0**) und `fetchAbsences` (Filter Person, Jahr, Typ 1;
+  ein kaputter Eintrag ist `format`, kein stilles Überspringen). Fehlertypen aus beiden
+  Fehlerformen, auch aus JSON-Text: 409/`AbsenceCollision` → `collision`,
+  `StatusIsForbidden`/`CannotManageAbsencesOfUser` → `forbidden`.
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
@@ -194,6 +205,10 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
 - `src/domain/types.ts` → Feld `clockodoSync` mit `ids`/`hash`/`at` am `TimeEntry` (Dexie
   und Backup; umbenannt gelten alle Einträge als nie übertragen — der nächste Lauf bucht
   **alles doppelt**); Preferences-Schlüssel `clockodoDeletes:<employmentId>`
+- `src/domain/employment.ts` → Feld `clockodoAbsence` mit `id`/`status`/`at` am `VacationDay`
+  (Preferences `vacations` und Backup; umbenannt gelten alle Urlaubstage als nie beantragt — der
+  nächste Abgleich findet die Zeiträume nur über „erst lesen, dann senden" wieder, Teilstücke
+  stoßen als Überschneidung an)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
