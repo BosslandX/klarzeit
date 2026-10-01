@@ -1,6 +1,7 @@
 import { addDays, getYear, startOfDay } from 'date-fns';
 import type { Employment, VacationDay } from './employment';
 import { workdaysInRange } from './employment';
+import type { ClockodoAbsenceRef, ClockodoAbsenceStatus } from './clockodo';
 import { toDateInput } from './time';
 
 export interface VacationRequestRange {
@@ -68,4 +69,42 @@ export function vacationRequestRanges(
     dates: [...dates],
   });
   return ranges;
+}
+
+
+export function applyAbsenceRef(
+  days: readonly VacationDay[],
+  employmentId: string,
+  dates: readonly number[],
+  ref: ClockodoAbsenceRef,
+): VacationDay[] {
+  const wanted = new Set(dates);
+  return days.map((d) => {
+    if (d.employmentId !== employmentId || !wanted.has(d.date)) return d;
+    return { ...d, clockodoAbsence: ref };
+  });
+}
+
+export function syncAbsenceStatus(
+  days: readonly VacationDay[],
+  employmentId: string,
+  known: readonly { id: number; status: ClockodoAbsenceStatus }[],
+  now: number,
+): { days: VacationDay[]; updated: number; missing: number } {
+  const byId = new Map(known.map((k) => [k.id, k.status]));
+  let updated = 0;
+  let missing = 0;
+  const out = days.map((d) => {
+    if (d.employmentId !== employmentId || d.clockodoAbsence === undefined) return d;
+    const id = d.clockodoAbsence.id;
+    const status = byId.get(id);
+    if (status === undefined) {
+      missing++;
+      return d;
+    }
+    if (status === d.clockodoAbsence.status) return d;
+    updated++;
+    return { ...d, clockodoAbsence: { id, status, at: now } };
+  });
+  return { days: out, updated, missing };
 }

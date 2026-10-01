@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { vacationRequestRanges } from './clockodo-absence';
+import { applyAbsenceRef, syncAbsenceStatus, vacationRequestRanges } from './clockodo-absence';
 import {
   defaultEmployment,
   type Employment,
@@ -97,5 +97,49 @@ describe('Urlaubsantraege: Zeitraeume (AUF-019)', () => {
 
   it('vacationRequestRanges: ohne Clockodo-Zugang leer', () => {
     expect(vacationRequestRanges([tag(2026, 10, 5)], empMit({ clockodo: null }))).toEqual([]);
+  });
+});
+
+describe('Urlaubsantraege: Verweise (AUF-020)', () => {
+  it('applyAbsenceRef setzt den Verweis nur an den genannten Tagen der Beschaeftigung', () => {
+    const days = [
+      tag(2026, 10, 5),
+      tag(2026, 10, 5, { employmentId: 'emp-2' }),
+      tag(2026, 10, 6),
+      tag(2026, 10, 7),
+    ];
+    const vorher = JSON.stringify(days);
+    const ref = { id: 9, status: 0 as const, at: 1 };
+    const out = applyAbsenceRef(days, 'emp-1', [ab(2026, 10, 5), ab(2026, 10, 6)], ref);
+    expect(out.map((d) => d.clockodoAbsence)).toEqual([ref, undefined, ref, undefined]);
+    expect(JSON.stringify(days)).toBe(vorher);
+  });
+
+  it('syncAbsenceStatus zieht geaenderten Status nach und zaehlt verschwundene', () => {
+    const days = [
+      tag(2026, 10, 5, { clockodoAbsence: { id: 1, status: 0, at: 1 } }),
+      tag(2026, 10, 6, { clockodoAbsence: { id: 2, status: 1, at: 1 } }),
+      tag(2026, 10, 7, { clockodoAbsence: { id: 3, status: 0, at: 1 } }),
+      tag(2026, 10, 8, { employmentId: 'emp-2', clockodoAbsence: { id: 1, status: 0, at: 1 } }),
+      tag(2026, 10, 9),
+    ];
+    const r = syncAbsenceStatus(
+      days,
+      'emp-1',
+      [
+        { id: 1, status: 2 },
+        { id: 2, status: 1 },
+      ],
+      99,
+    );
+    expect(r.updated).toBe(1);
+    expect(r.missing).toBe(1);
+    expect(r.days.map((d) => d.clockodoAbsence)).toEqual([
+      { id: 1, status: 2, at: 99 },
+      { id: 2, status: 1, at: 1 },
+      { id: 3, status: 0, at: 1 },
+      { id: 1, status: 0, at: 1 },
+      undefined,
+    ]);
   });
 });

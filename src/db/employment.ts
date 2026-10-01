@@ -8,7 +8,12 @@ import {
   type VacationDay,
   type VacationYearMode,
 } from '../domain/employment';
-import { cleanClockodoAbsenceRef, cleanClockodoConfig } from '../domain/clockodo';
+import {
+  cleanClockodoAbsenceRef,
+  cleanClockodoConfig,
+  type ClockodoAbsenceRef,
+} from '../domain/clockodo';
+import { applyAbsenceRef } from '../domain/clockodo-absence';
 import { getProfile } from './profile';
 import { removeClockodoKey } from '../clockodo/key-store';
 import { removeClockodoLists } from './clockodo-lists';
@@ -348,6 +353,18 @@ export async function addVacationDay(
   ]);
   await saveVacationDays(merged);
   return merged;
+}
+
+
+/** Vermerkt einen Clockodo-Antrag an den genannten Urlaubstagen einer Beschaeftigung. */
+export async function setVacationAbsenceRef(
+  employmentId: string,
+  dates: readonly number[],
+  ref: ClockodoAbsenceRef,
+): Promise<VacationDay[]> {
+  const next = applyAbsenceRef(await getVacationDays(), employmentId, dates, ref);
+  await saveVacationDays(next);
+  return next;
 }
 
 /** Entfernt einen Urlaubstag nur in der genannten Beschaeftigung. */
