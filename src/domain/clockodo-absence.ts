@@ -117,7 +117,7 @@ export function syncAbsenceStatus(
   });
   return { days: out, updated, missing };
 }
-/** Anzeige des Clockodo-Stands eines Urlaubstags; ohne Verweis "nicht beantragt". */
+
 const ABSENCE_STATUS_LABELS: Record<ClockodoAbsenceStatus, string> = {
   0: 'beantragt',
   1: 'genehmigt',
@@ -126,6 +126,7 @@ const ABSENCE_STATUS_LABELS: Record<ClockodoAbsenceStatus, string> = {
   4: 'storniert',
 };
 
+/** Anzeige des Clockodo-Stands eines Urlaubstags; ohne Verweis "nicht beantragt". */
 export function absenceStatusLabel(ref: ClockodoAbsenceRef | undefined): string {
   if (ref === undefined) return 'nicht beantragt';
   return ABSENCE_STATUS_LABELS[ref.status];
