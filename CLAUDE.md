@@ -51,6 +51,15 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
     bliebe nach `removeEmployment` eine tote ID stehen.
   - **Löschen** ist gesperrt, solange Zeiteinträge oder Urlaubstage daran hängen, und
     ebenso für die letzte verbliebene Beschäftigung.
+  - **Urlaubstage je Beschäftigung eindeutig (AUF-018):** doppelt ist nur derselbe Tag
+    derselben Beschäftigung (`vacationDayKey` in `src/domain/employment.ts`, genutzt von
+    `cleanVacationDays` und `mergeVacationDays`); derselbe Kalendertag darf in zwei
+    Beschäftigungen Urlaub sein. `cleanVacationDays` setzt den Rückfall auf `emp-1` **vor**
+    der Doppelprüfung. Eintragen/Entfernen über `addVacationDay`/`removeVacationDay`
+    (`src/db/employment.ts`), `remove` verlangt die Beschäftigung. Bis 1.8 war das Datum
+    allein der Schlüssel — ein zweiter Urlaubstag am selben Datum ging still verloren.
+    `cleanVacationDays` baut jeden Tag aus seinen Feldern neu: ein **neues Feld** am
+    `VacationDay` muss dort nachgetragen werden, sonst verwirft es jedes Speichern still.
   - **Kein Sammelbericht über alle Beschäftigungen.** Ein Nachweis, der die Stunden
     zweier Arbeitgeber addiert, ist für beide unbrauchbar; der Bericht gilt für die
     gewählte Beschäftigung, und der PDF-Kopf nimmt Arbeitgeber, Personalnummer und
