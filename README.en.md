@@ -90,7 +90,7 @@ and the rounding rule of § 5 (2) — which only ever rounds **up**: an entitlem
 of 13.33 days stays 13.33 days, it is not rounded down to 13.
 
 The logic lives in [`src/domain/employment.ts`](src/domain/employment.ts), is
-free of UI and database code, and is covered by 67 tests that walk through the
+free of UI and database code, and is covered by 68 tests that walk through the
 statutes one by one.
 
 If your contract grants more than the statutory minimum, you enter your annual

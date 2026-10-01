@@ -216,7 +216,7 @@ UI- und Datenbankcode, damit sie prüfbar bleibt.
   er beginnt (Stundenzettel-Konvention). Bei Nachtschichten ist das zu beachten.
 
 Die Rechenwege sind in
-[`src/domain/employment.test.ts`](src/domain/employment.test.ts) mit 67 Tests
+[`src/domain/employment.test.ts`](src/domain/employment.test.ts) mit 68 Tests
 belegt, die die Paragraphen einzeln durchgehen.
 
 </details>
@@ -441,7 +441,7 @@ Verfahren mit Prüfschritten:
 
 | Phase | Was passiert ist |
 |---|---|
-| **Rechtslogik zuerst** | Arbeitszeitkonto und BUrlG-Berechnung testgetrieben: erst die Testfälle je Paragraph, dann die Implementierung. Heute 67 Tests. |
+| **Rechtslogik zuerst** | Arbeitszeitkonto und BUrlG-Berechnung testgetrieben: erst die Testfälle je Paragraph, dann die Implementierung. Heute 68 Tests. |
 | **Review-Durchgang 1** | Adversariale Mehrdimensions-Review des Gesamtcodes durch 26 Agenten. 16 Befunde bestätigt, 6 nach Gegenprüfung verworfen. |
 | **Review-Durchgang 2** | Vier Dimensionen plus Gegenprüfung durch 19 Agenten, gezielt auf Arbeitszeitkonto und Urlaub. 12 Befunde, alle behoben. |
 | **Gegenprüfung** | Jeder Befund musste widerlegbar sein. Was der Gegenprüfung nicht standhielt, wurde verworfen statt „sicherheitshalber" gefixt. |
