@@ -27,7 +27,7 @@ export function vacationRequestRanges(
       (d) =>
         d.employmentId === emp.id &&
         d.date >= syncFrom &&
-        !('clockodoAbsence' in d),
+        d.clockodoAbsence === undefined,
     )
     .sort((a, b) => a.date - b.date);
   if (open.length === 0) return [];

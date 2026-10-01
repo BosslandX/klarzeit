@@ -291,6 +291,16 @@ describe('clockodo client', () => {
     });
   });
 
+  it('createAbsence: Fehlertyp auch aus einer Text-Antwort', async () => {
+    const http: ClockodoHttp = async () => ({
+      status: 422,
+      data: JSON.stringify({ errors: [{ error: { type: 'AbsenceCollision' } }] }),
+    });
+    await expect(
+      createAbsence(AUTH, { usersId: 7, dateSince: '2026-10-05', dateUntil: '2026-10-09' }, http),
+    ).rejects.toMatchObject({ kind: 'collision', status: 422 });
+  });
+
   it('fetchAbsences fragt Person, Jahr und Typ 1 ab und liest die Liste', async () => {
     const calls: ClockodoRequest[] = [];
     const http: ClockodoHttp = async (req) => {

@@ -1,5 +1,9 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
-import type { ClockodoLists } from '../domain/clockodo';
+import {
+  isClockodoAbsenceStatus,
+  type ClockodoAbsenceStatus,
+  type ClockodoLists,
+} from '../domain/clockodo';
 import type { ClockodoEntryPayload } from '../domain/clockodo-transfer';
 
 export const CLOCKODO_API = 'https://my.clockodo.com/api';
@@ -349,11 +353,6 @@ export async function deleteClockodoEntry(
   if (err) throw err;
 }
 
-import {
-  isClockodoAbsenceStatus,
-  type ClockodoAbsenceStatus,
-} from '../domain/clockodo';
-
 /** openapi: type 1 = Holiday from the quota */
 const ABSENCE_TYPE_HOLIDAY_QUOTA = 1;
 /** openapi AbsenceStatus: 0 = Enquired (beantragt) */
@@ -389,9 +388,18 @@ function readAbsence(raw: unknown): ClockodoAbsence | null {
   return { id, dateSince, dateUntil, status: x.status, countDays };
 }
 
+/** Fehlertypen aus beiden Fehlerformen (`errors[].type`, `errors[].error.type`), auch aus JSON-Text. */
 function extractErrorTypes(data: unknown): string[] {
-  if (typeof data !== 'object' || data === null) return [];
-  const errors = (data as { errors?: unknown }).errors;
+  let body = data;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      return [];
+    }
+  }
+  if (typeof body !== 'object' || body === null) return [];
+  const errors = (body as { errors?: unknown }).errors;
   if (!Array.isArray(errors)) return [];
   const types: string[] = [];
   for (const item of errors) {
