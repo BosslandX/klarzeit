@@ -288,8 +288,10 @@ export async function removeEmployment(id: string): Promise<Employment[]> {
   return next;
 }
 
-/** Validiert + sortiert Urlaubstage; fehlende employmentId → emp-1.
- *  Doppelt ist nur derselbe Tag derselben Beschaeftigung. */
+/**
+ * Validiert + sortiert Urlaubstage; fehlende employmentId → emp-1. Doppelt ist
+ * nur derselbe Tag derselben Beschaeftigung (der erste bleibt).
+ */
 export function cleanVacationDays(raw: unknown): VacationDay[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();

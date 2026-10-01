@@ -454,7 +454,6 @@ describe('Urlaubslisten zusammenfuehren', () => {
     expect(merged[0].note).toBe('meine Notiz');
   });
 
-
   it('gleiches Datum in zwei Beschaeftigungen bleibt zweimal erhalten', () => {
     const merged = mergeVacationDays(
       [v(2026, 6, 10, 'meine Notiz')],
