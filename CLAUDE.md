@@ -6,7 +6,7 @@
 - **Typ:** Capacitor-Android-App (lokale Zeiterfassung)
 - **Stack:** Vite + React 19 + TypeScript, Capacitor 8, Dexie (IndexedDB), jsPDF, date-fns
 - **App-ID:** `io.github.bosslandx.klarzeit` · webDir: `dist`
-- **Version:** 1.8.1 (`versionCode 12`)
+- **Version:** 1.9.0 (`versionCode 13`)
 
 ## Build & Run
 ```bash
@@ -184,6 +184,13 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   Antwort, zurückgespieltes Backup), sonst beantragen; jeder Erfolg wird **sofort** vermerkt
   (`setVacationAbsenceRef`). `auth`/`network`/`rate` brechen ab, alles andere trifft nur den
   eigenen Zeitraum. Weicht Clockodos `countDays` von Klarzeits Tageszahl ab → `mismatches`.
+- **Urlaubsanträge — Oberfläche (AUF-021):** im Urlaubsbereich von `MoreScreen` der Knopf
+  „Urlaub mit Clockodo abgleichen" (`src/ui/components/VacationClockodo.tsx`, nur für die im Feld
+  „Urlaub fuer Beschaeftigung" gewählte Beschäftigung mit Zugang, im Browser gesperrt) und je Tag
+  der Stand (`VacationDayRow`, `absenceStatusLabel`). **Beantragte und genehmigte Tage lassen
+  sich nicht entfernen** (`isVacationDayRemovable`: erst ab Status 2) — die Sperre sitzt in der
+  Oberfläche, `removeVacationDay` selbst prüft nicht. Der Zustand des Urlaubsbereichs bleibt in
+  `MoreScreen`: `vacEmp` ist zugleich der Ausgangswert des Beschäftigungs-Formulars.
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).

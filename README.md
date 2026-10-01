@@ -120,7 +120,7 @@ Safe-Area-Abstände geringfügig.
 - **Gesetzlicher und vertraglicher Urlaub** — Jahresanspruch, Zwölftelung, Wartezeit, genommene Tage, Resturlaub.
 - **Personendaten** — Name, Personalnummer, Arbeitgeber, Abteilung für den Berichtskopf.
 - **Backup** — JSON-Export/-Import sowie ein automatisches Backup in den Documents-Ordner, das eine Deinstallation überlebt.
-- **Clockodo-Übertragung (optional)** — je Beschäftigung einschaltbar: Kunde, Projekt und Leistung aus deinem Clockodo-Konto wählen und Einträge per Knopf übertragen, je Arbeitsabschnitt zwischen den Pausen ein Clockodo-Eintrag. Geänderte und gelöschte Einträge zieht der nächste Lauf nach.
+- **Clockodo-Übertragung (optional)** — je Beschäftigung einschaltbar: Kunde, Projekt und Leistung aus deinem Clockodo-Konto wählen und Einträge per Knopf übertragen, je Arbeitsabschnitt zwischen den Pausen ein Clockodo-Eintrag. Geänderte und gelöschte Einträge zieht der nächste Lauf nach. Dazu **Urlaubsanträge**: offene Urlaubstage per Knopf in Clockodo beantragen; der Stand (beantragt, genehmigt, abgelehnt) steht danach an jedem Urlaubstag, und beantragte oder genehmigte Tage lassen sich nicht versehentlich entfernen.
 - **In-App-Update** — prüft die GitHub-Releases dieses Repos und installiert die neue Version auf Wunsch.
 - **Hell und dunkel** — folgt dem Systemdesign.
 
@@ -237,7 +237,9 @@ du schaltest die Übertragung an Clockodo ein.
 - **Clockodo nur, wenn du es einschaltest.** Schaltest du bei einer Beschäftigung
   die Übertragung an Clockodo ein, sendet die App deren Einträge (Zeiten, Pausen als
   Lücken, Tätigkeit, Kunde, Projekt, Leistung) an dein Clockodo-Konto — und zwar nur,
-  wenn du „An Clockodo uebertragen“ tippst. Der API-Schlüssel liegt verschlüsselt im
+  wenn du „An Clockodo uebertragen“ tippst. Tippst du „Urlaub mit Clockodo abgleichen“,
+  sendet sie die offenen Urlaubszeiträume dieser Beschäftigung als Urlaubsantrag und liest
+  den Stand deiner Urlaubsanträge zurück. Der API-Schlüssel liegt verschlüsselt im
   Android-Schlüsselspeicher, ist von Google-Backup und Geräteumzug ausgenommen und
   steht in keinem Klarzeit-Backup.
 - **Weitergabe nur durch dich.** PDF, CSV und Backup verlassen das Gerät
