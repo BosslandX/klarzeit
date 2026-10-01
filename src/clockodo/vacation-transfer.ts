@@ -12,7 +12,7 @@ import {
   syncAbsenceStatus,
   vacationRequestRanges,
 } from '../domain/clockodo-absence';
-import type { ClockodoAbsenceRef } from '../domain/clockodo';
+import type { VacationDay } from '../domain/employment';
 import {
   getEmployments,
   getVacationDays,
@@ -57,7 +57,7 @@ function errorMessage(e: unknown): string {
 }
 
 function yearsForTransfer(
-  days: readonly import('../domain/employment').VacationDay[],
+  days: readonly VacationDay[],
   employmentId: string,
   ranges: ReturnType<typeof vacationRequestRanges>,
 ): number[] {
@@ -166,42 +166,17 @@ export async function transferVacations(
   }
 
   for (const range of ranges) {
-    const existing = findMatchingAbsence(allAbsences, range.dateSince, range.dateUntil);
-    let ref: ClockodoAbsenceRef;
-    if (existing) {
+    let absence = findMatchingAbsence(allAbsences, range.dateSince, range.dateUntil);
+    if (absence) {
       result.adopted++;
-      ref = { id: existing.id, status: existing.status, at: now() };
-      if (
-        existing.countDays !== null &&
-        existing.countDays !== range.dates.length
-      ) {
-        result.mismatches.push({
-          dateSince: range.dateSince,
-          dateUntil: range.dateUntil,
-          klarzeitDays: range.dates.length,
-          clockodoDays: existing.countDays,
-        });
-      }
     } else {
       try {
-        const created = await createAbsence(
+        absence = await createAbsence(
           auth,
           { usersId, dateSince: range.dateSince, dateUntil: range.dateUntil },
           http,
         );
         result.requested++;
-        ref = { id: created.id, status: created.status, at: now() };
-        if (
-          created.countDays !== null &&
-          created.countDays !== range.dates.length
-        ) {
-          result.mismatches.push({
-            dateSince: range.dateSince,
-            dateUntil: range.dateUntil,
-            klarzeitDays: range.dates.length,
-            clockodoDays: created.countDays,
-          });
-        }
       } catch (e) {
         if (e instanceof ClockodoError && isFatal(e)) {
           result.stopped = e.message;
@@ -215,7 +190,19 @@ export async function transferVacations(
         continue;
       }
     }
-    await setVacationAbsenceRef(employmentId, range.dates, ref);
+    await setVacationAbsenceRef(employmentId, range.dates, {
+      id: absence.id,
+      status: absence.status,
+      at: now(),
+    });
+    if (absence.countDays !== null && absence.countDays !== range.dates.length) {
+      result.mismatches.push({
+        dateSince: range.dateSince,
+        dateUntil: range.dateUntil,
+        klarzeitDays: range.dates.length,
+        clockodoDays: absence.countDays,
+      });
+    }
   }
 
   return result;

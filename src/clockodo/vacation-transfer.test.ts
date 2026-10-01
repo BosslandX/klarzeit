@@ -274,6 +274,16 @@ describe('Urlaubsantraege an Clockodo (AUF-020)', () => {
     ]);
   });
 
+  it('abweichende Tageszahl wird auch bei einem uebernommenen Antrag gemeldet', async () => {
+    await seed([5, 6, 7, 8, 9].map((d) => tag(2026, 10, d)));
+    absencesByYear['2026'] = [absence(55, '2026-10-05', '2026-10-09', 1, 4)];
+    const r = await transferVacations(EMP, { http, now: () => NOW });
+    expect(r.adopted).toBe(1);
+    expect(r.mismatches).toEqual([
+      { dateSince: '2026-10-05', dateUntil: '2026-10-09', klarzeitDays: 5, clockodoDays: 4 },
+    ]);
+  });
+
   it('ueber den Jahreswechsel werden beide Jahre gelesen, bevor gesendet wird', async () => {
     await seed([tag(2026, 12, 30), tag(2026, 12, 31), tag(2027, 1, 4)]);
     const r = await transferVacations(EMP, { http, now: () => NOW });

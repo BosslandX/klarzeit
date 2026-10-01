@@ -71,7 +71,11 @@ export function vacationRequestRanges(
   return ranges;
 }
 
-
+/**
+ * Setzt den Clockodo-Verweis an den genannten Tagen einer Beschaeftigung; alle
+ * anderen Tage -- auch derselbe Kalendertag einer anderen Beschaeftigung -- bleiben
+ * unberuehrt. Liefert eine neue Liste.
+ */
 export function applyAbsenceRef(
   days: readonly VacationDay[],
   employmentId: string,
@@ -85,6 +89,11 @@ export function applyAbsenceRef(
   });
 }
 
+/**
+ * Zieht den Status bekannter Antraege einer Beschaeftigung aus der Clockodo-Liste nach:
+ * anderer Status -> neuer Verweis mit neuer Zeit (`updated`); gleicher Status -> unveraendert;
+ * ID nicht in der Liste -> Verweis bleibt, der Tag zaehlt in `missing`.
+ */
 export function syncAbsenceStatus(
   days: readonly VacationDay[],
   employmentId: string,
