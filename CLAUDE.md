@@ -175,6 +175,15 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   ein kaputter Eintrag ist `format`, kein stilles Überspringen). Fehlertypen aus beiden
   Fehlerformen, auch aus JSON-Text: 409/`AbsenceCollision` → `collision`,
   `StatusIsForbidden`/`CannotManageAbsencesOfUser` → `forbidden`.
+- **Urlaubsanträge — Ablauf (AUF-020), nur auf Knopfdruck:** `transferVacations`
+  (`src/clockodo/vacation-transfer.ts`). Zugang wie `transferEmployment`; ohne betroffene Jahre
+  keine einzige Anfrage. **Erst lesen, dann senden:** `fetchMe` + `fetchAbsences` je Jahr —
+  scheitert das, wird nichts gesendet. Dann Status nachziehen (`syncAbsenceStatus`; ein in
+  Clockodo verschwundener Antrag behält seinen Verweis und zählt als `missing`, er wird **nicht**
+  neu gestellt). Je offenem Zeitraum: gleicher Zeitraum in Clockodo → übernehmen (verlorene
+  Antwort, zurückgespieltes Backup), sonst beantragen; jeder Erfolg wird **sofort** vermerkt
+  (`setVacationAbsenceRef`). `auth`/`network`/`rate` brechen ab, alles andere trifft nur den
+  eigenen Zeitraum. Weicht Clockodos `countDays` von Klarzeits Tageszahl ab → `mismatches`.
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
