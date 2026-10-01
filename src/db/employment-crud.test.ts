@@ -48,6 +48,9 @@ import {
   saveVacationDays,
   updateEmployment,
   cleanEmployment,
+  addVacationDay,
+  removeVacationDay,
+  cleanVacationDays,
 } from './employment';
 import { db } from './db';
 import { addEntry } from './entries';
@@ -231,4 +234,51 @@ describe('Beschaeftigungs-Verwaltung', () => {
     const days = await getVacationDays();
     expect(days[0].employmentId).toBe(secondId);
   });
+
+  it('cleanVacationDays: gleicher Tag zaehlt je Beschaeftigung einmal', () => {
+    const out = cleanVacationDays([
+      { date: 1_700_100_000_000, note: 'erst', employmentId: 'emp-1' },
+      { date: 1_700_100_000_000, note: '', employmentId: 'emp-2' },
+      { date: 1_700_100_000_000, note: 'doppelt', employmentId: 'emp-1' },
+    ]);
+    expect(out).toHaveLength(2);
+    const e1 = out.find((d) => d.employmentId === 'emp-1');
+    expect(e1?.note).toBe('erst');
+    expect(out.some((d) => d.employmentId === 'emp-2')).toBe(true);
+  });
+
+  it('cleanVacationDays: Tag ohne employmentId gilt beim Doppeltpruefen als emp-1', () => {
+    const out = cleanVacationDays([
+      { date: 1_700_100_000_000, note: 'alt' },
+      { date: 1_700_100_000_000, note: '', employmentId: 'emp-1' },
+    ]);
+    expect(out).toEqual([{ employmentId: 'emp-1', date: 1_700_100_000_000, note: 'alt' }]);
+  });
+
+  it('addVacationDay: derselbe Tag in einer zweiten Beschaeftigung wird gespeichert', async () => {
+    const list = await addEmployment({ name: 'Zweit', weeklyHours: 5 });
+    const secondId = list[1].id;
+    await addVacationDay(1_700_100_000_000, '', INITIAL_EMPLOYMENT_ID);
+    await addVacationDay(1_700_100_000_000, '', secondId);
+    const days = await getVacationDays();
+    expect(days).toHaveLength(2);
+    expect(days.map((d) => d.employmentId).sort()).toEqual(
+      [INITIAL_EMPLOYMENT_ID, secondId].sort(),
+    );
+  });
+
+  it('removeVacationDay entfernt nur den Tag der genannten Beschaeftigung', async () => {
+    const list = await addEmployment({ name: 'Zweit', weeklyHours: 5 });
+    const secondId = list[1].id;
+    await saveVacationDays([
+      { employmentId: INITIAL_EMPLOYMENT_ID, date: 1_700_100_000_000, note: '' },
+      { employmentId: secondId, date: 1_700_100_000_000, note: '' },
+    ]);
+    await removeVacationDay(1_700_100_000_000, secondId);
+    const days = await getVacationDays();
+    expect(days).toEqual([
+      { employmentId: INITIAL_EMPLOYMENT_ID, date: 1_700_100_000_000, note: '' },
+    ]);
+  });
+
 });

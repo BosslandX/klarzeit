@@ -454,6 +454,15 @@ describe('Urlaubslisten zusammenfuehren', () => {
     expect(merged[0].note).toBe('meine Notiz');
   });
 
+
+  it('gleiches Datum in zwei Beschaeftigungen bleibt zweimal erhalten', () => {
+    const merged = mergeVacationDays(
+      [v(2026, 6, 10, 'meine Notiz')],
+      [{ ...v(2026, 6, 10), employmentId: 'emp-2' }],
+    );
+    expect(merged).toHaveLength(2);
+    expect(merged.map((x) => x.employmentId).sort()).toEqual(['emp-1', 'emp-2']);
+  });
   it('leere Eingaben', () => {
     expect(mergeVacationDays([], [])).toEqual([]);
     expect(mergeVacationDays([], [v(2026, 6, 1)])).toHaveLength(1);

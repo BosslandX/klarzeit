@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   defaultEmployment,
   mergeVacationDays,
+  vacationDayKey,
   type Employment,
   type VacationDay,
   type VacationYearMode,
@@ -287,10 +288,11 @@ export async function removeEmployment(id: string): Promise<Employment[]> {
   return next;
 }
 
-/** Validiert + sortiert Urlaubstage; fehlende employmentId → emp-1. */
+/** Validiert + sortiert Urlaubstage; fehlende employmentId → emp-1.
+ *  Doppelt ist nur derselbe Tag derselben Beschaeftigung. */
 export function cleanVacationDays(raw: unknown): VacationDay[] {
   if (!Array.isArray(raw)) return [];
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   const out: VacationDay[] = [];
   for (const item of raw) {
     const x = (typeof item === 'object' && item !== null ? item : {}) as Record<
@@ -298,12 +300,13 @@ export function cleanVacationDays(raw: unknown): VacationDay[] {
       unknown
     >;
     if (typeof x.date !== 'number' || !Number.isFinite(x.date)) continue;
-    if (seen.has(x.date)) continue;
-    seen.add(x.date);
     const employmentId =
       typeof x.employmentId === 'string' && x.employmentId.trim() !== ''
         ? x.employmentId
         : INITIAL_EMPLOYMENT_ID;
+    const key = vacationDayKey(employmentId, x.date);
+    if (seen.has(key)) continue;
+    seen.add(key);
     out.push({
       employmentId,
       date: x.date,
@@ -328,6 +331,31 @@ export async function saveVacationDays(days: VacationDay[]): Promise<void> {
     key: KEY_VAC,
     value: JSON.stringify(cleanVacationDays(days)),
   });
+}
+
+/** Traegt einen Urlaubstag ein; ein schon erfasster bleibt samt Notiz bestehen. */
+export async function addVacationDay(
+  date: number,
+  note: string,
+  employmentId: string,
+): Promise<VacationDay[]> {
+  const merged = mergeVacationDays(await getVacationDays(), [
+    { date, note, employmentId },
+  ]);
+  await saveVacationDays(merged);
+  return merged;
+}
+
+/** Entfernt einen Urlaubstag nur in der genannten Beschaeftigung. */
+export async function removeVacationDay(
+  date: number,
+  employmentId: string,
+): Promise<VacationDay[]> {
+  const next = (await getVacationDays()).filter(
+    (d) => !(d.date === date && d.employmentId === employmentId),
+  );
+  await saveVacationDays(next);
+  return next;
 }
 
 // --- React-Hooks ---
@@ -388,7 +416,7 @@ export function useVacationDays(): {
   loading: boolean;
   add: (date: number, note?: string, employmentId?: string) => Promise<void>;
   addMany: (dates: readonly number[], employmentId?: string) => Promise<number>;
-  remove: (date: number) => Promise<void>;
+  remove: (date: number, employmentId: string) => Promise<void>;
 } {
   const [days, setDays] = useState<VacationDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -412,13 +440,7 @@ export function useVacationDays(): {
         employmentId != null && employmentId !== ''
           ? employmentId
           : await getActiveEmploymentId();
-      const next = await getVacationDays();
-      if (!next.some((d) => d.date === date)) {
-        next.push({ date, note, employmentId: eid });
-      }
-      const cleaned = cleanVacationDays(next);
-      await saveVacationDays(cleaned);
-      setDays(cleaned);
+      setDays(await addVacationDay(date, note, eid));
     },
     [],
   );
@@ -438,10 +460,8 @@ export function useVacationDays(): {
     return merged.length - current.length;
   }, []);
 
-  const remove = useCallback(async (date: number) => {
-    const next = (await getVacationDays()).filter((d) => d.date !== date);
-    await saveVacationDays(next);
-    setDays(next);
+  const remove = useCallback(async (date: number, employmentId: string) => {
+    setDays(await removeVacationDay(date, employmentId));
   }, []);
 
   return { days, loading, add, addMany, remove };

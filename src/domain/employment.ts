@@ -359,18 +359,31 @@ export function workdaysInRange(
 }
 
 /**
- * Vereinigt zwei Urlaubslisten. Bei gleichem Datum gewinnt der BESTEHENDE
- * Eintrag, damit ein Backup-Import lokale Tage (und deren Notiz) nie
- * ueberschreibt. Ergebnis aufsteigend sortiert.
+ * Ein Urlaubstag ist je Beschaeftigung eindeutig — derselbe Kalendertag darf
+ * in zwei Beschaeftigungen Urlaub sein, in einer nur einmal.
+ */
+export function vacationDayKey(employmentId: string, date: number): string {
+  return `${employmentId}|${date}`;
+}
+
+/**
+ * Vereinigt zwei Urlaubslisten. Bei gleichem Tag derselben Beschaeftigung
+ * gewinnt der BESTEHENDE Eintrag, damit ein Backup-Import lokale Tage (und
+ * deren Notiz) nie ueberschreibt. Ergebnis aufsteigend sortiert.
  */
 export function mergeVacationDays(
   existing: readonly VacationDay[],
   incoming: readonly VacationDay[],
 ): VacationDay[] {
-  const known = new Set(existing.map((d) => d.date));
-  return [...existing, ...incoming.filter((d) => !known.has(d.date))].sort(
-    (a, b) => a.date - b.date,
+  const known = new Set(
+    existing.map((d) => vacationDayKey(d.employmentId, d.date)),
   );
+  return [
+    ...existing,
+    ...incoming.filter(
+      (d) => !known.has(vacationDayKey(d.employmentId, d.date)),
+    ),
+  ].sort((a, b) => a.date - b.date);
 }
 
 // --- Urlaub (BUrlG) ---

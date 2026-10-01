@@ -685,7 +685,7 @@ export function MoreScreen() {
         ) : (
           <ul className="vac-list">
             {vacDays.map((d) => (
-              <li key={d.date}>
+              <li key={`${d.employmentId}-${d.date}`}>
                 <span>
                   {formatDateWithWeekday(d.date)}
                   <span className="muted small"> ({empLabel(d.employmentId)})</span>
@@ -693,7 +693,7 @@ export function MoreScreen() {
                 <button
                   className="link-btn danger"
                   type="button"
-                  onClick={() => void removeVac(d.date)}
+                  onClick={() => void removeVac(d.date, d.employmentId)}
                 >
                   entfernen
                 </button>

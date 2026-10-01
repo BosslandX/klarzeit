@@ -92,6 +92,27 @@ describe('Backup Version 3 und Beschaeftigungen', () => {
     await db.open();
   });
 
+  it('ersetzen: Urlaubstage am selben Datum in zwei Beschaeftigungen bleiben beide', async () => {
+    const tag = new Date(2026, 6, 6).getTime();
+    const beide = [emp('emp-1', 'Hauptjob', 30), emp('emp-b', 'Nebenjob', 10)];
+    const backup: BackupData = {
+      app: 'zeiterfassung',
+      version: 3,
+      exportedAt: 1,
+      profile: zeiterfassungV2.profile,
+      entries: [],
+      employments: beide,
+      vacations: [
+        { date: tag, note: '', employmentId: 'emp-1' },
+        { date: tag, note: '', employmentId: 'emp-b' },
+      ],
+    };
+    await restoreBackup(JSON.stringify(backup), 'replace');
+    const vacations = await getVacationDays();
+    expect(vacations.map((v) => v.employmentId).sort()).toEqual(['emp-1', 'emp-b']);
+    expect(vacations.every((v) => v.date === tag)).toBe(true);
+  });
+
   it('Version-2-Backup ohne employmentId: Eintraege erhalten emp-1, Anzahl gleich', async () => {
     const entries = [baseEntry({ activity: 'E1' }), baseEntry({ activity: 'E2', start: 1_700_001_000_000, end: 1_700_001_360_000 })];
     const backup: BackupData = {
@@ -618,6 +639,30 @@ describe('Zusammenfuehren in eine vorhandene Beschaeftigung', () => {
     const empB = list.find((e) => e.id === 'emp-b');
     expect(empB?.weeklyHours).toBe(10);
   });
+
+  it('zusammenfuehren: Urlaubstag am selben Datum in anderer Beschaeftigung kommt hinzu', async () => {
+    const tag = new Date(2026, 6, 6).getTime();
+    const beide = [emp('emp-1', 'Hauptjob', 30), emp('emp-b', 'Nebenjob', 10)];
+    prefStore.set('employments', JSON.stringify(beide));
+    prefStore.set(
+      'vacations',
+      JSON.stringify([{ date: tag, note: '', employmentId: 'emp-1' }]),
+    );
+    const backup: BackupData = {
+      app: 'zeiterfassung',
+      version: 3,
+      exportedAt: 1,
+      profile: zeiterfassungV2.profile,
+      entries: [],
+      employments: beide,
+      vacations: [{ date: tag, note: '', employmentId: 'emp-b' }],
+    };
+    await restoreBackup(JSON.stringify(backup), 'merge');
+    const vacations = await getVacationDays();
+    expect(vacations.map((v) => v.employmentId).sort()).toEqual(['emp-1', 'emp-b']);
+    expect(vacations.every((v) => v.date === tag)).toBe(true);
+  });
+
 });
 
 describe('Pausen mit Uhrzeit im Backup', () => {
