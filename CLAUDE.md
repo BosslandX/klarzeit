@@ -150,7 +150,8 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   bei einer kaputten Projekt-ID). Das Formular zeigt die Auswahl nur bei Beschäftigungen mit
   Zugang, Startwert `defaultEntryRef` der Beschäftigung; `EntryDraft.clockodo` ist Pflicht
   (Dexie-`update`, wie `breaks`). Gespeichert wird nur eine vollständige Auswahl, sonst `null`.
-- **Übertragung an Clockodo (AUF-014/015), nur Klarzeit → Clockodo, nur auf Knopfdruck:**
+- **Übertragung an Clockodo (AUF-014/015), nur Klarzeit → Clockodo, auf Knopfdruck oder — wenn
+  eingeschaltet — automatisch (AUF-025):**
   `src/domain/clockodo-transfer.ts` (rein): je Arbeitsabschnitt zwischen den Pausen ein
   Clockodo-Eintrag (`workSegments`, `buildEntryPayloads`), UTC ohne Millisekunden, Prüfsumme
   `entrySyncHash` (FNV-1a über das Gesendete), `transferStatus` in fester Reihenfolge
@@ -235,6 +236,21 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   abgelehnt, die übrigen der Woche angenommen; ob Clockodo Kalender- oder Arbeitstage zählt, ist
   offen. `edit_lock` (festes Datum) bleibt außen vor — ob der Tag selbst gesperrt ist, sagt die
   Spec nicht.
+- **Automatisch übertragen (AUF-025):** `ClockodoConfig.autoTransfer?: boolean` (fehlt = aus;
+  `cleanClockodoConfig` trägt es nur bei `true` — als Pflichtfeld wären drei bestehende Tests rot
+  geworden und sechs Testdateien mit getypten Konstanten nicht mehr durch `tsc` gekommen).
+  **Lauf-Schloss** in `transferEmployment`: je Beschäftigung eine Promise-Kette (`laeufe`), ein
+  zweiter Aufruf wartet auf den ersten, ein gescheiterter Lauf hält den nächsten nicht auf —
+  gemessen: ohne Schloss buchen zwei gleichzeitige Läufe doppelt (4 statt 2 POST). `skipLocked`
+  (nur der automatische Lauf) lässt Einträge jenseits der gemerkten Sperrfrist aus, ungezählt;
+  der Knopf versucht sie weiter. `runAutoTransfer` (`src/clockodo/auto-transfer.ts`): je
+  Beschäftigung mit Schalter erst `refreshClockodoLock`, dann `transferEmployment(…, { skipLocked:
+  true })`; der Fehler einer Beschäftigung wird ihr Abbruchgrund, die nächste läuft trotzdem.
+  Ergebnis nur für diese Sitzung (`lastAutoTransferResults`, Hörer, `useAutoTransferResults`).
+  Auslöser über `startAutoTransfer` (nur nativ): App-Start, Rückkehr in die App
+  (`appStateChange`), Speichern oder Löschen eines Eintrags in „Erfassung" und „Eintraege". Ein
+  Hinweis erscheint nur bei Abbruch oder Fehlern (`autoTransferHint`), in „Erfassung" und im
+  Clockodo-Kasten. Urlaubsanträge bleiben auf Knopfdruck.
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
@@ -256,8 +272,9 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
   Dexie-Datenbank und in jedem Backup; umbenannt verwirft `cleanBreaks` beim Import jede
   Pausenzeit)
 - `src/domain/clockodo.ts` → Feld `clockodo` am `Employment` samt `apiUser`, `syncFrom`,
-  `defaultCustomersId`, `defaultProjectsId`, `defaultServicesId`, `billable` (Preferences
-  `employments` und Backup); Preferences-Schlüssel `clockodoLists:<employmentId>`;
+  `defaultCustomersId`, `defaultProjectsId`, `defaultServicesId`, `billable`, `autoTransfer`
+  (Preferences `employments` und Backup; `autoTransfer` umbenannt schaltet das automatische
+  Übertragen still ab); Preferences-Schlüssel `clockodoLists:<employmentId>`;
   KeyStore-Schlüssel `clockodo-key-<employmentId>` (umbenannt findet die App den
   gespeicherten API-Schlüssel nicht mehr)
 - `src/domain/types.ts` → Feld `clockodo` mit `customersId`/`projectsId`/`servicesId` am

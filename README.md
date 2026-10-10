@@ -39,7 +39,7 @@ gesetzlichen Urlaubsanspruch nach dem Bundesurlaubsgesetz.
 Ohne Konto, ohne Anmeldung, ohne Server. Die Daten liegen in der App auf dem
 Gerät und verlassen es nur, wenn du selbst ein PDF, eine CSV-Datei oder ein
 Backup teilst — oder wenn du für eine Beschäftigung die Übertragung an Clockodo
-einschaltest und selbst auslöst.
+einschaltest: dann auf Knopfdruck oder, mit „Automatisch uebertragen“, von selbst.
 
 ---
 
@@ -120,7 +120,7 @@ Safe-Area-Abstände geringfügig.
 - **Gesetzlicher und vertraglicher Urlaub** — Jahresanspruch, Zwölftelung, Wartezeit, genommene Tage, Resturlaub.
 - **Personendaten** — Name, Personalnummer, Arbeitgeber, Abteilung für den Berichtskopf.
 - **Backup** — JSON-Export/-Import sowie ein automatisches Backup in den Documents-Ordner, das eine Deinstallation überlebt.
-- **Clockodo-Übertragung (optional)** — je Beschäftigung einschaltbar: Kunde, Projekt und Leistung aus deinem Clockodo-Konto wählen und Einträge per Knopf übertragen, je Arbeitsabschnitt zwischen den Pausen ein Clockodo-Eintrag. Geänderte und gelöschte Einträge zieht der nächste Lauf nach — auch einen Eintrag, der die Beschäftigung wechselt oder seine Clockodo-Auswahl verliert; offene Löschungen zeigt die Liste an. Dazu **Urlaubsanträge**: offene Urlaubstage per Knopf in Clockodo beantragen; der Stand (beantragt, genehmigt, abgelehnt) steht danach an jedem Urlaubstag, beantragte oder genehmigte Tage lassen sich nicht versehentlich entfernen, und einen falsch gestellten Antrag ziehst du per Knopf zurück.
+- **Clockodo-Übertragung (optional)** — je Beschäftigung einschaltbar: Kunde, Projekt und Leistung aus deinem Clockodo-Konto wählen und Einträge per Knopf übertragen, je Arbeitsabschnitt zwischen den Pausen ein Clockodo-Eintrag. Geänderte und gelöschte Einträge zieht der nächste Lauf nach — auch einen Eintrag, der die Beschäftigung wechselt oder seine Clockodo-Auswahl verliert; offene Löschungen zeigt die Liste an. Auf Wunsch überträgt Klarzeit **automatisch** — nach dem Speichern oder Löschen eines Eintrags und beim Öffnen der App. Die **Sperrfrist** deines Clockodo-Kontos kennt die App: Sie warnt vor dem letzten Tag, an dem Clockodo einen Eintrag noch annimmt, und zeigt gesperrte Einträge als solche an. Dazu **Urlaubsanträge**: offene Urlaubstage per Knopf in Clockodo beantragen; der Stand (beantragt, genehmigt, abgelehnt) steht danach an jedem Urlaubstag, beantragte oder genehmigte Tage lassen sich nicht versehentlich entfernen, und einen falsch gestellten Antrag ziehst du per Knopf zurück.
 - **In-App-Update** — prüft die GitHub-Releases dieses Repos und installiert die neue Version auf Wunsch.
 - **Hell und dunkel** — folgt dem Systemdesign.
 
@@ -233,11 +233,14 @@ du schaltest die Übertragung an Clockodo ein.
 - **Keine Datenübertragung im Betrieb, außer auf deinen Wunsch.** Die einzige
   Netzverbindung, die die App
   von sich aus aufbaut, ist der Update-Check gegen die GitHub-Releases dieses
-  Repos — und den stößt du im Tab „Mehr" selbst an.
+  Repos — und den stößt du im Tab „Mehr" selbst an. Einzige Ausnahme: das
+  automatische Übertragen an Clockodo, wenn du es einschaltest (s. u.).
 - **Clockodo nur, wenn du es einschaltest.** Schaltest du bei einer Beschäftigung
   die Übertragung an Clockodo ein, sendet die App deren Einträge (Zeiten, Pausen als
-  Lücken, Tätigkeit, Kunde, Projekt, Leistung) an dein Clockodo-Konto — und zwar nur,
-  wenn du „An Clockodo uebertragen“ tippst. Tippst du „Urlaub mit Clockodo abgleichen“,
+  Lücken, Tätigkeit, Kunde, Projekt, Leistung) an dein Clockodo-Konto — wenn du
+  „An Clockodo uebertragen“ tippst oder, wenn du zusätzlich „Automatisch uebertragen“
+  einschaltest, nach dem Speichern oder Löschen eines Eintrags und beim Öffnen der App.
+  Dabei liest sie auch die Sperrfrist deines Kontos. Tippst du „Urlaub mit Clockodo abgleichen“,
   sendet sie die offenen Urlaubszeiträume dieser Beschäftigung als Urlaubsantrag und liest
   den Stand deiner Urlaubsanträge zurück; tippst du an einem beantragten Tag
   „zurueckziehen“, löscht oder storniert sie diesen Antrag. Der API-Schlüssel liegt verschlüsselt im
@@ -250,7 +253,7 @@ du schaltest die Übertragung an Clockodo ein.
 
 | Berechtigung | Wofür | Anmerkung |
 |---|---|---|
-| `INTERNET` | Update-Prüfung und Download der neuen APK; Übertragung an Clockodo, wenn eingeschaltet | nur bei manuell ausgelöster Update-Prüfung bzw. Übertragung |
+| `INTERNET` | Update-Prüfung und Download der neuen APK; Übertragung an Clockodo, wenn eingeschaltet | nur bei manuell ausgelöster Update-Prüfung bzw. Übertragung — oder automatisch, wenn du „Automatisch uebertragen“ einschaltest |
 | `WRITE_EXTERNAL_STORAGE` | automatisches Backup nach `Documents/Klarzeit/` | nur bis Android 10 (`maxSdkVersion=29`); ab Android 11 schreibt die App ihre eigenen Dateien ohne Berechtigung |
 | `REQUEST_INSTALL_PACKAGES` | Start des System-Installers für das In-App-Update | öffnet nur den Android-Dialog; die Installation bestätigst du |
 
