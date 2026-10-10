@@ -6,7 +6,7 @@
 - **Typ:** Capacitor-Android-App (lokale Zeiterfassung)
 - **Stack:** Vite + React 19 + TypeScript, Capacitor 8, Dexie (IndexedDB), jsPDF, date-fns
 - **App-ID:** `io.github.bosslandx.klarzeit` · webDir: `dist`
-- **Version:** 1.9.0 (`versionCode 13`)
+- **Version:** 1.10.0 (`versionCode 14`)
 
 ## Build & Run
 ```bash
