@@ -47,6 +47,9 @@ import { setClockodoKey } from './key-store';
 import {
   transferVacations,
   vacationTransferSummary,
+  vacationWithdrawQuestion,
+  vacationWithdrawSummary,
+  withdrawVacationRequest,
   type VacationTransferResult,
 } from './vacation-transfer';
 
@@ -345,5 +348,160 @@ describe('Abgleich: Anzeige (AUF-021)', () => {
       info: ['0 beantragt, 0 uebernommen, 0 Status aktualisiert.'],
       problems: ['Abgebrochen: Clockodo-Login fehlt.'],
     });
+  });
+});
+
+describe('Urlaubsantrag zurueckziehen (AUF-023)', () => {
+  type Antwort = () => { status: number; data: unknown };
+  let loeschen: Antwort;
+  let stornieren: Antwort;
+  const httpZ: ClockodoHttp = async (req) => {
+    calls.push(req);
+    if (req.method === 'DELETE') return loeschen();
+    if (req.method === 'PUT') return stornieren();
+    return { status: 500, data: {} };
+  };
+  const wege = () => calls.map((c) => `${c.method} ${c.url.replace(/.*\/api/, '')}`);
+  const antrag = (status: number) => ({ clockodoAbsence: { id: 55, status: status as 0 | 1, at: 1 } });
+  const tage = () => [
+    tag(2026, 10, 5, antrag(0)),
+    tag(2026, 10, 6, antrag(0)),
+    tag(2026, 10, 6, { employmentId: 'emp-2', clockodoAbsence: { id: 77, status: 0, at: 1 } }),
+    tag(2026, 10, 12, { clockodoAbsence: { id: 56, status: 1, at: 1 } }),
+    tag(2026, 10, 14),
+  ];
+  const fehler = (status: number, type: string): Antwort => () => ({
+    status,
+    data: { errors: [{ error: { type } }] },
+  });
+
+  beforeEach(() => {
+    prefStore.clear();
+    secureStore.clear();
+    calls = [];
+    loeschen = () => ({ status: 200, data: { success: true } });
+    stornieren = () => ({
+      status: 200,
+      data: { data: absence(55, '2026-10-05', '2026-10-06', 4) },
+    });
+  });
+
+  it('Zurueckziehen loescht den Antrag und entfernt nur seine Tage', async () => {
+    await seed(tage());
+    const r = await withdrawVacationRequest(EMP, 55, { http: httpZ });
+    expect(r).toEqual({ outcome: 'deleted', removed: 2, error: null });
+    expect(wege()).toEqual(['DELETE /v4/absences/55']);
+    expect((await getVacationDays()).map((d) => [d.employmentId, d.date])).toEqual([
+      ['emp-2', ab(2026, 10, 6)],
+      [EMP, ab(2026, 10, 12)],
+      [EMP, ab(2026, 10, 14)],
+    ]);
+  });
+
+  it('Darf Klarzeit den Antrag nicht loeschen, wird er storniert', async () => {
+    await seed(tage());
+    loeschen = fehler(403, 'CannotManageAbsencesOfUser');
+    const r = await withdrawVacationRequest(EMP, 55, { http: httpZ });
+    expect(r).toEqual({ outcome: 'cancelled', removed: 2, error: null });
+    expect(wege()).toEqual(['DELETE /v4/absences/55', 'PUT /v4/absences/55']);
+    expect(calls[1].data).toEqual({ status: 4 });
+    expect(await getVacationDays()).toHaveLength(3);
+  });
+
+  it('Antrag in Clockodo verschwunden: die Tage werden entfernt', async () => {
+    await seed(tage());
+    loeschen = () => ({ status: 404, data: {} });
+    stornieren = () => ({ status: 404, data: {} });
+    const r = await withdrawVacationRequest(EMP, 55, { http: httpZ });
+    expect(r).toEqual({ outcome: 'gone', removed: 2, error: null });
+    expect(wege()).toEqual(['DELETE /v4/absences/55']);
+    expect(await getVacationDays()).toHaveLength(3);
+  });
+
+  it('Lehnt Clockodo beides ab, bleibt alles stehen und beide Gruende werden genannt', async () => {
+    await seed(tage());
+    loeschen = fehler(422, 'AbsenceHasToBeDeclined');
+    stornieren = fehler(422, 'StatusIsForbidden');
+    const r = await withdrawVacationRequest(EMP, 55, { http: httpZ });
+    expect(r).toEqual({
+      outcome: null,
+      removed: 0,
+      error:
+        'Loeschen: Der Antrag muss in Clockodo erst abgelehnt werden. / Stornieren: Clockodo laesst einen Urlaubsantrag fuer diesen Zugang nicht zu.',
+    });
+    expect(await getVacationDays()).toEqual(tage());
+  });
+
+  it('Ohne Netz wird nicht storniert und nichts entfernt', async () => {
+    await seed(tage());
+    loeschen = () => {
+      throw new Error('offline');
+    };
+    const r = await withdrawVacationRequest(EMP, 55, { http: httpZ });
+    expect(r).toEqual({ outcome: null, removed: 0, error: 'Keine Verbindung zu Clockodo.' });
+    expect(wege()).toEqual(['DELETE /v4/absences/55']);
+    expect(await getVacationDays()).toEqual(tage());
+  });
+
+  it('Storniert Clockodo nicht, bleibt alles stehen', async () => {
+    await seed(tage());
+    loeschen = () => ({ status: 403, data: {} });
+    stornieren = () => ({
+      status: 200,
+      data: { data: absence(55, '2026-10-05', '2026-10-06', 0) },
+    });
+    const r = await withdrawVacationRequest(EMP, 55, { http: httpZ });
+    expect(r).toEqual({
+      outcome: null,
+      removed: 0,
+      error:
+        'Loeschen: Keine Berechtigung bei Clockodo. / Stornieren: Clockodo hat den Antrag nicht storniert.',
+    });
+    expect(await getVacationDays()).toEqual(tage());
+  });
+
+  it('Zurueckziehen ohne Zugang fragt nichts an', async () => {
+    prefStore.set(
+      'employments',
+      JSON.stringify([{ ...defaultEmployment, id: EMP, clockodo: null }]),
+    );
+    await saveVacationDays(tage());
+    const r = await withdrawVacationRequest(EMP, 55, { http: httpZ });
+    expect(r).toEqual({
+      outcome: null,
+      removed: 0,
+      error: 'Clockodo ist fuer diese Beschaeftigung nicht eingeschaltet.',
+    });
+    expect(calls).toHaveLength(0);
+    expect(await getVacationDays()).toEqual(tage());
+  });
+
+  it('vacationWithdrawQuestion nennt Zeitraum und Zahl der Tage', () => {
+    const days = [
+      ...[5, 6, 7, 8, 9].map((d) => tag(2026, 10, d, antrag(0))),
+      tag(2026, 10, 12, { clockodoAbsence: { id: 56, status: 1, at: 1 } }),
+    ];
+    expect(vacationWithdrawQuestion(days, EMP, 55)).toBe(
+      'Antrag 05.10.2026–09.10.2026 (5 Urlaubstag(e)) in Clockodo zurueckziehen? Die Tage werden danach aus Klarzeit entfernt.',
+    );
+    expect(vacationWithdrawQuestion(days, EMP, 56)).toBe(
+      'Antrag 12.10.2026 (1 Urlaubstag(e)) in Clockodo zurueckziehen? Die Tage werden danach aus Klarzeit entfernt.',
+    );
+  });
+
+  it('vacationWithdrawSummary nennt den Ausgang', () => {
+    expect(
+      [
+        { outcome: 'deleted' as const, removed: 2, error: null },
+        { outcome: 'cancelled' as const, removed: 1, error: null },
+        { outcome: 'gone' as const, removed: 3, error: null },
+        { outcome: null, removed: 0, error: 'Clockodo-Login fehlt.' },
+      ].map(vacationWithdrawSummary),
+    ).toEqual([
+      'Antrag in Clockodo geloescht, 2 Urlaubstag(e) entfernt.',
+      'Antrag in Clockodo storniert, 1 Urlaubstag(e) entfernt.',
+      'Antrag war in Clockodo nicht mehr vorhanden, 3 Urlaubstag(e) entfernt.',
+      'Zurueckziehen fehlgeschlagen: Clockodo-Login fehlt.',
+    ]);
   });
 });

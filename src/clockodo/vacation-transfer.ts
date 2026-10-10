@@ -1,7 +1,9 @@
 import { getYear } from 'date-fns';
 import {
   ClockodoError,
+  cancelAbsence,
   createAbsence,
+  deleteAbsence,
   fetchAbsences,
   fetchMe,
   type ClockodoAbsence,
@@ -9,15 +11,17 @@ import {
 } from './client';
 import { getClockodoKey } from './key-store';
 import {
+  daysOfAbsence,
   syncAbsenceStatus,
   vacationRequestRanges,
 } from '../domain/clockodo-absence';
-import type { VacationDay } from '../domain/employment';
-import { formatDate, fromDateInput } from '../domain/time';
+import type { Employment, VacationDay } from '../domain/employment';
+import { formatDate, fromDateInput, toDateInput } from '../domain/time';
 import {
   getEmployments,
   getVacationDays,
   saveVacationDays,
+  removeVacationDaysOfAbsence,
   setVacationAbsenceRef,
 } from '../db/employment';
 
@@ -34,6 +38,35 @@ export interface VacationTransferResult {
   }[];
   errors: { dateSince: string; dateUntil: string; message: string }[];
   stopped: string | null;
+}
+
+
+type ClockodoZugang =
+  | { ok: true; employment: Employment; auth: { apiUser: string; apiKey: string } }
+  | { ok: false; stopped: string };
+
+async function clockodoZugang(employmentId: string): Promise<ClockodoZugang> {
+  const list = await getEmployments();
+  const employment = list.find((e) => e.id === employmentId);
+  if (!employment) {
+    return { ok: false, stopped: 'Clockodo ist fuer diese Beschaeftigung nicht eingeschaltet.' };
+  }
+  const config = employment.clockodo;
+  if (config === null) {
+    return { ok: false, stopped: 'Clockodo ist fuer diese Beschaeftigung nicht eingeschaltet.' };
+  }
+  if (!config.apiUser.trim()) {
+    return { ok: false, stopped: 'Clockodo-Login fehlt.' };
+  }
+  const apiKey = await getClockodoKey(employmentId);
+  if (!apiKey) {
+    return { ok: false, stopped: 'API-Schluessel fehlt.' };
+  }
+  return { ok: true, employment, auth: { apiUser: config.apiUser.trim(), apiKey } };
+}
+
+function isWithdrawFatal(err: ClockodoError): boolean {
+  return err.kind === 'auth' || err.kind === 'network' || err.kind === 'rate';
 }
 
 function emptyResult(): VacationTransferResult {
@@ -100,27 +133,12 @@ export async function transferVacations(
   const now = opts?.now ?? (() => Date.now());
   const http = opts?.http;
 
-  const list = await getEmployments();
-  const employment = list.find((e) => e.id === employmentId);
-  if (!employment) {
-    result.stopped = 'Clockodo ist fuer diese Beschaeftigung nicht eingeschaltet.';
+  const zugang = await clockodoZugang(employmentId);
+  if (!zugang.ok) {
+    result.stopped = zugang.stopped;
     return result;
   }
-  const config = employment.clockodo;
-  if (config === null) {
-    result.stopped = 'Clockodo ist fuer diese Beschaeftigung nicht eingeschaltet.';
-    return result;
-  }
-  if (!config.apiUser.trim()) {
-    result.stopped = 'Clockodo-Login fehlt.';
-    return result;
-  }
-  const apiKey = await getClockodoKey(employmentId);
-  if (!apiKey) {
-    result.stopped = 'API-Schluessel fehlt.';
-    return result;
-  }
-  const auth = { apiUser: config.apiUser.trim(), apiKey };
+  const { employment, auth } = zugang;
 
   let days = await getVacationDays();
   const ranges = vacationRequestRanges(days, employment);
@@ -238,4 +256,98 @@ function spanne(dateSince: string, dateUntil: string): string {
   const from = formatDate(fromDateInput(dateSince));
   if (dateSince === dateUntil) return from;
   return `${from}–${formatDate(fromDateInput(dateUntil))}`;
+}
+
+export interface VacationWithdrawResult {
+  /** deleted = geloescht, cancelled = storniert, gone = in Clockodo schon weg, null = nicht zurueckgezogen */
+  outcome: 'deleted' | 'cancelled' | 'gone' | null;
+  removed: number;
+  error: string | null;
+}
+
+/**
+ * Zieht einen Urlaubsantrag in Clockodo zurueck -- nur auf Knopfdruck. Erst loeschen; darf
+ * Klarzeit das nicht, stornieren (Status 4). Erst danach verschwinden seine Tage aus Klarzeit.
+ */
+export async function withdrawVacationRequest(
+  employmentId: string,
+  absenceId: number,
+  opts?: { http?: ClockodoHttp },
+): Promise<VacationWithdrawResult> {
+  const http = opts?.http;
+  const zugang = await clockodoZugang(employmentId);
+  if (!zugang.ok) {
+    return { outcome: null, removed: 0, error: zugang.stopped };
+  }
+  const { auth } = zugang;
+
+  let outcome: 'deleted' | 'cancelled' | 'gone' | null = null;
+
+  try {
+    const deleted = await deleteAbsence(auth, absenceId, http);
+    outcome = deleted ? 'deleted' : 'gone';
+  } catch (e) {
+    if (!(e instanceof ClockodoError)) {
+      return { outcome: null, removed: 0, error: errorMessage(e) };
+    }
+    if (isWithdrawFatal(e)) {
+      return { outcome: null, removed: 0, error: e.message };
+    }
+    const msg1 = e.message;
+    try {
+      const cancelled = await cancelAbsence(auth, absenceId, http);
+      if (cancelled === null) {
+        outcome = 'gone';
+      } else if (cancelled.status === 4) {
+        outcome = 'cancelled';
+      } else {
+        return {
+          outcome: null,
+          removed: 0,
+          error: `Loeschen: ${msg1} / Stornieren: Clockodo hat den Antrag nicht storniert.`,
+        };
+      }
+    } catch (e2) {
+      const msg2 = e2 instanceof ClockodoError ? e2.message : errorMessage(e2);
+      return {
+        outcome: null,
+        removed: 0,
+        error: `Loeschen: ${msg1} / Stornieren: ${msg2}`,
+      };
+    }
+  }
+
+  if (outcome === 'deleted' || outcome === 'cancelled' || outcome === 'gone') {
+    const removed = await removeVacationDaysOfAbsence(employmentId, absenceId);
+    return { outcome, removed, error: null };
+  }
+  return { outcome: null, removed: 0, error: 'Unbekannter Fehler.' };
+}
+
+/** Rueckfrage vor dem Zurueckziehen: Zeitraum und Zahl der Tage des Antrags. */
+export function vacationWithdrawQuestion(
+  days: readonly VacationDay[],
+  employmentId: string,
+  absenceId: number,
+): string {
+  const matched = daysOfAbsence(days, employmentId, absenceId);
+  const n = matched.length;
+  const since = toDateInput(matched[0].date);
+  const until = toDateInput(matched[n - 1].date);
+  const range = spanne(since, until);
+  return `Antrag ${range} (${n} Urlaubstag(e)) in Clockodo zurueckziehen? Die Tage werden danach aus Klarzeit entfernt.`;
+}
+
+const WITHDRAW_SUMMARY_OUTCOME: Record<'deleted' | 'cancelled' | 'gone', string> = {
+  deleted: 'Antrag in Clockodo geloescht',
+  cancelled: 'Antrag in Clockodo storniert',
+  gone: 'Antrag war in Clockodo nicht mehr vorhanden',
+};
+
+/** Text fuer das Ergebnis eines Zurueckziehens. */
+export function vacationWithdrawSummary(r: VacationWithdrawResult): string {
+  if (r.outcome === null) {
+    return `Zurueckziehen fehlgeschlagen: ${r.error ?? ''}`;
+  }
+  return `${WITHDRAW_SUMMARY_OUTCOME[r.outcome]}, ${r.removed} Urlaubstag(e) entfernt.`;
 }

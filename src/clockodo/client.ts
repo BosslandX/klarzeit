@@ -14,7 +14,7 @@ export interface ClockodoAuth {
 }
 
 export interface ClockodoRequest {
-  method: 'GET' | 'POST' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   url: string;
   headers: Record<string, string>;
   params?: Record<string, string>;
@@ -284,7 +284,7 @@ function positiveEntryId(v: unknown): number | null {
 
 async function clockodoRequest(
   auth: ClockodoAuth,
-  method: 'POST' | 'DELETE',
+  method: 'POST' | 'PUT' | 'DELETE',
   path: string,
   data?: unknown,
   http: ClockodoHttp = defaultHttp,
@@ -296,7 +296,7 @@ async function clockodoRequest(
       url: `${CLOCKODO_API}${path}`,
       headers: {
         ...clockodoHeaders(auth),
-        ...(method === 'POST'
+        ...(method === 'POST' || method === 'PUT'
           ? { 'Content-Type': 'application/json' }
           : {}),
       },
@@ -357,6 +357,8 @@ export async function deleteClockodoEntry(
 const ABSENCE_TYPE_HOLIDAY_QUOTA = 1;
 /** openapi AbsenceStatus: 0 = Enquired (beantragt) */
 const ABSENCE_STATUS_ENQUIRED = 0;
+/** openapi AbsenceStatus: 4 = Cancelled (storniert) */
+const ABSENCE_STATUS_CANCELLED = 4;
 
 const DATE_INPUT = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -440,6 +442,13 @@ function mapAbsenceError(status: number, data: unknown): ClockodoError | null {
       status,
     );
   }
+  if (types.includes('AbsenceHasToBeDeclined')) {
+    return new ClockodoError(
+      'forbidden',
+      'Der Antrag muss in Clockodo erst abgelehnt werden.',
+      status,
+    );
+  }
   if (types.includes('UntilMustBeInSameYear')) {
     return new ClockodoError(
       'validation',
@@ -448,6 +457,26 @@ function mapAbsenceError(status: number, data: unknown): ClockodoError | null {
     );
   }
   return mapStatus(status);
+}
+
+function absenceFromBody(raw: unknown): ClockodoAbsence {
+  let body = raw;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+    }
+  }
+  if (typeof body !== 'object' || body === null) {
+    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+  }
+  const data = (body as { data?: unknown }).data;
+  const absence = readAbsence(data);
+  if (absence === null) {
+    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
+  }
+  return absence;
 }
 
 export async function createAbsence(
@@ -471,23 +500,7 @@ export async function createAbsence(
   );
   const err = mapAbsenceError(res.status, res.data);
   if (err) throw err;
-  let body: unknown = res.data;
-  if (typeof body === 'string') {
-    try {
-      body = JSON.parse(body);
-    } catch {
-      throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
-    }
-  }
-  if (typeof body !== 'object' || body === null) {
-    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
-  }
-  const data = (body as { data?: unknown }).data;
-  const absence = readAbsence(data);
-  if (absence === null) {
-    throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
-  }
-  return absence;
+  return absenceFromBody(res.data);
 }
 
 export async function fetchAbsences(
@@ -528,4 +541,44 @@ export async function fetchAbsences(
     out.push(a);
   }
   return out;
+}
+
+/** Loescht eine Abwesenheit in Clockodo; `false` heisst: dort schon nicht mehr vorhanden (404). */
+export async function deleteAbsence(
+  auth: ClockodoAuth,
+  id: number,
+  http?: ClockodoHttp,
+): Promise<boolean> {
+  const h = http ?? defaultHttp;
+  const res = await clockodoRequest(
+    auth,
+    'DELETE',
+    `/v4/absences/${id}`,
+    undefined,
+    h,
+  );
+  if (res.status === 404) return false;
+  const err = mapAbsenceError(res.status, res.data);
+  if (err) throw err;
+  return true;
+}
+
+/** Storniert eine Abwesenheit (PUT mit Status 4); `null` heisst: dort schon nicht mehr vorhanden (404). */
+export async function cancelAbsence(
+  auth: ClockodoAuth,
+  id: number,
+  http?: ClockodoHttp,
+): Promise<ClockodoAbsence | null> {
+  const h = http ?? defaultHttp;
+  const res = await clockodoRequest(
+    auth,
+    'PUT',
+    `/v4/absences/${id}`,
+    { status: ABSENCE_STATUS_CANCELLED },
+    h,
+  );
+  if (res.status === 404) return null;
+  const err = mapAbsenceError(res.status, res.data);
+  if (err) throw err;
+  return absenceFromBody(res.data);
 }

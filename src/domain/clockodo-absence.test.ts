@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   absenceStatusLabel,
   applyAbsenceRef,
+  daysOfAbsence,
   isVacationDayRemovable,
   openVacationDayCount,
   syncAbsenceStatus,
@@ -175,5 +176,23 @@ describe('Urlaubsantraege: Anzeige (AUF-021)', () => {
     ];
     expect(openVacationDayCount(days, empMit())).toBe(6);
     expect(openVacationDayCount(days, empMit({ clockodo: null }))).toBe(0);
+  });
+});
+
+describe('Urlaubsantrag zurueckziehen: Tage eines Antrags (AUF-023)', () => {
+  it('daysOfAbsence nimmt nur die Tage dieses Antrags in dieser Beschaeftigung', () => {
+    const days = [
+      tag(2026, 10, 5, { clockodoAbsence: { id: 55, status: 0, at: 1 } }),
+      tag(2026, 10, 6, { clockodoAbsence: { id: 55, status: 0, at: 1 } }),
+      tag(2026, 10, 6, { employmentId: 'emp-2', clockodoAbsence: { id: 55, status: 0, at: 1 } }),
+      tag(2026, 10, 12, { clockodoAbsence: { id: 56, status: 1, at: 1 } }),
+      tag(2026, 10, 14),
+    ];
+    expect(daysOfAbsence(days, 'emp-1', 55).map((d) => d.date)).toEqual([
+      ab(2026, 10, 5),
+      ab(2026, 10, 6),
+    ]);
+    expect(daysOfAbsence(days, 'emp-2', 55)).toEqual([days[2]]);
+    expect(daysOfAbsence(days, 'emp-1', 99)).toEqual([]);
   });
 });

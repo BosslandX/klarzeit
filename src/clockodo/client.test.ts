@@ -7,6 +7,8 @@ import {
   fetchMe,
   createAbsence,
   fetchAbsences,
+  deleteAbsence,
+  cancelAbsence,
   type ClockodoHttp,
   type ClockodoRequest,
 } from './client';
@@ -415,3 +417,76 @@ describe('clockodo client', () => {
       kind: 'forbidden',
     });
   });
+
+describe('Abwesenheit loeschen und stornieren (AUF-023)', () => {
+  const mit =
+    (status: number, data: unknown, calls: ClockodoRequest[] = []): ClockodoHttp =>
+    async (req) => {
+      calls.push(req);
+      return { status, data };
+    };
+
+  it('deleteAbsence: DELETE auf die Abwesenheit, 404 heisst schon weg', async () => {
+    const calls: ClockodoRequest[] = [];
+    expect(await deleteAbsence(AUTH, 55, mit(200, { success: true }, calls))).toBe(true);
+    expect(await deleteAbsence(AUTH, 55, mit(404, {}, calls))).toBe(false);
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+      `DELETE ${CLOCKODO_API}/v4/absences/55`,
+      `DELETE ${CLOCKODO_API}/v4/absences/55`,
+    ]);
+    expect(calls[0].headers).toEqual(clockodoHeaders(AUTH));
+  });
+
+  it('cancelAbsence: PUT mit Status 4 liest die Abwesenheit, 404 heisst schon weg', async () => {
+    const calls: ClockodoRequest[] = [];
+    const antwort = {
+      data: {
+        id: 55,
+        users_id: 7,
+        date_since: '2026-10-05',
+        date_until: '2026-10-09',
+        status: 4,
+        count_days: 5,
+      },
+    };
+    expect(await cancelAbsence(AUTH, 55, mit(200, antwort, calls))).toEqual({
+      id: 55,
+      dateSince: '2026-10-05',
+      dateUntil: '2026-10-09',
+      status: 4,
+      countDays: 5,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
+    expect(calls[0].url).toBe(`${CLOCKODO_API}/v4/absences/55`);
+    expect(calls[0].data).toEqual({ status: 4 });
+    expect(calls[0].headers['Content-Type']).toBe('application/json');
+    expect(await cancelAbsence(AUTH, 55, mit(404, {}))).toBeNull();
+    await expect(cancelAbsence(AUTH, 55, mit(200, { data: {} }))).rejects.toMatchObject({
+      kind: 'format',
+    });
+  });
+
+  it('Loeschen und Stornieren: Fehlertypen aus Clockodo', async () => {
+    await expect(
+      deleteAbsence(
+        AUTH,
+        55,
+        mit(422, { errors: [{ error: { type: 'AbsenceHasToBeDeclined' } }] }),
+      ),
+    ).rejects.toMatchObject({
+      kind: 'forbidden',
+      status: 422,
+      message: 'Der Antrag muss in Clockodo erst abgelehnt werden.',
+    });
+    await expect(
+      cancelAbsence(AUTH, 55, mit(422, { errors: [{ error: { type: 'StatusIsForbidden' } }] })),
+    ).rejects.toMatchObject({ kind: 'forbidden', status: 422 });
+    await expect(deleteAbsence(AUTH, 55, mit(401, 'nein'))).rejects.toMatchObject({
+      kind: 'auth',
+    });
+    await expect(cancelAbsence(AUTH, 55, mit(500, '<html>'))).rejects.toMatchObject({
+      kind: 'server',
+    });
+  });
+});

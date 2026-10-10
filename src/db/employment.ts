@@ -1,3 +1,4 @@
+import { daysOfAbsence } from '../domain/clockodo-absence';
 import { Preferences } from '@capacitor/preferences';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -377,6 +378,20 @@ export async function removeVacationDay(
   );
   await saveVacationDays(next);
   return next;
+}
+
+/** Entfernt die Urlaubstage eines Clockodo-Antrags einer Beschaeftigung; liefert ihre Zahl. */
+export async function removeVacationDaysOfAbsence(
+  employmentId: string,
+  absenceId: number,
+): Promise<number> {
+  const current = await getVacationDays();
+  const drop = daysOfAbsence(current, employmentId, absenceId);
+  if (drop.length === 0) return 0;
+  const keys = new Set(drop.map((d) => `${d.employmentId} ${d.date}`));
+  const next = current.filter((d) => !keys.has(`${d.employmentId} ${d.date}`));
+  await saveVacationDays(next);
+  return drop.length;
 }
 
 // --- React-Hooks ---

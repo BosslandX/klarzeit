@@ -694,11 +694,13 @@ export function MoreScreen() {
               <VacationDayRow
                 key={`${d.employmentId}-${d.date}`}
                 day={d}
+                days={vacDays}
                 employmentLabel={empLabel(d.employmentId)}
                 showClockodo={
                   employments.find((e) => e.id === d.employmentId)?.clockodo != null
                 }
                 onRemove={() => void removeVac(d.date, d.employmentId)}
+                onWithdrawn={refreshVac}
               />
             ))}
           </ul>

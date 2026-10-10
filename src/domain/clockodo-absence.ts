@@ -146,3 +146,14 @@ export function isVacationDayRemovable(day: VacationDay): boolean {
 export function openVacationDayCount(days: readonly VacationDay[], emp: Employment): number {
   return vacationRequestRanges(days, emp).reduce((sum, range) => sum + range.dates.length, 0);
 }
+
+/** Die Urlaubstage einer Beschaeftigung, die diesen Clockodo-Antrag tragen. */
+export function daysOfAbsence(
+  days: readonly VacationDay[],
+  employmentId: string,
+  absenceId: number,
+): VacationDay[] {
+  return days.filter(
+    (d) => d.employmentId === employmentId && d.clockodoAbsence?.id === absenceId,
+  );
+}
