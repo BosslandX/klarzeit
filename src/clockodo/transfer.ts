@@ -21,7 +21,7 @@ import { getEmployments } from '../db/employment';
 import { setEntryClockodoSync } from '../db/entries';
 import { db } from '../db/db';
 import { getClockodoLock } from '../db/clockodo-lock';
-import { lockedEntryMessage } from '../domain/clockodo-lock';
+import { lockState, lockedEntryMessage } from '../domain/clockodo-lock';
 import type { ClockodoLock } from '../domain/clockodo';
 
 export interface TransferResult {
@@ -96,9 +96,17 @@ async function rollbackCreated(
   }
 }
 
-export async function transferEmployment(
+/**
+ * Laufende Uebertragung je Beschaeftigung. Ein zweiter Aufruf wartet, bis der erste fertig
+ * ist -- sonst saehen beide dieselben offenen Eintraege und buchten sie doppelt (Knopf und
+ * automatischer Lauf koennen zusammentreffen). Ein gescheiterter Lauf haelt den naechsten
+ * nicht auf.
+ */
+const laeufe = new Map<string, Promise<TransferResult>>();
+
+async function uebertrage(
   employmentId: string,
-  opts?: { http?: ClockodoHttp; now?: () => number },
+  opts?: { http?: ClockodoHttp; now?: () => number; skipLocked?: boolean },
 ): Promise<TransferResult> {
   const result = emptyResult();
   const now = opts?.now ?? (() => Date.now());
@@ -159,6 +167,16 @@ export async function transferEmployment(
       continue;
     }
     if (status === 'synced') continue;
+
+    // Der automatische Lauf laesst gesperrte Eintraege aus; sie kaemen nur mit 403 zurueck.
+    if (
+      opts?.skipLocked &&
+      lock != null &&
+      lock.days != null &&
+      lockState(entry.start, lock.days, now()) === 'locked'
+    ) {
+      continue;
+    }
 
     if (status === 'changed') {
       const sync = entry.clockodoSync;
@@ -233,4 +251,28 @@ export async function transferEmployment(
   }
 
   return result;
+}
+
+export function transferEmployment(
+  employmentId: string,
+  opts?: { http?: ClockodoHttp; now?: () => number; skipLocked?: boolean },
+): Promise<TransferResult> {
+  const had = laeufe.has(employmentId);
+  if (!had) {
+    const work = uebertrage(employmentId, opts);
+    const slot = work.catch(() => undefined);
+    laeufe.set(employmentId, slot);
+    void slot.finally(() => {
+      if (laeufe.get(employmentId) === slot) laeufe.delete(employmentId);
+    });
+    return work;
+  }
+  const prev = laeufe.get(employmentId) as Promise<unknown>;
+  const run = prev.catch(() => undefined).then(() => uebertrage(employmentId, opts));
+  const slot = run.catch(() => undefined);
+  laeufe.set(employmentId, slot);
+  void slot.finally(() => {
+    if (laeufe.get(employmentId) === slot) laeufe.delete(employmentId);
+  });
+  return run;
 }

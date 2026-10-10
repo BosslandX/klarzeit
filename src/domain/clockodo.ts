@@ -5,6 +5,8 @@ export interface ClockodoConfig {
   defaultProjectsId: number | null;
   defaultServicesId: number | null;
   billable: 0 | 1 | null;
+  /** Automatisch uebertragen (beim Speichern und beim Oeffnen der App); fehlt = aus */
+  autoTransfer?: boolean;
 }
 
 export interface ClockodoEntryRef {
@@ -43,6 +45,7 @@ export function cleanClockodoConfig(raw: unknown): ClockodoConfig | null {
     defaultProjectsId: positiveInt(x.defaultProjectsId),
     defaultServicesId: positiveInt(x.defaultServicesId),
     billable,
+    ...(x.autoTransfer === true ? { autoTransfer: true } : {}),
   };
 }
 

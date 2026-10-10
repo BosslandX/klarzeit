@@ -8,6 +8,11 @@ import {
 } from '../../db/employment';
 import { useClockodoLocks } from '../../db/clockodo-lock';
 import { countLockStates, lockHint } from '../../domain/clockodo-lock';
+import {
+  autoTransferHint,
+  startAutoTransfer,
+  useAutoTransferResults,
+} from '../../clockodo/auto-transfer';
 import { dayPeriod, totalMs } from '../../domain/aggregate';
 import { formatClock, formatDuration, formatStopwatch } from '../../domain/time';
 import { IconPlay, IconStop } from '../components/Icons';
@@ -35,6 +40,7 @@ export function HomeScreen({ tracker }: Props) {
     [employments],
   );
   const { locks } = useClockodoLocks(clockodoEmployments.map((e) => e.id));
+  const autoErgebnisse = useAutoTransferResults();
 
   const today = dayPeriod(Date.now());
   const todayEntries = useEntriesInRange(today.from, today.to) ?? [];
@@ -84,6 +90,7 @@ export function HomeScreen({ tracker }: Props) {
 
   const saveStop = async (draft: EntryDraft) => {
     await addEntry(draft);
+    startAutoTransfer();
     await cancel();
     setStopDraft(null);
   };
@@ -112,6 +119,15 @@ export function HomeScreen({ tracker }: Props) {
         const hinweis = lockHint({ ...counts, locked: 0 }, lock);
         return hinweis ? (
           <p key={`lock-${emp.id}`} className="error-text">
+            Clockodo – {emp.name}: {hinweis}
+          </p>
+        ) : null;
+      })}
+
+      {clockodoEmployments.map((emp) => {
+        const hinweis = autoTransferHint(autoErgebnisse[emp.id]);
+        return hinweis ? (
+          <p key={`auto-${emp.id}`} className="error-text">
             Clockodo – {emp.name}: {hinweis}
           </p>
         ) : null;

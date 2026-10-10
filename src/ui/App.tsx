@@ -11,6 +11,7 @@ import { HomeScreen } from './screens/HomeScreen';
 import { EntriesScreen } from './screens/EntriesScreen';
 import { ReportsScreen } from './screens/ReportsScreen';
 import { MoreScreen } from './screens/MoreScreen';
+import { startAutoTransfer } from '../clockodo/auto-transfer';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
@@ -21,10 +22,14 @@ export default function App() {
 
   // Auto-Backup: beim Verlassen der App den aktuellen Stand in den oeffentlichen
   // Documents-Ordner sichern (ueberlebt eine Deinstallation).
+  // Beim Oeffnen und bei jeder Rueckkehr in die App automatisch an Clockodo uebertragen,
+  // wo der Schalter an ist.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
+    startAutoTransfer();
     const handle = CapApp.addListener('appStateChange', (state) => {
       if (!state.isActive) void writeAutoBackup();
+      else startAutoTransfer();
     });
     return () => {
       void handle.then((h) => h.remove());

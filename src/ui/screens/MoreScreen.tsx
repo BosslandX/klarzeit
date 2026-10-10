@@ -753,9 +753,11 @@ export function MoreScreen() {
           Ausnahme: Schaltest du bei einer Beschaeftigung die Uebertragung an
           Clockodo ein, verbindet sich die App mit deinem Clockodo-Konto und
           uebertraegt die Eintraege dieser Beschaeftigung (Zeiten, Pausen als
-          Luecken, Taetigkeit, Kunde, Projekt, Leistung); auf Knopfdruck
-          beantragt sie die offenen Urlaubstage, liest den Stand deiner
-          Urlaubsantraege zurueck und zieht einen Antrag auf Wunsch zurueck.
+          Luecken, Taetigkeit, Kunde, Projekt, Leistung) auf Knopfdruck oder,
+          wenn „Automatisch uebertragen" eingeschaltet ist, beim Speichern und
+          beim Oeffnen der App; auf Knopfdruck beantragt sie die offenen
+          Urlaubstage, liest den Stand deiner Urlaubsantraege zurueck und zieht
+          einen Antrag auf Wunsch zurueck.
           Der API-Schluessel
           liegt verschluesselt auf dem Geraet und steht in keinem Backup.
         </p>

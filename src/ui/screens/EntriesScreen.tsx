@@ -9,6 +9,11 @@ import {
 import { getClockodoDeletes } from '../../db/clockodo-deletes';
 import { getEmployments, useEmployments } from '../../db/employment';
 import { transferEmployment, type TransferResult } from '../../clockodo/transfer';
+import {
+  autoTransferHint,
+  startAutoTransfer,
+  useAutoTransferResults,
+} from '../../clockodo/auto-transfer';
 import { refreshClockodoLock } from '../../clockodo/lock';
 import { transferStatus } from '../../domain/clockodo-transfer';
 import {
@@ -112,6 +117,7 @@ export function EntriesScreen() {
   const { locks, reload: reloadLocks } = useClockodoLocks(
     clockodoEmployments.map((e) => e.id),
   );
+  const autoErgebnisse = useAutoTransferResults();
   const [deleteCounts, setDeleteCounts] = useState<Record<string, number>>(
     {},
   );
@@ -129,6 +135,12 @@ export function EntriesScreen() {
     void refreshDeleteCounts();
   }, [refreshDeleteCounts]);
 
+  // Nach jedem automatischen Lauf stehen Loeschvermerke und Sperrfrist neu.
+  useEffect(() => {
+    void refreshDeleteCounts();
+    void reloadLocks();
+  }, [autoErgebnisse, refreshDeleteCounts, reloadLocks]);
+
   const filteredEntries = useMemo(() => {
     if (!entries) return undefined;
     if (!filterEmploymentId) return entries;
@@ -142,6 +154,7 @@ export function EntriesScreen() {
     } else {
       await addEntry(draft);
     }
+    startAutoTransfer();
     setModal(null);
   };
 
@@ -156,6 +169,7 @@ export function EntriesScreen() {
     if (!ok) return;
     await deleteEntryWithClockodo(entry);
     await refreshDeleteCounts();
+    startAutoTransfer();
   };
 
   const handleSharePdf = async (entry: TimeEntry) => {
@@ -240,6 +254,7 @@ export function EntriesScreen() {
             const cfg = emp.clockodo!;
             const buckets = countTransferBuckets(entries, emp.id, cfg);
             const outcome = transferOutcome[emp.id];
+            const autoHinweis = autoTransferHint(autoErgebnisse[emp.id]);
             return (
               <section key={`clockodo-${emp.id}`} className="card-section">
                 <p>
@@ -263,6 +278,7 @@ export function EntriesScreen() {
                       <p className="error-text">{hint}</p>
                     ) : null;
                   })()}
+                {autoHinweis && <p className="error-text">{autoHinweis}</p>}
                 <button
                   type="button"
                   className="btn btn-primary"

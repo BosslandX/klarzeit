@@ -530,3 +530,66 @@ describe('403 an gesperrten Eintraegen (AUF-024)', () => {
     expect(r.errors).toEqual([{ entryId: id, clockodoId: 501, message: MELDUNG }]);
   });
 });
+
+describe('Lauf-Schloss und automatischer Lauf (AUF-025)', () => {
+  /** E_DAY = 06.07.2026; mit 3 Tagen Sperrfrist ab dem 09.07.2026 gesperrt */
+  const GESPERRT = new Date(2026, 6, 9, 12).getTime();
+
+  beforeEach(async () => {
+    prefStore.clear();
+    secureStore.clear();
+    httpCalls = [];
+    postSeq = 0;
+    postHandler = null;
+    delHandler = null;
+    db.close();
+    await Dexie.delete('zeiterfassung');
+    await db.open();
+    await seedClockodo();
+  });
+
+  it('zwei gleichzeitige Laeufe senden jeden Abschnitt genau einmal', async () => {
+    const id = await addEntry(baseEntry(E_DAY));
+    const [r1, r2] = await Promise.all([
+      transferEmployment(EMP, { http, now: () => NOW }),
+      transferEmployment(EMP, { http, now: () => NOW }),
+    ]);
+    expect(httpCalls.filter((c) => c.method === 'POST')).toHaveLength(2);
+    expect([r1.sent, r2.sent]).toEqual([1, 0]);
+    expect((await getEntry(id))?.clockodoSync?.ids).toEqual([501, 502]);
+  });
+
+  it('scheitert ein Lauf unerwartet, laeuft der naechste trotzdem', async () => {
+    await addEntry(baseEntry(E_DAY));
+    const kaputt = transferEmployment(EMP, {
+      http,
+      now: () => {
+        throw new Error('Uhr kaputt');
+      },
+    });
+    const danach = transferEmployment(EMP, { http, now: () => NOW });
+    await expect(kaputt).rejects.toThrow('Uhr kaputt');
+    expect(await danach).toMatchObject({ sent: 1, stopped: null });
+  });
+
+  it('der automatische Lauf laesst gesperrte Eintraege aus, der Knopf versucht sie', async () => {
+    prefStore.set(`clockodoLock:${EMP}`, JSON.stringify({ days: 3, at: 1 }));
+    const alt = await addEntry(baseEntry(E_DAY));
+    const neu = await addEntry(baseEntry(8));
+    const auto = await transferEmployment(EMP, { http, now: () => GESPERRT, skipLocked: true });
+    expect(auto.sent).toBe(1);
+    expect((await getEntry(alt))?.clockodoSync).toBeUndefined();
+    expect((await getEntry(neu))?.clockodoSync?.ids).toEqual([501, 502]);
+    const knopf = await transferEmployment(EMP, { http, now: () => GESPERRT });
+    expect(knopf.sent).toBe(1);
+    expect((await getEntry(alt))?.clockodoSync?.ids).toEqual([503, 504]);
+  });
+
+  it('ohne gemerkte Sperrfrist laesst auch der automatische Lauf nichts aus', async () => {
+    const alt = await addEntry(baseEntry(E_DAY));
+    const auto = await transferEmployment(EMP, { http, now: () => GESPERRT, skipLocked: true });
+    expect(auto.sent).toBe(1);
+    expect((await getEntry(alt))?.clockodoSync?.ids).toEqual([501, 502]);
+  });
+});
+

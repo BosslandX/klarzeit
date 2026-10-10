@@ -119,3 +119,19 @@ describe('clockodo domain', () => {
     }
   });
 });
+
+describe('Automatisch uebertragen: Schalter (AUF-025)', () => {
+  it('cleanClockodoConfig traegt autoTransfer nur, wenn es eingeschaltet ist', () => {
+    expect(cleanClockodoConfig({ ...CFG, autoTransfer: true })).toEqual({
+      ...CFG,
+      autoTransfer: true,
+    });
+    for (const v of [false, 'ja', 1, null]) {
+      expect(cleanClockodoConfig({ ...CFG, autoTransfer: v })).not.toHaveProperty(
+        'autoTransfer',
+      );
+    }
+    expect(cleanClockodoConfig(CFG)).not.toHaveProperty('autoTransfer');
+  });
+});
+

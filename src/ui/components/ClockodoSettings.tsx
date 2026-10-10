@@ -141,6 +141,14 @@ export function ClockodoSettings({
               }}
             />
           </label>
+          <label className="field row">
+            <span>Automatisch uebertragen (beim Speichern und beim Oeffnen der App)</span>
+            <input
+              type="checkbox"
+              checked={value.autoTransfer === true}
+              onChange={(e) => patch({ autoTransfer: e.target.checked })}
+            />
+          </label>
           <label className="field">
             <span>API-Schluessel</span>
             <input
