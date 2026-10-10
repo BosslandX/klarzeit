@@ -99,12 +99,7 @@ export async function deleteEntryWithClockodo(entry: TimeEntry): Promise<void> {
   await db.entries.delete(entry.id);
 }
 
-/**
- * Speichert einen bearbeiteten Eintrag. Wechselt ein uebertragener Eintrag die
- * Beschaeftigung oder verliert er bei eingeschaltetem Clockodo die Auswahl, werden
- * seine Clockodo-Eintraege bei der bisherigen Beschaeftigung zum Loeschen vorgemerkt --
- * sonst blieben sie in Clockodo stehen, und kein Lauf fasste sie mehr an.
- */
+/** Verlaesst der Eintrag mit diesem Speichern die Uebertragung seiner Beschaeftigung? */
 function leavesClockodoSync(
   entry: TimeEntry,
   patch: Partial<TimeEntry>,
@@ -123,6 +118,12 @@ function leavesClockodoSync(
   return false;
 }
 
+/**
+ * Speichert einen bearbeiteten Eintrag. Wechselt ein uebertragener Eintrag die
+ * Beschaeftigung oder verliert er bei eingeschaltetem Clockodo die Auswahl, werden
+ * seine Clockodo-Eintraege bei der bisherigen Beschaeftigung zum Loeschen vorgemerkt --
+ * sonst blieben sie in Clockodo stehen, und kein Lauf fasste sie mehr an.
+ */
 export async function updateEntryWithClockodo(
   entry: TimeEntry,
   patch: Partial<TimeEntry>,
