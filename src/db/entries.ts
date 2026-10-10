@@ -116,7 +116,10 @@ function leavesClockodoSync(
   ) {
     return true;
   }
-  if (patch.clockodo === null) return true;
+  if (patch.clockodo === null) {
+    const emp = employments.find((e) => e.id === entry.employmentId);
+    if (emp?.clockodo != null) return true;
+  }
   return false;
 }
 
@@ -130,7 +133,7 @@ export async function updateEntryWithClockodo(
   if (
     sync &&
     sync.ids.length > 0 &&
-(leavesClockodoSync(entry, patch, employments) || patch.clockodo != null)
+    leavesClockodoSync(entry, patch, employments)
   ) {
     await addClockodoDeletes(entry.employmentId, sync.ids);
     await updateEntry(entry.id, { ...patch, clockodoSync: undefined });
