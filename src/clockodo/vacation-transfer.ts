@@ -7,6 +7,7 @@ import {
   fetchAbsences,
   fetchMe,
   type ClockodoAbsence,
+  type ClockodoAuth,
   type ClockodoHttp,
 } from './client';
 import { getClockodoKey } from './key-store';
@@ -40,11 +41,11 @@ export interface VacationTransferResult {
   stopped: string | null;
 }
 
-
 type ClockodoZugang =
-  | { ok: true; employment: Employment; auth: { apiUser: string; apiKey: string } }
+  | { ok: true; employment: Employment; auth: ClockodoAuth }
   | { ok: false; stopped: string };
 
+/** Zugang einer Beschaeftigung zu Clockodo; Meldungen wie in transferEmployment. */
 async function clockodoZugang(employmentId: string): Promise<ClockodoZugang> {
   const list = await getEmployments();
   const employment = list.find((e) => e.id === employmentId);
@@ -63,10 +64,6 @@ async function clockodoZugang(employmentId: string): Promise<ClockodoZugang> {
     return { ok: false, stopped: 'API-Schluessel fehlt.' };
   }
   return { ok: true, employment, auth: { apiUser: config.apiUser.trim(), apiKey } };
-}
-
-function isWithdrawFatal(err: ClockodoError): boolean {
-  return err.kind === 'auth' || err.kind === 'network' || err.kind === 'rate';
 }
 
 function emptyResult(): VacationTransferResult {
@@ -265,6 +262,9 @@ export interface VacationWithdrawResult {
   error: string | null;
 }
 
+/** openapi AbsenceStatus: 4 = Cancelled (storniert) */
+const STATUS_STORNIERT = 4;
+
 /**
  * Zieht einen Urlaubsantrag in Clockodo zurueck -- nur auf Knopfdruck. Erst loeschen; darf
  * Klarzeit das nicht, stornieren (Status 4). Erst danach verschwinden seine Tage aus Klarzeit.
@@ -281,7 +281,7 @@ export async function withdrawVacationRequest(
   }
   const { auth } = zugang;
 
-  let outcome: 'deleted' | 'cancelled' | 'gone' | null = null;
+  let outcome: 'deleted' | 'cancelled' | 'gone';
 
   try {
     const deleted = await deleteAbsence(auth, absenceId, http);
@@ -290,7 +290,7 @@ export async function withdrawVacationRequest(
     if (!(e instanceof ClockodoError)) {
       return { outcome: null, removed: 0, error: errorMessage(e) };
     }
-    if (isWithdrawFatal(e)) {
+    if (isFatal(e)) {
       return { outcome: null, removed: 0, error: e.message };
     }
     const msg1 = e.message;
@@ -298,7 +298,7 @@ export async function withdrawVacationRequest(
       const cancelled = await cancelAbsence(auth, absenceId, http);
       if (cancelled === null) {
         outcome = 'gone';
-      } else if (cancelled.status === 4) {
+      } else if (cancelled.status === STATUS_STORNIERT) {
         outcome = 'cancelled';
       } else {
         return {
@@ -308,20 +308,16 @@ export async function withdrawVacationRequest(
         };
       }
     } catch (e2) {
-      const msg2 = e2 instanceof ClockodoError ? e2.message : errorMessage(e2);
       return {
         outcome: null,
         removed: 0,
-        error: `Loeschen: ${msg1} / Stornieren: ${msg2}`,
+        error: `Loeschen: ${msg1} / Stornieren: ${errorMessage(e2)}`,
       };
     }
   }
 
-  if (outcome === 'deleted' || outcome === 'cancelled' || outcome === 'gone') {
-    const removed = await removeVacationDaysOfAbsence(employmentId, absenceId);
-    return { outcome, removed, error: null };
-  }
-  return { outcome: null, removed: 0, error: 'Unbekannter Fehler.' };
+  const removed = await removeVacationDaysOfAbsence(employmentId, absenceId);
+  return { outcome, removed, error: null };
 }
 
 /** Rueckfrage vor dem Zurueckziehen: Zeitraum und Zahl der Tage des Antrags. */
@@ -330,12 +326,9 @@ export function vacationWithdrawQuestion(
   employmentId: string,
   absenceId: number,
 ): string {
-  const matched = daysOfAbsence(days, employmentId, absenceId);
-  const n = matched.length;
-  const since = toDateInput(matched[0].date);
-  const until = toDateInput(matched[n - 1].date);
-  const range = spanne(since, until);
-  return `Antrag ${range} (${n} Urlaubstag(e)) in Clockodo zurueckziehen? Die Tage werden danach aus Klarzeit entfernt.`;
+  const dates = daysOfAbsence(days, employmentId, absenceId).map((d) => d.date);
+  const range = spanne(toDateInput(Math.min(...dates)), toDateInput(Math.max(...dates)));
+  return `Antrag ${range} (${dates.length} Urlaubstag(e)) in Clockodo zurueckziehen? Die Tage werden danach aus Klarzeit entfernt.`;
 }
 
 const WITHDRAW_SUMMARY_OUTCOME: Record<'deleted' | 'cancelled' | 'gone', string> = {

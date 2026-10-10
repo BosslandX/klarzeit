@@ -505,3 +505,13 @@ describe('Urlaubsantrag zurueckziehen (AUF-023)', () => {
     ]);
   });
 });
+
+describe('Urlaubsantrag zurueckziehen: Nacharbeit (AUF-023)', () => {
+  it('vacationWithdrawQuestion nimmt den fruehesten und den spaetesten Tag, auch unsortiert', () => {
+    const ref = { clockodoAbsence: { id: 55, status: 0 as const, at: 1 } };
+    const days = [tag(2026, 10, 9, ref), tag(2026, 10, 5, ref), tag(2026, 10, 7, ref)];
+    expect(vacationWithdrawQuestion(days, EMP, 55)).toBe(
+      'Antrag 05.10.2026–09.10.2026 (3 Urlaubstag(e)) in Clockodo zurueckziehen? Die Tage werden danach aus Klarzeit entfernt.',
+    );
+  });
+});

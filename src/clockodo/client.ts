@@ -459,6 +459,7 @@ function mapAbsenceError(status: number, data: unknown): ClockodoError | null {
   return mapStatus(status);
 }
 
+/** Die Abwesenheit aus der Antwort von POST/PUT, auch aus JSON-Text; sonst ein Formatfehler. */
 function absenceFromBody(raw: unknown): ClockodoAbsence {
   let body = raw;
   if (typeof body === 'string') {

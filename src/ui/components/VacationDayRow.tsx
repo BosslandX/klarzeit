@@ -28,8 +28,7 @@ export function VacationDayRow({
   const [busy, setBusy] = useState(false);
   const removable = isVacationDayRemovable(day);
   const absenceId = day.clockodoAbsence?.id;
-  const showWithdraw =
-    !removable && showClockodo && day.clockodoAbsence !== undefined && absenceId !== undefined;
+  const showWithdraw = !removable && showClockodo && absenceId !== undefined;
 
   const handleWithdraw = async () => {
     if (absenceId === undefined) return;

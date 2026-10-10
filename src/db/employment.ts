@@ -1,4 +1,3 @@
-import { daysOfAbsence } from '../domain/clockodo-absence';
 import { Preferences } from '@capacitor/preferences';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -14,7 +13,7 @@ import {
   cleanClockodoConfig,
   type ClockodoAbsenceRef,
 } from '../domain/clockodo';
-import { applyAbsenceRef } from '../domain/clockodo-absence';
+import { applyAbsenceRef, daysOfAbsence } from '../domain/clockodo-absence';
 import { getProfile } from './profile';
 import { removeClockodoKey } from '../clockodo/key-store';
 import { removeClockodoLists } from './clockodo-lists';
