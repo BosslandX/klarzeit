@@ -124,7 +124,8 @@ so night shifts are not split at midnight.
   app sends that employment's entries (times, breaks as gaps, activity, customer,
   project, service) to your Clockodo account — only when you tap “An Clockodo
   uebertragen”. Tapping “Urlaub mit Clockodo abgleichen” sends the employment's open
-  vacation periods as leave requests and reads back the status of your requests.
+  vacation periods as leave requests and reads back the status of your requests;
+  tapping “zurueckziehen” on a requested day deletes or cancels that request.
   The API key is kept encrypted in the Android KeyStore, excluded
   from Google backup and device transfer, and never part of a Klarzeit backup.
 - PDF, CSV and backup leave the device only through the share sheet you operate.

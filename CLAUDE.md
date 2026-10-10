@@ -163,7 +163,18 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   Doppelbuchung). `auth`/`network`/`rate` brechen den ganzen Lauf ab. Client: erst Status,
   dann JSON (ein 401 mit Nicht-JSON-Antwort muss als `auth` ankommen). „Alle Einträge
   löschen" und Backup-Ersetzen vermerken nichts — nur das Löschen eines übertragenen
-  Eintrags in der Liste (`deleteEntryWithClockodo`).
+  Eintrags in der Liste (`deleteEntryWithClockodo`) und ein Bearbeiten, mit dem er die
+  Übertragung verlässt (AUF-022).
+- **Korrekturen an übertragenen Einträgen (AUF-022):** Bearbeiten in der Liste speichert über
+  `updateEntryWithClockodo` (`src/db/entries.ts`). Wechselt ein übertragener Eintrag die
+  Beschäftigung oder verliert er bei **eingeschaltetem** Clockodo die Auswahl, werden seine IDs
+  Löschvermerke der **bisherigen** Beschäftigung (deren Zugang sie angelegt hat), und
+  `clockodoSync` fällt weg; der nächste Lauf dort löscht sie, die neue Beschäftigung sendet frisch.
+  Bei ausgeschaltetem Clockodo liefert das Formular immer `clockodo: null` — keine Entscheidung
+  des Nutzers, es wird nichts vermerkt. Der Clockodo-Kasten in „Eintraege" zählt offene
+  Löschvermerke („n zu loeschen"); die Rückfrage „Alle Daten loeschen" sagt, dass Übertragenes in
+  Clockodo stehen bleibt. Nicht abgedeckt: ein übertragener Eintrag, der vor „Uebertragen ab"
+  rückt (`before-start`), bleibt in Clockodo, wie er war.
 - **Urlaubsanträge an Clockodo — Bausteine (AUF-019):** `VacationDay.clockodoAbsence?` =
   `{ id, status, at }` des Clockodo-Antrags (Status 0 beantragt … 4 storniert, openapi
   `AbsenceStatus`); fehlt = nie beantragt, `cleanVacationDays` trägt einen gültigen Verweis,
@@ -191,6 +202,20 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   sich nicht entfernen** (`isVacationDayRemovable`: erst ab Status 2) — die Sperre sitzt in der
   Oberfläche, `removeVacationDay` selbst prüft nicht. Der Zustand des Urlaubsbereichs bleibt in
   `MoreScreen`: `vacEmp` ist zugleich der Ausgangswert des Beschäftigungs-Formulars.
+- **Urlaubsantrag zurückziehen (AUF-023), nur auf Knopfdruck:** Ein beantragter oder genehmigter
+  Tag einer Beschäftigung mit Clockodo zeigt statt des Hinweises „zurueckziehen" (`VacationDayRow`,
+  im Browser gesperrt). Der Knopf gilt für den **ganzen** Antrag; die Rückfrage nennt Zeitraum und
+  Zahl der Tage (`vacationWithdrawQuestion`). `withdrawVacationRequest`
+  (`src/clockodo/vacation-transfer.ts`): erst `deleteAbsence` (`DELETE /v4/absences/{id}`), darf
+  Klarzeit das nicht, `cancelAbsence` (`PUT`, Status 4); `404` heißt schon weg; `auth`/`network`/
+  `rate` brechen **ohne** Stornieren ab. **Erst nach Erfolg** entfernt
+  `removeVacationDaysOfAbsence` die Tage (`daysOfAbsence`: Beschäftigung **und** Antrags-ID).
+  Erst löschen, weil ein stornierter Antrag einen neuen Antrag für dieselben Tage als
+  „übernommen" schlucken würde (`transferVacations` übernimmt gleiche Zeiträume jeden Status).
+  Welcher Weg einem Mitarbeiter erlaubt ist, belegt die Spec nicht (`info.version` 2026-10-09) —
+  das zeigt der Gerätetest. Ein in Clockodo verschwundener Antrag ist damit keine Sackgasse mehr
+  (Knopf → `404` → Tage weg). `AbsenceHasToBeDeclined` → `forbidden`. Die Zugangsprüfung teilen
+  sich `transferVacations` und `withdrawVacationRequest` (`clockodoZugang`).
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
