@@ -387,8 +387,8 @@ export async function removeVacationDaysOfAbsence(
   const current = await getVacationDays();
   const drop = daysOfAbsence(current, employmentId, absenceId);
   if (drop.length === 0) return 0;
-  const keys = new Set(drop.map((d) => `${d.employmentId} ${d.date}`));
-  const next = current.filter((d) => !keys.has(`${d.employmentId} ${d.date}`));
+  const keys = new Set(drop.map((d) => vacationDayKey(d.employmentId, d.date)));
+  const next = current.filter((d) => !keys.has(vacationDayKey(d.employmentId, d.date)));
   await saveVacationDays(next);
   return drop.length;
 }
