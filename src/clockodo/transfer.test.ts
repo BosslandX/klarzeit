@@ -42,7 +42,7 @@ vi.mock('capacitor-secure-storage-plugin', () => ({
 }));
 
 import { db } from '../db/db';
-import { addEntry, getEntry, updateEntry, setEntryClockodoSync, deleteEntryWithClockodo } from '../db/entries';
+import { addEntry, getEntry, updateEntry, setEntryClockodoSync, deleteEntryWithClockodo, updateEntryWithClockodo } from '../db/entries';
 import { updateEmployment } from '../db/employment';
 import { setClockodoKey } from './key-store';
 import { addClockodoDeletes, getClockodoDeletes } from '../db/clockodo-deletes';
@@ -381,3 +381,108 @@ describe('clockodo transfer', () => {
     expect(await getClockodoDeletes(EMP)).toEqual([501]);
   });
 });
+
+describe('Korrekturen an uebertragenen Eintraegen (AUF-022)', () => {
+  const EMP2 = 'emp-2';
+  const CFG_2 = { ...CFG_T, apiUser: 'zweitnutzer' };
+  const REF_2 = { customersId: 12, projectsId: null, servicesId: 32 };
+  const anfragen = () =>
+    httpCalls.map(
+      (c) => `${c.method} ${c.url.replace(/.*\/api/, '')} ${c.headers['X-ClockodoApiUser']}`,
+    );
+
+  beforeEach(async () => {
+    prefStore.clear();
+    secureStore.clear();
+    httpCalls = [];
+    postSeq = 0;
+    postHandler = null;
+    delHandler = null;
+    db.close();
+    await Dexie.delete('zeiterfassung');
+    await db.open();
+    await seedClockodo();
+  });
+
+  async function zweiteBeschaeftigung() {
+    const list = JSON.parse(prefStore.get('employments')!);
+    prefStore.set(
+      'employments',
+      JSON.stringify([
+        ...list,
+        { ...defaultEmployment, id: EMP2, name: 'Zweitjob', clockodo: CFG_2 },
+      ]),
+    );
+    await setClockodoKey(EMP2, 'KEY456');
+  }
+
+  async function uebertragen(): Promise<TimeEntry> {
+    const id = await addEntry(baseEntry(E_DAY));
+    await transferEmployment(EMP, { http, now: () => NOW });
+    httpCalls = [];
+    return (await getEntry(id))!;
+  }
+
+  it('Auswahl entfernt: die alten Clockodo-Eintraege werden vermerkt und beim Uebertragen geloescht', async () => {
+    const entry = await uebertragen();
+    await updateEntryWithClockodo(entry, { note: 'neu', clockodo: null });
+    expect(await getClockodoDeletes(EMP)).toEqual([501, 502]);
+    const stored = await getEntry(entry.id!);
+    expect(stored?.note).toBe('neu');
+    expect(stored?.clockodo).toBeNull();
+    expect(Object.prototype.hasOwnProperty.call(stored, 'clockodoSync')).toBe(false);
+    const r = await transferEmployment(EMP, { http, now: () => NOW });
+    expect(anfragen()).toEqual([
+      'DELETE /v2/entries/501 testnutzer',
+      'DELETE /v2/entries/502 testnutzer',
+    ]);
+    expect(r).toMatchObject({ deleted: 2, sent: 0, errors: [], stopped: null });
+    expect(r.skipped.incomplete).toBe(1);
+    expect(await getClockodoDeletes(EMP)).toEqual([]);
+  });
+
+  it('Beschaeftigung gewechselt: Vermerk bei der alten, die neue sendet frisch und loescht nichts', async () => {
+    await zweiteBeschaeftigung();
+    const entry = await uebertragen();
+    await updateEntryWithClockodo(entry, { employmentId: EMP2, clockodo: REF_2 });
+    expect(await getClockodoDeletes(EMP)).toEqual([501, 502]);
+    expect(await getClockodoDeletes(EMP2)).toEqual([]);
+    const stored = await getEntry(entry.id!);
+    expect(stored?.employmentId).toBe(EMP2);
+    expect(Object.prototype.hasOwnProperty.call(stored, 'clockodoSync')).toBe(false);
+
+    const r2 = await transferEmployment(EMP2, { http, now: () => NOW });
+    expect(anfragen()).toEqual([
+      'POST /v2/entries zweitnutzer',
+      'POST /v2/entries zweitnutzer',
+    ]);
+    expect(r2).toMatchObject({ sent: 1, deleted: 0, errors: [], stopped: null });
+
+    httpCalls = [];
+    const r1 = await transferEmployment(EMP, { http, now: () => NOW });
+    expect(anfragen()).toEqual([
+      'DELETE /v2/entries/501 testnutzer',
+      'DELETE /v2/entries/502 testnutzer',
+    ]);
+    expect(r1).toMatchObject({ sent: 0, deleted: 2, errors: [], stopped: null });
+  });
+
+  it('normales Bearbeiten vermerkt nichts, der Lauf ersetzt den Eintrag wie bisher', async () => {
+    const entry = await uebertragen();
+    await updateEntryWithClockodo(entry, { note: 'neu', clockodo: REF });
+    expect(await getClockodoDeletes(EMP)).toEqual([]);
+    expect((await getEntry(entry.id!))?.clockodoSync?.ids).toEqual([501, 502]);
+    const r = await transferEmployment(EMP, { http, now: () => NOW });
+    expect(httpCalls.map((c) => c.method)).toEqual(['DELETE', 'DELETE', 'POST', 'POST']);
+    expect(r).toMatchObject({ deleted: 2, sent: 1 });
+  });
+
+  it('Clockodo ausgeschaltet: Bearbeiten ohne Auswahl vermerkt nichts und behaelt die Uebertragung', async () => {
+    const entry = await uebertragen();
+    await updateEmployment(EMP, { clockodo: null });
+    await updateEntryWithClockodo(entry, { note: 'neu', clockodo: null });
+    expect(await getClockodoDeletes(EMP)).toEqual([]);
+    expect((await getEntry(entry.id!))?.clockodoSync?.ids).toEqual([501, 502]);
+  });
+});
+

@@ -274,8 +274,11 @@ export function MoreScreen() {
 
   const wipeAll = async () => {
     const n = await countEntries();
+    const clockodoExtra = employments.some((e) => e.clockodo !== null)
+      ? '\nAn Clockodo uebertragene Eintraege bleiben dort stehen.'
+      : '';
     const ok = window.confirm(
-      `ALLE ${n} Eintraege unwiderruflich loeschen? Vorher unbedingt ein Backup exportieren!`,
+      `ALLE ${n} Eintraege unwiderruflich loeschen? Vorher unbedingt ein Backup exportieren!${clockodoExtra}`,
     );
     if (!ok) return;
     await clearAllEntries();

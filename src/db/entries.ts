@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
-import { getActiveEmploymentId } from './employment';
+import { getActiveEmploymentId, getEmployments } from './employment';
 import type { ClockodoSync } from '../domain/clockodo';
 import type { TimeEntry } from '../domain/types';
 import { addClockodoDeletes } from './clockodo-deletes';
@@ -97,6 +97,46 @@ export async function deleteEntryWithClockodo(entry: TimeEntry): Promise<void> {
     await addClockodoDeletes(entry.employmentId, sync.ids);
   }
   await db.entries.delete(entry.id);
+}
+
+/**
+ * Speichert einen bearbeiteten Eintrag. Wechselt ein uebertragener Eintrag die
+ * Beschaeftigung oder verliert er bei eingeschaltetem Clockodo die Auswahl, werden
+ * seine Clockodo-Eintraege bei der bisherigen Beschaeftigung zum Loeschen vorgemerkt --
+ * sonst blieben sie in Clockodo stehen, und kein Lauf fasste sie mehr an.
+ */
+function leavesClockodoSync(
+  entry: TimeEntry,
+  patch: Partial<TimeEntry>,
+  employments: Awaited<ReturnType<typeof getEmployments>>,
+): boolean {
+  if (
+    patch.employmentId !== undefined &&
+    patch.employmentId !== entry.employmentId
+  ) {
+    return true;
+  }
+  if (patch.clockodo === null) return true;
+  return false;
+}
+
+export async function updateEntryWithClockodo(
+  entry: TimeEntry,
+  patch: Partial<TimeEntry>,
+): Promise<void> {
+  if (entry.id == null) return;
+  const sync = entry.clockodoSync;
+  const employments = await getEmployments();
+  if (
+    sync &&
+    sync.ids.length > 0 &&
+(leavesClockodoSync(entry, patch, employments) || patch.clockodo != null)
+  ) {
+    await addClockodoDeletes(entry.employmentId, sync.ids);
+    await updateEntry(entry.id, { ...patch, clockodoSync: undefined });
+    return;
+  }
+  await updateEntry(entry.id, patch);
 }
 
 // --- React-Hooks (reaktiv via Dexie liveQuery) ---

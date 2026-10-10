@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import {
   addEntry,
   deleteEntryWithClockodo,
-  updateEntry,
+  updateEntryWithClockodo,
   useAllEntriesDesc,
 } from '../../db/entries';
+import { getClockodoDeletes } from '../../db/clockodo-deletes';
 import { getEmployments, useEmployments } from '../../db/employment';
 import { transferEmployment, type TransferResult } from '../../clockodo/transfer';
 import { transferStatus } from '../../domain/clockodo-transfer';
@@ -115,6 +116,23 @@ export function EntriesScreen() {
     () => employments.filter((e) => e.clockodo != null),
     [employments],
   );
+  const [deleteCounts, setDeleteCounts] = useState<Record<string, number>>(
+    {},
+  );
+
+  const refreshDeleteCounts = useCallback(async () => {
+    const next: Record<string, number> = {};
+    for (const emp of clockodoEmployments) {
+      const ids = await getClockodoDeletes(emp.id);
+      next[emp.id] = ids.length;
+    }
+    setDeleteCounts(next);
+  }, [clockodoEmployments]);
+
+  useEffect(() => {
+    void refreshDeleteCounts();
+  }, [refreshDeleteCounts]);
+
   const filteredEntries = useMemo(() => {
     if (!entries) return undefined;
     if (!filterEmploymentId) return entries;
@@ -123,7 +141,8 @@ export function EntriesScreen() {
 
   const handleSave = async (draft: EntryDraft) => {
     if (modal?.mode === 'edit' && modal.entry.id != null) {
-      await updateEntry(modal.entry.id, draft);
+      await updateEntryWithClockodo(modal.entry, draft);
+      await refreshDeleteCounts();
     } else {
       await addEntry(draft);
     }
@@ -140,6 +159,7 @@ export function EntriesScreen() {
     );
     if (!ok) return;
     await deleteEntryWithClockodo(entry);
+    await refreshDeleteCounts();
   };
 
   const handleSharePdf = async (entry: TimeEntry) => {
@@ -179,6 +199,7 @@ export function EntriesScreen() {
       );
     } finally {
       setTransferBusyId(null);
+      await refreshDeleteCounts();
     }
   };
 
@@ -223,8 +244,8 @@ export function EntriesScreen() {
               <section key={`clockodo-${emp.id}`} className="card-section">
                 <p>
                   Clockodo – {emp.name}: {buckets.open} offen ·{' '}
-                  {buckets.untimed} Pause ohne Uhrzeit · {buckets.incomplete}{' '}
-                  ohne Auswahl
+                  {deleteCounts[emp.id] ?? 0} zu loeschen · {buckets.untimed}{' '}
+                  Pause ohne Uhrzeit · {buckets.incomplete} ohne Auswahl
                 </p>
                 <button
                   type="button"
