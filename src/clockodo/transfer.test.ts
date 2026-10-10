@@ -486,3 +486,47 @@ describe('Korrekturen an uebertragenen Eintraegen (AUF-022)', () => {
   });
 });
 
+describe('403 an gesperrten Eintraegen (AUF-024)', () => {
+  /** E_DAY = 06.07.2026; mit 3 Tagen Sperrfrist ab dem 09.07.2026 gesperrt */
+  const GESPERRT = new Date(2026, 6, 9, 12).getTime();
+  const LETZTER_TAG = new Date(2026, 6, 8, 12).getTime();
+  const MELDUNG = 'In Clockodo gesperrt (Sperrfrist 3 Tage) – Vorgesetzten fragen.';
+
+  beforeEach(async () => {
+    prefStore.clear();
+    secureStore.clear();
+    httpCalls = [];
+    postSeq = 0;
+    postHandler = null;
+    delHandler = null;
+    db.close();
+    await Dexie.delete('zeiterfassung');
+    await db.open();
+    await seedClockodo();
+    prefStore.set(`clockodoLock:${EMP}`, JSON.stringify({ days: 3, at: 1 }));
+  });
+
+  it('403 jenseits der Frist heisst in Clockodo gesperrt', async () => {
+    const id = await addEntry(baseEntry(E_DAY));
+    postHandler = () => ({ status: 403, data: {} });
+    const r = await transferEmployment(EMP, { http, now: () => GESPERRT });
+    expect(r.errors).toEqual([{ entryId: id, message: MELDUNG }]);
+    expect(r).toMatchObject({ sent: 0, stopped: null });
+  });
+
+  it('403 am letzten Tag bleibt Keine Berechtigung', async () => {
+    const id = await addEntry(baseEntry(E_DAY));
+    postHandler = () => ({ status: 403, data: {} });
+    const r = await transferEmployment(EMP, { http, now: () => LETZTER_TAG });
+    expect(r.errors).toEqual([{ entryId: id, message: 'Keine Berechtigung bei Clockodo.' }]);
+  });
+
+  it('403 beim Loeschen eines geaenderten Eintrags jenseits der Frist', async () => {
+    const id = await addEntry(baseEntry(E_DAY));
+    await transferEmployment(EMP, { http, now: () => LETZTER_TAG });
+    await updateEntry(id, { note: 'neu' });
+    delHandler = () => ({ status: 403, data: {} });
+    const r = await transferEmployment(EMP, { http, now: () => GESPERRT });
+    expect(r.errors).toEqual([{ entryId: id, clockodoId: 501, message: MELDUNG }]);
+  });
+});

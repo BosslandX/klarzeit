@@ -35,7 +35,7 @@ describe('clockodo client', () => {
       };
     };
     const me = await fetchMe(AUTH, http);
-    expect(me).toEqual({ id: 7, name: 'Test Person' });
+    expect(me).toEqual({ id: 7, name: 'Test Person', editLockDays: null });
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('GET');
     expect(calls[0].url).toBe(`${CLOCKODO_API}/v4/users/me`);
@@ -48,7 +48,7 @@ describe('clockodo client', () => {
       data: JSON.stringify({ data: { id: 7, name: 'Test Person' } }),
     });
     const me = await fetchMe(AUTH, http);
-    expect(me).toEqual({ id: 7, name: 'Test Person' });
+    expect(me).toEqual({ id: 7, name: 'Test Person', editLockDays: null });
   });
 
   it('fetchLists holt alle Seiten', async () => {
@@ -488,5 +488,23 @@ describe('Abwesenheit loeschen und stornieren (AUF-023)', () => {
     await expect(cancelAbsence(AUTH, 55, mit(500, '<html>'))).rejects.toMatchObject({
       kind: 'server',
     });
+  });
+});
+describe('Sperrfrist aus /v4/users/me (AUF-024)', () => {
+  const me =
+    (extra: Record<string, unknown>): ClockodoHttp =>
+    async () => ({ status: 200, data: { data: { id: 7, name: 'Test Person', ...extra } } });
+
+  it('fetchMe liest edit_lock_dyn, nur positive ganze Zahlen', async () => {
+    expect(await fetchMe(AUTH, me({ edit_lock_dyn: 3 }))).toEqual({
+      id: 7,
+      name: 'Test Person',
+      editLockDays: 3,
+    });
+    expect((await fetchMe(AUTH, me({ edit_lock_dyn: 91 }))).editLockDays).toBe(91);
+    expect((await fetchMe(AUTH, me({ edit_lock_dyn: 4 }))).editLockDays).toBe(4);
+    for (const v of [null, 0, -3, 2.5, '3', true]) {
+      expect((await fetchMe(AUTH, me({ edit_lock_dyn: v }))).editLockDays).toBeNull();
+    }
   });
 });

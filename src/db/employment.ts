@@ -17,6 +17,7 @@ import { applyAbsenceRef, daysOfAbsence } from '../domain/clockodo-absence';
 import { getProfile } from './profile';
 import { removeClockodoKey } from '../clockodo/key-store';
 import { removeClockodoLists } from './clockodo-lists';
+import { removeClockodoLock } from './clockodo-lock';
 import { db } from './db';
 
 const KEY_EMP = 'employment';
@@ -288,6 +289,7 @@ export async function removeEmployment(id: string): Promise<Employment[]> {
   }
   await removeClockodoKey(id);
   await removeClockodoLists(id);
+  await removeClockodoLock(id);
   const next = list.filter((e) => e.id !== id);
   await saveEmploymentsList(next);
   return next;

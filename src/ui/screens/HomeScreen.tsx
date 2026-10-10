@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Tracker } from '../../tracking/useTracker';
-import { addEntry } from '../../db/entries';
-import { useEntriesInRange } from '../../db/entries';
+import { addEntry, useAllEntriesDesc, useEntriesInRange } from '../../db/entries';
 import {
   getActiveEmploymentId,
   setActiveEmployment,
   useEmployments,
 } from '../../db/employment';
+import { useClockodoLocks } from '../../db/clockodo-lock';
+import { countLockStates, lockHint } from '../../domain/clockodo-lock';
 import { dayPeriod, totalMs } from '../../domain/aggregate';
 import { formatClock, formatDuration, formatStopwatch } from '../../domain/time';
 import { IconPlay, IconStop } from '../components/Icons';
@@ -27,6 +28,13 @@ export function HomeScreen({ tracker }: Props) {
     if (empLoading) return;
     void getActiveEmploymentId().then((id) => setCaptureEmploymentId(id));
   }, [empLoading, employments.length]);
+
+  const alleEintraege = useAllEntriesDesc() ?? [];
+  const clockodoEmployments = useMemo(
+    () => employments.filter((e) => e.clockodo != null),
+    [employments],
+  );
+  const { locks } = useClockodoLocks(clockodoEmployments.map((e) => e.id));
 
   const today = dayPeriod(Date.now());
   const todayEntries = useEntriesInRange(today.from, today.to) ?? [];
@@ -89,6 +97,25 @@ export function HomeScreen({ tracker }: Props) {
       <header className="screen-header">
         <h1>Klarzeit</h1>
       </header>
+
+      {clockodoEmployments.map((emp) => {
+        if (!(emp.id in locks)) return null;
+        const lock = locks[emp.id];
+        const counts = countLockStates(
+          alleEintraege,
+          emp.id,
+          emp.clockodo!,
+          lock?.days ?? null,
+          Date.now(),
+        );
+        /* Gesperrte zaehlen unter Erfassung nicht — Hinweis ließe sich sonst nicht wegklicken */
+        const hinweis = lockHint({ ...counts, locked: 0 }, lock);
+        return hinweis ? (
+          <p key={`lock-${emp.id}`} className="error-text">
+            Clockodo – {emp.name}: {hinweis}
+          </p>
+        ) : null;
+      })}
 
       {running ? (
         <div className="tracker-card running">

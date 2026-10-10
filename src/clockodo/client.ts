@@ -1,5 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import {
+  cleanLockDays,
   isClockodoAbsenceStatus,
   type ClockodoAbsenceStatus,
   type ClockodoLists,
@@ -153,7 +154,7 @@ async function clockodoGet(
 export async function fetchMe(
   auth: ClockodoAuth,
   http?: ClockodoHttp,
-): Promise<{ id: number; name: string }> {
+): Promise<{ id: number; name: string; editLockDays: number | null }> {
   const body = await clockodoGet(auth, '/v4/users/me', undefined, http);
   if (typeof body !== 'object' || body === null) {
     throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
@@ -166,7 +167,11 @@ export async function fetchMe(
   if (typeof d.id !== 'number' || typeof d.name !== 'string') {
     throw new ClockodoError('format', 'Unerwartete Antwort von Clockodo.');
   }
-  return { id: d.id, name: d.name };
+  return {
+    id: d.id,
+    name: d.name,
+    editLockDays: cleanLockDays(d.edit_lock_dyn),
+  };
 }
 
 interface Paging {

@@ -118,3 +118,26 @@ export function cleanClockodoAbsenceRef(raw: unknown): ClockodoAbsenceRef | null
   if (typeof x.at !== 'number' || !Number.isFinite(x.at)) return null;
   return { id, status: x.status, at: x.at };
 }
+
+/** Gemerkte Sperrfrist aus Clockodo (`edit_lock_dyn`): `days` null = keine Sperrfrist, `at` = gelesen am */
+export interface ClockodoLock {
+  days: number | null;
+  at: number;
+}
+
+/** Sperrfrist in Tagen (openapi `edit_lock_dyn`): eine positive ganze Zahl, sonst null. */
+export function cleanLockDays(v: unknown): number | null {
+  return positiveInt(v);
+}
+
+/** Gemerkte Sperrfrist pruefen; kaputt oder unvollstaendig heisst unbekannt (null). */
+export function cleanClockodoLock(raw: unknown): ClockodoLock | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const x = raw as Record<string, unknown>;
+  if (typeof x.at !== 'number' || !Number.isFinite(x.at)) return null;
+  const at = x.at;
+  if (x.days === null) return { days: null, at };
+  const days = cleanLockDays(x.days);
+  if (days === null) return null;
+  return { days, at };
+}

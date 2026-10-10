@@ -303,3 +303,23 @@ describe('Beschaeftigungs-Verwaltung', () => {
   });
 
 });
+
+describe('Beschaeftigung loeschen: Sperrfrist (AUF-024)', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    seedOneEmployment();
+  });
+
+  it('removeEmployment entfernt die gemerkte Sperrfrist, die der anderen bleibt', async () => {
+    const list = await addEmployment({ name: 'Zweit', weeklyHours: 5 });
+    const secondId = list[1].id;
+    prefStore.set(`clockodoLock:${secondId}`, '{"days":3,"at":1}');
+    prefStore.set(`clockodoLock:${INITIAL_EMPLOYMENT_ID}`, '{"days":5,"at":1}');
+    await removeEmployment(secondId);
+    expect(prefStore.has(`clockodoLock:${secondId}`)).toBe(false);
+    expect(prefStore.get(`clockodoLock:${INITIAL_EMPLOYMENT_ID}`)).toBe('{"days":5,"at":1}');
+  });
+});

@@ -46,7 +46,7 @@ type ClockodoZugang =
   | { ok: false; stopped: string };
 
 /** Zugang einer Beschaeftigung zu Clockodo; Meldungen wie in transferEmployment. */
-async function clockodoZugang(employmentId: string): Promise<ClockodoZugang> {
+export async function clockodoZugang(employmentId: string): Promise<ClockodoZugang> {
   const list = await getEmployments();
   const employment = list.find((e) => e.id === employmentId);
   if (!employment) {

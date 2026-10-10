@@ -7,6 +7,8 @@ import { fromDateInput } from '../../domain/time';
 import { ClockodoError, fetchLists, fetchMe } from '../../clockodo/client';
 import { getClockodoKey, setClockodoKey } from '../../clockodo/key-store';
 import { getClockodoLists, saveClockodoLists } from '../../db/clockodo-lists';
+import { saveClockodoLock } from '../../db/clockodo-lock';
+import { lockDaysText } from '../../domain/clockodo-lock';
 
 type Props = {
   employmentId: string;
@@ -84,11 +86,15 @@ export function ClockodoSettings({
       }
       const auth = { apiUser: value.apiUser, apiKey };
       const me = await fetchMe(auth);
+      await saveClockodoLock(employmentId, {
+        days: me.editLockDays,
+        at: Date.now(),
+      });
       const loaded = await fetchLists(auth);
       await saveClockodoLists(employmentId, loaded);
       setLists(loaded);
       setMsg(
-        `Verbunden als ${me.name}. ${loaded.customers.length} Kunden, ${loaded.projects.length} Projekte, ${loaded.services.length} Leistungen geladen.`,
+        `Verbunden als ${me.name}. ${lockDaysText(me.editLockDays)} ${loaded.customers.length} Kunden, ${loaded.projects.length} Projekte, ${loaded.services.length} Leistungen geladen.`,
       );
     } catch (e) {
       setMsg(e instanceof ClockodoError ? e.message : 'Fehler bei der Verbindung.');

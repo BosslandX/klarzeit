@@ -38,6 +38,7 @@ import { VacationClockodo } from '../components/VacationClockodo';
 import { VacationDayRow } from '../components/VacationDayRow';
 import { removeClockodoKey } from '../../clockodo/key-store';
 import { removeClockodoLists } from '../../db/clockodo-lists';
+import { removeClockodoLock } from '../../db/clockodo-lock';
 import {
   checkForUpdate,
   downloadAndInstall,
@@ -137,6 +138,7 @@ export function MoreScreen() {
     if (vorher?.clockodo && patch.clockodo === null) {
       await removeClockodoKey(editingId);
       await removeClockodoLists(editingId);
+      await removeClockodoLock(editingId);
     }
     await refreshEmps();
     closeEdit();

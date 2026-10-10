@@ -9,7 +9,14 @@ import {
 import { getClockodoDeletes } from '../../db/clockodo-deletes';
 import { getEmployments, useEmployments } from '../../db/employment';
 import { transferEmployment, type TransferResult } from '../../clockodo/transfer';
+import { refreshClockodoLock } from '../../clockodo/lock';
 import { transferStatus } from '../../domain/clockodo-transfer';
+import {
+  clockodoEntryLabel,
+  countLockStates,
+  lockHint,
+} from '../../domain/clockodo-lock';
+import { useClockodoLocks } from '../../db/clockodo-lock';
 import type { ClockodoConfig } from '../../domain/clockodo';
 import { groupByDay } from '../../domain/aggregate';
 import type { Period } from '../../domain/aggregate';
@@ -49,20 +56,6 @@ function defaultManualDraft(): EntryDraft {
   };
 }
 
-
-function clockodoStatusLabel(
-  entry: TimeEntry,
-  config: ClockodoConfig | null,
-): string | null {
-  if (!config) return null;
-  const s = transferStatus(entry, config);
-  if (s === 'synced') return 'in Clockodo';
-  if (s === 'changed') return 'geaendert';
-  if (s === 'pending') return 'noch nicht uebertragen';
-  if (s === 'untimed-break') return 'Pause ohne Uhrzeit';
-  if (s === 'incomplete') return 'Clockodo-Auswahl fehlt';
-  return null;
-}
 
 function countTransferBuckets(
   list: TimeEntry[],
@@ -115,6 +108,9 @@ export function EntriesScreen() {
   const clockodoEmployments = useMemo(
     () => employments.filter((e) => e.clockodo != null),
     [employments],
+  );
+  const { locks, reload: reloadLocks } = useClockodoLocks(
+    clockodoEmployments.map((e) => e.id),
   );
   const [deleteCounts, setDeleteCounts] = useState<Record<string, number>>(
     {},
@@ -191,6 +187,7 @@ export function EntriesScreen() {
     setTransferBusyId(employmentId);
     setTransferOutcome((o) => ({ ...o, [employmentId]: null }));
     try {
+      await refreshClockodoLock(employmentId);
       const result = await transferEmployment(employmentId);
       setTransferOutcome((o) => ({ ...o, [employmentId]: result }));
     } catch (e) {
@@ -200,8 +197,11 @@ export function EntriesScreen() {
     } finally {
       setTransferBusyId(null);
       await refreshDeleteCounts();
+      await reloadLocks();
     }
   };
+
+  const now = Date.now();
 
   const groups = filteredEntries
     ? [...groupByDay(filteredEntries)].reverse()
@@ -247,6 +247,22 @@ export function EntriesScreen() {
                   {deleteCounts[emp.id] ?? 0} zu loeschen · {buckets.untimed}{' '}
                   Pause ohne Uhrzeit · {buckets.incomplete} ohne Auswahl
                 </p>
+                {emp.id in locks &&
+                  (() => {
+                    const hint = lockHint(
+                      countLockStates(
+                        entries,
+                        emp.id,
+                        cfg,
+                        locks[emp.id]?.days ?? null,
+                        now,
+                      ),
+                      locks[emp.id],
+                    );
+                    return hint ? (
+                      <p className="error-text">{hint}</p>
+                    ) : null;
+                  })()}
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -327,9 +343,11 @@ export function EntriesScreen() {
                     const emp = employments.find(
                       (x) => x.id === e.employmentId,
                     );
-                    const label = clockodoStatusLabel(
+                    const label = clockodoEntryLabel(
                       e,
                       emp?.clockodo ?? null,
+                      locks[e.employmentId] ?? null,
+                      now,
                     );
                     return label ? (
                       <div className="muted entry-clockodo">{label}</div>

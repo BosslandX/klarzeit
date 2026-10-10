@@ -20,6 +20,9 @@ import {
 import { getEmployments } from '../db/employment';
 import { setEntryClockodoSync } from '../db/entries';
 import { db } from '../db/db';
+import { getClockodoLock } from '../db/clockodo-lock';
+import { lockedEntryMessage } from '../domain/clockodo-lock';
+import type { ClockodoLock } from '../domain/clockodo';
 
 export interface TransferResult {
   sent: number;
@@ -41,6 +44,28 @@ function emptyResult(): TransferResult {
 
 function isFatal(err: ClockodoError): boolean {
   return err.kind === 'auth' || err.kind === 'network' || err.kind === 'rate';
+}
+
+
+
+
+
+
+
+function entryErrorMessage(
+  e: unknown,
+  entry: TimeEntry,
+  lock: ClockodoLock | null,
+  nowMs: number,
+): string {
+  return (
+    lockedEntryMessage(
+      e instanceof ClockodoError ? e.status : undefined,
+      entry.start,
+      lock,
+      nowMs,
+    ) ?? errorMessage(e)
+  );
 }
 
 function errorMessage(e: unknown): string {
@@ -101,6 +126,7 @@ export async function transferEmployment(
     return result;
   }
   const auth = { apiUser: config.apiUser.trim(), apiKey };
+  const lock = await getClockodoLock(employmentId);
 
   const pendingDeletes = await getClockodoDeletes(employmentId);
   for (const clockodoId of pendingDeletes) {
@@ -166,7 +192,7 @@ export async function transferEmployment(
           result.errors.push({
             entryId: entry.id,
             clockodoId: cid,
-            message: errorMessage(e),
+            message: entryErrorMessage(e, entry, lock, now()),
           });
           deleteFailed = true;
           break;
@@ -194,7 +220,7 @@ export async function transferEmployment(
         await setEntryClockodoSync(entry.id, null);
         result.errors.push({
           entryId: entry.id,
-          message: errorMessage(e),
+          message: entryErrorMessage(e, entry, lock, now()),
         });
         sendFailed = true;
         break;
