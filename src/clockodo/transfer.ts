@@ -46,12 +46,7 @@ function isFatal(err: ClockodoError): boolean {
   return err.kind === 'auth' || err.kind === 'network' || err.kind === 'rate';
 }
 
-
-
-
-
-
-
+/** Ein 403 an einem Eintrag jenseits der Sperrfrist heisst „in Clockodo gesperrt". */
 function entryErrorMessage(
   e: unknown,
   entry: TimeEntry,

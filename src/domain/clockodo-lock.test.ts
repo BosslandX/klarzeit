@@ -143,7 +143,7 @@ describe('Clockodo-Sperrfrist (AUF-024)', () => {
     expect(lab(eintrag(10, 8, { clockodo: undefined }))).toBe(
       'Clockodo-Auswahl fehlt – heute letzter Tag',
     );
-    expect(lab(eintrag(10, 8, { note: 'neu', clockodoSync: { ids: [5], hash: 'alt', at: 1 } }))).toBe(
+    expect(lab(eintrag(10, 8, { clockodoSync: { ids: [5], hash: 'alt', at: 1 } }))).toBe(
       'geaendert – heute letzter Tag',
     );
     expect(lab(eintrag(10, 7, { breakMinutes: 30 }))).toBe('in Clockodo gesperrt');

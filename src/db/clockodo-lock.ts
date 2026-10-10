@@ -36,11 +36,13 @@ export function useClockodoLocks(employmentIds: readonly string[]): {
   reload: () => Promise<void>;
 } {
   const [locks, setLocks] = useState<Record<string, ClockodoLock | null>>({});
+  // Als Text, weil die Aufrufer das Array bei jedem Rendern neu bauen -- mit dem Array als
+  // Abhaengigkeit liefe das Laden endlos. Gelesen werden die IDs darum auch aus dem Text.
   const idsKey = JSON.stringify(employmentIds);
 
   const reload = useCallback(async () => {
     const next: Record<string, ClockodoLock | null> = {};
-    for (const id of employmentIds) {
+    for (const id of JSON.parse(idsKey) as string[]) {
       next[id] = await getClockodoLock(id);
     }
     setLocks(next);

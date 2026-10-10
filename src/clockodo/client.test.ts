@@ -490,6 +490,7 @@ describe('Abwesenheit loeschen und stornieren (AUF-023)', () => {
     });
   });
 });
+
 describe('Sperrfrist aus /v4/users/me (AUF-024)', () => {
   const me =
     (extra: Record<string, unknown>): ClockodoHttp =>

@@ -108,7 +108,7 @@ export function HomeScreen({ tracker }: Props) {
           lock?.days ?? null,
           Date.now(),
         );
-        /* Gesperrte zaehlen unter Erfassung nicht — Hinweis ließe sich sonst nicht wegklicken */
+        // Gesperrte nur unter „Eintraege": hier liesse sich der Hinweis nie wegklicken.
         const hinweis = lockHint({ ...counts, locked: 0 }, lock);
         return hinweis ? (
           <p key={`lock-${emp.id}`} className="error-text">

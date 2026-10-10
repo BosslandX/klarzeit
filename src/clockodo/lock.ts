@@ -1,5 +1,4 @@
-import type { ClockodoHttp } from './client';
-import { fetchMe } from './client';
+import { fetchMe, type ClockodoHttp } from './client';
 import type { ClockodoLock } from '../domain/clockodo';
 import { saveClockodoLock } from '../db/clockodo-lock';
 import { clockodoZugang } from './vacation-transfer';
