@@ -752,8 +752,9 @@ export function MoreScreen() {
           Clockodo ein, verbindet sich die App mit deinem Clockodo-Konto und
           uebertraegt die Eintraege dieser Beschaeftigung (Zeiten, Pausen als
           Luecken, Taetigkeit, Kunde, Projekt, Leistung); auf Knopfdruck
-          beantragt sie die offenen Urlaubstage und liest den Stand deiner
-          Urlaubsantraege zurueck. Der API-Schluessel
+          beantragt sie die offenen Urlaubstage, liest den Stand deiner
+          Urlaubsantraege zurueck und zieht einen Antrag auf Wunsch zurueck.
+          Der API-Schluessel
           liegt verschluesselt auf dem Geraet und steht in keinem Backup.
         </p>
       </section>
