@@ -216,6 +216,25 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   das zeigt der Gerätetest. Ein in Clockodo verschwundener Antrag ist damit keine Sackgasse mehr
   (Knopf → `404` → Tage weg). `AbsenceHasToBeDeclined` → `forbidden`. Die Zugangsprüfung teilen
   sich `transferVacations` und `withdrawVacationRequest` (`clockodoZugang`).
+- **Clockodo-Sperrfrist (AUF-024):** `fetchMe` liest `edit_lock_dyn` (openapi „Relative editing
+  lock in days", Enum 1–91; Klarzeit nimmt jede positive ganze Zahl, sonst `null` = keine
+  Sperrfrist). `refreshClockodoLock` (`src/clockodo/lock.ts`) merkt sie je Beschäftigung in
+  Preferences `clockodoLock:<employmentId>` = `{ days, at }` (`src/db/clockodo-lock.ts`, nicht im
+  Backup; kaputt heißt unbekannt); ohne Zugang oder bei einem Fehler bleibt die gemerkte.
+  Aufgefrischt wird bei „Verbindung testen" und von der Oberfläche **vor** jedem Übertragen —
+  nicht in `transferEmployment`: ein GET mehr dort machte fünf Übertragungstests rot, die die
+  Anfragefolge prüfen. Letzter Sendetag = Eintragstag + Frist − 1 in **Kalendertagen**
+  (`lastSendDay`/`lockState` in `src/domain/clockodo-lock.ts`, über `date-fns`, sommerzeitfest).
+  Offen sind `pending`, `changed`, `incomplete`, `untimed-break`. „Erfassung" warnt bei
+  heute/morgen letztem Tag und unbekannter Frist (`lockHint` mit `locked: 0` — ein gesperrter
+  Eintrag ließe sich dort nie wegklicken), „Eintraege" zusätzlich bei gesperrten; der Stand je
+  Eintrag trägt die Frist (`clockodoEntryLabel`). Ein 403 an einem Eintrag jenseits der Frist
+  meldet `transferEmployment` als „In Clockodo gesperrt (Sperrfrist n Tage) – Vorgesetzten
+  fragen." (`lockedEntryMessage`). Ausschalten beim Speichern und `removeEmployment` entfernen die
+  gemerkte Frist. Beobachtet (Frist 3, an einem Freitag): Einträge von Montag und Dienstag mit 403
+  abgelehnt, die übrigen der Woche angenommen; ob Clockodo Kalender- oder Arbeitstage zählt, ist
+  offen. `edit_lock` (festes Datum) bleibt außen vor — ob der Tag selbst gesperrt ist, sagt die
+  Spec nicht.
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
@@ -250,6 +269,9 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
   (Preferences `vacations` und Backup; umbenannt gelten alle Urlaubstage als nie beantragt — der
   nächste Abgleich findet die Zeiträume nur über „erst lesen, dann senden" wieder, Teilstücke
   stoßen als Überschneidung an)
+- `src/db/clockodo-lock.ts` → Preferences-Schlüssel `clockodoLock:<employmentId>` mit `days`/`at`
+  (umbenannt gilt die Sperrfrist als unbekannt, bis zum nächsten Übertragen oder „Verbindung
+  testen" — kein Datenverlust, aber bis dahin fehlen die Fristwarnungen)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
