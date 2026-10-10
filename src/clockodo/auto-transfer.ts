@@ -81,17 +81,19 @@ export function autoTransferHint(result: TransferResult | undefined): string | n
   }
   if (result.errors.length > 0) {
     const n = result.errors.length;
-    return `Automatisches Uebertragen: ${n} Fehler – „An Clockodo uebertragen“ unter „Eintraege“ zeigt die Gruende.`;
+    return `Automatisches Uebertragen: ${n} Fehler – „An Clockodo uebertragen" unter „Eintraege" zeigt die Gruende.`;
   }
   return null;
 }
 
+/** Startet den automatischen Lauf im Hintergrund, nur in der Android-App. */
 export function startAutoTransfer(): void {
   if (!Capacitor.isNativePlatform()) return;
   // Scheitert schon das Lesen der Beschaeftigungen, versucht es der naechste Ausloeser wieder.
   void runAutoTransfer().catch(() => undefined);
 }
 
+/** Letzte Ergebnisse des automatischen Uebertragens, neu nach jedem Lauf. */
 export function useAutoTransferResults(): Record<string, TransferResult> {
   const [stand, setStand] = useState(lastAutoTransferResults);
   useEffect(() => {

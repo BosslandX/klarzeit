@@ -193,7 +193,7 @@ describe('Automatisch uebertragen (AUF-025)', () => {
       'Automatisches Uebertragen abgebrochen: Keine Verbindung zu Clockodo.',
     );
     expect(autoTransferHint({ ...leer, errors: [{ entryId: 1, message: 'x' }] })).toBe(
-      'Automatisches Uebertragen: 1 Fehler \u2013 \u201eAn Clockodo uebertragen\u201c unter \u201eEintraege\u201c zeigt die Gruende.',
+      'Automatisches Uebertragen: 1 Fehler – „An Clockodo uebertragen" unter „Eintraege" zeigt die Gruende.',
     );
     expect(
       autoTransferHint({
@@ -204,7 +204,7 @@ describe('Automatisch uebertragen (AUF-025)', () => {
         ],
       }),
     ).toBe(
-      'Automatisches Uebertragen: 2 Fehler \u2013 \u201eAn Clockodo uebertragen\u201c unter \u201eEintraege\u201c zeigt die Gruende.',
+      'Automatisches Uebertragen: 2 Fehler – „An Clockodo uebertragen" unter „Eintraege" zeigt die Gruende.',
     );
   });
 });

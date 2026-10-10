@@ -257,22 +257,12 @@ export function transferEmployment(
   employmentId: string,
   opts?: { http?: ClockodoHttp; now?: () => number; skipLocked?: boolean },
 ): Promise<TransferResult> {
-  const had = laeufe.has(employmentId);
-  if (!had) {
-    const work = uebertrage(employmentId, opts);
-    const slot = work.catch(() => undefined);
-    laeufe.set(employmentId, slot);
-    void slot.finally(() => {
-      if (laeufe.get(employmentId) === slot) laeufe.delete(employmentId);
-    });
-    return work;
-  }
-  const prev = laeufe.get(employmentId) as Promise<unknown>;
-  const run = prev.catch(() => undefined).then(() => uebertrage(employmentId, opts));
-  const slot = run.catch(() => undefined);
-  laeufe.set(employmentId, slot);
-  void slot.finally(() => {
-    if (laeufe.get(employmentId) === slot) laeufe.delete(employmentId);
-  });
-  return run;
+  const vorher: Promise<unknown> = laeufe.get(employmentId) ?? Promise.resolve();
+  const lauf = vorher.catch(() => undefined).then(() => uebertrage(employmentId, opts));
+  laeufe.set(employmentId, lauf);
+  const fertig = () => {
+    if (laeufe.get(employmentId) === lauf) laeufe.delete(employmentId);
+  };
+  lauf.then(fertig, fertig);
+  return lauf;
 }
