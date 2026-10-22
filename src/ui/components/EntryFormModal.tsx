@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BreakInterval, EntrySource } from '../../domain/types';
 import type { ClockodoEntryRef, ClockodoLists } from '../../domain/clockodo';
 import { defaultEntryRef } from '../../domain/clockodo';
 import { resolveBreakMinutes, validateBreaks } from '../../domain/breaks';
+import {
+  breakTimeOnEntry,
+  followStartDate,
+  toTimeInput,
+} from '../../domain/entry-dates';
 import {
   fromDatetimeLocal,
   toDatetimeLocal,
@@ -36,8 +41,15 @@ interface Props {
   onSave: (draft: EntryDraft) => Promise<void> | void;
 }
 
-function breakInputValue(ms: number): string {
+/** Wert fuer ein <input type="datetime-local">; leer, wenn das Feld geleert wurde. */
+function dateTimeInputValue(ms: number): string {
   return Number.isNaN(ms) ? '' : toDatetimeLocal(ms);
+}
+
+/** Eine Pause im Formular: nur Uhrzeiten ("HH:mm", leer = noch nicht gesetzt). */
+interface BreakRow {
+  start: string;
+  end: string;
 }
 
 function isCompleteBreak(b: BreakInterval): boolean {
@@ -64,9 +76,14 @@ export function EntryFormModal({
   const { employments, loading: empLoading } = useEmployments();
   const [start, setStart] = useState(initial.start);
   const [end, setEnd] = useState(initial.end);
-  const [breaks, setBreaks] = useState<BreakInterval[]>(
-    initial.breaks.length ? initial.breaks : [],
+  const [breakRows, setBreakRows] = useState<BreakRow[]>(() =>
+    initial.breaks.map((b) => ({
+      start: toTimeInput(b.start),
+      end: toTimeInput(b.end),
+    })),
   );
+  // Beginn vor der letzten Aenderung; ein geleertes Feld zaehlt nicht.
+  const lastStart = useRef(initial.start);
   const [legacyMinutes, setLegacyMinutes] = useState(() =>
     initial.breaks.length === 0 && initial.breakMinutes > 0
       ? initial.breakMinutes
@@ -125,6 +142,16 @@ export function EntryFormModal({
     employmentId,
   ]);
 
+  // Das Datum einer Pause kommt aus Beginn und Ende des Eintrags.
+  const breaks = useMemo<BreakInterval[]>(
+    () =>
+      breakRows.map((r) => ({
+        start: breakTimeOnEntry(start, end, r.start),
+        end: breakTimeOnEntry(start, end, r.end),
+      })),
+    [breakRows, start, end],
+  );
+
   const completeBreaks = useMemo(
     () => breaks.filter(isCompleteBreak),
     [breaks],
@@ -177,18 +204,27 @@ export function EntryFormModal({
     }
   };
 
-  const addBreakRow = () => {
-    setBreaks((prev) => [...prev, { start: NaN, end: NaN }]);
+  const handleStartChange = (value: string) => {
+    const next = fromDatetimeLocal(value);
+    if (Number.isFinite(next)) {
+      setEnd(followStartDate(lastStart.current, next, end));
+      lastStart.current = next;
+    }
+    setStart(next);
   };
 
-  const updateBreak = (index: number, patch: Partial<BreakInterval>) => {
-    setBreaks((prev) =>
+  const addBreakRow = () => {
+    setBreakRows((prev) => [...prev, { start: '', end: '' }]);
+  };
+
+  const updateBreak = (index: number, patch: Partial<BreakRow>) => {
+    setBreakRows((prev) =>
       prev.map((b, i) => (i === index ? { ...b, ...patch } : b)),
     );
   };
 
   const removeBreak = (index: number) => {
-    setBreaks((prev) => prev.filter((_, i) => i !== index));
+    setBreakRows((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = async () => {
@@ -287,8 +323,8 @@ export function EntryFormModal({
           <span>Beginn</span>
           <input
             type="datetime-local"
-            value={toDatetimeLocal(start)}
-            onChange={(e) => setStart(fromDatetimeLocal(e.target.value))}
+            value={dateTimeInputValue(start)}
+            onChange={(e) => handleStartChange(e.target.value)}
           />
         </label>
 
@@ -296,33 +332,29 @@ export function EntryFormModal({
           <span>Ende</span>
           <input
             type="datetime-local"
-            value={toDatetimeLocal(end)}
+            value={dateTimeInputValue(end)}
             onChange={(e) => setEnd(fromDatetimeLocal(e.target.value))}
           />
         </label>
 
         <div className="field">
           <span>Pausen</span>
-          {breaks.map((b, i) => (
+          {breakRows.map((b, i) => (
             <div key={i} className="break-row">
               <label>
                 Pause von
                 <input
-                  type="datetime-local"
-                  value={breakInputValue(b.start)}
-                  onChange={(e) =>
-                    updateBreak(i, { start: fromDatetimeLocal(e.target.value) })
-                  }
+                  type="time"
+                  value={b.start}
+                  onChange={(e) => updateBreak(i, { start: e.target.value })}
                 />
               </label>
               <label>
                 bis
                 <input
-                  type="datetime-local"
-                  value={breakInputValue(b.end)}
-                  onChange={(e) =>
-                    updateBreak(i, { end: fromDatetimeLocal(e.target.value) })
-                  }
+                  type="time"
+                  value={b.end}
+                  onChange={(e) => updateBreak(i, { end: e.target.value })}
                 />
               </label>
               <button
