@@ -109,9 +109,9 @@ Safe-Area-Abstände geringfügig.
 
 - **Start/Stopp mit Live-Stoppuhr** — die laufende Erfassung übersteht App-Neustarts und Neustart des Geräts.
 - **Tätigkeit erfassen** — beim Start eingeben oder jederzeit nachträglich ändern.
-- **Manuelles Nachtragen** — vergessene Zeiten über „+" mit Datums- und Uhrzeit-Auswahl; im Bericht als nachgetragen gekennzeichnet.
+- **Manuelles Nachtragen** — vergessene Zeiten über „+" mit Datums- und Uhrzeit-Auswahl; wechselt der Beginn den Tag, rückt das Ende mit; im Bericht als nachgetragen gekennzeichnet.
 - **Bearbeiten und Löschen** — Start, Ende, Pause, Tätigkeit und Notiz jedes Eintrags änderbar.
-- **Pausen mit Uhrzeit** — jede Pause mit Beginn und Ende; die Pausensumme rechnet die App selbst.
+- **Pausen mit Uhrzeit** — jede Pause mit Beginn und Ende als Uhrzeit, das Datum kommt vom Eintrag; die Pausensumme rechnet die App selbst.
 - **Berichte** — je Einzeleintrag, Tag, Woche (ISO), Monat oder frei gewähltem Zeitraum, mit Summen.
 - **PDF-Stundennachweis** — erzeugt und über das Android-Teilen-Menü direkt an die Mail-App.
 - **CSV-Export** — Semikolon-getrennt, für deutsches Excel vorbereitet.
