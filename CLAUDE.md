@@ -133,6 +133,18 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   trägt `breaks` ausdrücklich, auch leer — `updateEntry` nutzt Dexies `update`, das ein
   fehlendes Feld stehen ließe. **Keine vorbelegten Pausenzeiten** (Anlass: Übertragung an
   Clockodo, das Pausen nur als Lücke zwischen Einträgen kennt).
+- **Datum im Formular (AUF-026):** Wechselt „Beginn" den Kalendertag, rückt „Ende" um dieselbe
+  Zahl Tage mit und behält seine Uhrzeit (`followStartDate` in `src/domain/entry-dates.ts`, über
+  `date-fns`, sommerzeitfest); ändert sich nur die Uhrzeit, bleibt das Ende — eine Nachtschicht
+  behält so ihren Folgetag. Bezugspunkt ist der letzte **gültige** Beginn (`lastStart` im
+  Formular), ein zwischendurch geleertes Feld verliert ihn nicht. „Ende" zieht nichts mit.
+  **Pausen nur als Uhrzeit** (`type="time"`, Formularzustand `breakRows` mit „HH:mm"):
+  `breakTimeOnEntry` legt sie auf den Tag des Beginns, liegt die Uhrzeit dort vor dem Beginn, auf
+  den Folgetag — aber nur, wenn sie dann nicht nach dem Ende liegt; sonst bleibt sie am Tag des
+  Beginns, und `validateBreaks` meldet „ausserhalb". Gespeichert wird weiter Epoch-ms. **Grenze:**
+  bei Einträgen über 24 Stunden landet eine Pause am zweiten Tag, deren Uhrzeit nach der des
+  Beginns liegt, am ersten Tag. Ein geleertes „Beginn"/„Ende" zeigt ein leeres Feld
+  (`dateTimeInputValue`); bis 1.11 warf `toDatetimeLocal(NaN)` beim Zeichnen, und die App wurde weiß.
 - **Clockodo-Zugang je Beschäftigung (AUF-012):** `Employment.clockodo: ClockodoConfig | null`
   (`src/domain/clockodo.ts`; `null` = aus, `apiUser` darf leer sein). Client
   `src/clockodo/client.ts` mit einsetzbarem HTTP (Standard `CapacitorHttp`, nur nativ),
