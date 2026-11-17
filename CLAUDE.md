@@ -145,11 +145,67 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   überspringt Feiertage (§ 3 Abs. 2 BUrlG). Oberfläche: `HolidaySettingsField` (Land, regionale Tage,
   Vorschau des Jahres zum Streichen, eigene Tage), Hinweis am Urlaubstag (`VacationDayRow` bekommt die
   Beschäftigung), Zeile „Feiertage (n Tage)" in Auswertung und PDF-Kontoblock samt Fußnotensatz.
-- **Nicht abgebildet:** Krankheit und sonstige bezahlte Freistellung erzeugen weiterhin
-  Minusstunden; halbe Urlaubstage sind konstruktiv unmöglich (`taken` ist `.length`); kein
+- **Vertrag gültig ab (AUF-031/032):** `Employment.contractHistory?: ContractPeriod[]` (`validUntil` =
+  lokale Mitternacht des letzten Tages, `weeklyHours`, `workdaysPerWeek`, `workWeekdays?`), aufsteigend;
+  fehlt = der Vertrag galt immer wie heute. `contractAt(emp, tag)` liefert die Bedingungen eines Tages,
+  `cleanContractHistory` prüft. Monats-Soll je Kalendertag nach dem Vertrag des Tages (ohne Historie der
+  bisherige Weg), ebenso das Tagessoll der Gutschriften und die Wochentage (`wochentageAm`).
+  `annualEntitlement` und die abgegoltenen Überstunden rechnen weiter mit dem aktuellen Vertrag.
+  Formular: Ändern sich Wochenstunden oder Arbeitstage, fragt `ContractChangeField` „Gilt ab"
+  (vorbelegt: 1. des laufenden Monats) oder „Korrektur von Beginn an"; `historyAfterChange`
+  (`src/domain/contract-change.ts`) hängt den bisherigen Vertrag bis zum Vortag an — `null` bei einem
+  Datum nicht nach dem Beginn der Beschäftigung bzw. des laufenden Vertrags (Meldung, nichts
+  gespeichert). Keine Änderung: erstes Eintragen (0 Wochenstunden) und **erstmaliges Wählen der
+  Wochentage bei gleicher Zahl** (sonst zählte ein Urlaubszeitraum vor dem Stichtag wieder Mo–Fr).
+  Frühere Stände lassen sich entfernen. Feldgruppe Vertrag in `fillEmptyEmployment`; Backupformat
+  bleibt 3. Der Abschnitt „App-Update" steht in `UpdateSection.tsx` (MoreScreen hatte 797 Zeilen).
+- **Krankheit (AUF-033/034):** `SickPeriod {employmentId, from, to, certificate}` (Kalendertage
+  einschließlich Wochenende, lokale Mitternacht) in `src/domain/sickness.ts`, gespeichert in Preferences
+  `sickPeriods` (`src/db/sickness.ts`, Hook `useSickPeriods`) und im Backup (Feld `sickPeriods`, fehlt in
+  älteren). Überschneidende Zeiträume derselben Beschäftigung: `addSickPeriod` weist ab (`null`),
+  Bereinigen und Zusammenführen behalten den früheren bzw. lokalen. `splitVacationAndSickness` trennt
+  nach § 9 BUrlG: Urlaubstag in einem Zeitraum **mit** Bescheinigung → Krankheitstag, **ohne** → bleibt
+  Urlaub. Konto: `buildBalanceLedger(…, vacationDates, sickDates)`; `sickOfMonth` schreibt an eigenen
+  Arbeitstagen bis zum Tagessoll gut, abzüglich erfasster Zeit (§ 4 Abs. 1 EntgFG); Feiertag und Urlaub
+  gehen vor, auch bei ungetrennten Listen zählt kein Tag doppelt; Urlaub, Feiertage und Krankheit
+  zusammen höchstens das Monats-Soll; `MonthBalance.sickDays/sickCreditMs`. Die Gutschrift „bis zum
+  Tagessoll, abzüglich erfasster Zeit" steht für alle drei in `fillUpCreditMs`. Die Gutschrift endet
+  nicht nach sechs Wochen; `longSickRuns` meldet zusammenhängende Krankheit über 42 Kalendertage (§ 3
+  Abs. 1 EntgFG, aneinandergrenzende Zeiträume zählen zusammen). Die Wartezeit (§ 3 Abs. 3 EntgFG) ist
+  nicht abgebildet. `removeEmployment` sperrt bei Krankheitszeiten. Oberfläche: `SickPeriodsSection`
+  unter den Urlaubstagen (Beschäftigung = Urlaubsauswahl, Bescheinigung nicht vorbelegt, entfernen mit
+  Rückfrage, Sechs-Wochen-Hinweis), § 9-Hinweis an `VacationDayRow`, Zeile „Krankheit (n Tage)" in
+  Auswertung und PDF-Kontoblock samt Fußnotensatz; ReportsScreen trennt vor Konto und Urlaubsstand. Ein
+  in Clockodo beantragter Urlaubstag bleibt dort bestehen, auch wenn er hier als Krankheit zählt.
+- **Geänderte Stoppuhr-Einträge (AUF-035):** `TimeEntry.trackedTimes?: {start, end}` — die
+  Stoppuhr-Zeiten, gemerkt beim **ersten** Ändern von Beginn oder Ende (`withTrackedTimes` in
+  `updateEntryWithClockodo`, `src/domain/tracked-times.ts`); spätere Änderungen lassen sie stehen,
+  Tätigkeit/Notiz/Pausen allein merken nichts, nachgetragene Einträge bekommen keine.
+  `changedTrackedTimes` liefert sie nur, wenn die heutigen Zeiten abweichen: Hinweis „geaendert,
+  Stoppuhr 08:00–16:00" in „Eintraege", „°" vor der Tätigkeit im PDF samt Legende (`entryMark`,
+  `entryLegend`), Quelle „erfasst, geaendert (Stoppuhr …)" in der CSV. `cleanEntry` trägt das Feld
+  (`cleanTrackedTimes`).
+- **Veranlassung von Überstunden (AUF-036):** `TimeEntry.overtimeAuthorization?: string` (getrimmt,
+  höchstens 300 Zeichen, `cleanOvertimeAuthorization`; leer = keine Angabe). Feld im Eintragsformular mit
+  Hinweis auf BAG, Urteil vom 04.05.2022 – 5 AZR 359/21 (Leitsatz: „…hat er im Prozess die Leistung
+  solcher und deren Veranlassung durch den Arbeitgeber darzulegen."). Zeile „Veranlassung: …" in
+  „Eintraege" und als Zeile unter dem Eintrag in der PDF-Tabelle (keine Fußnotenliste: die Tabelle setzt
+  Seitenumbrüche selbst), letzte CSV-Spalte „Veranlassung"; `cleanEntry` trägt das Feld; nicht an
+  Clockodo. `EntryDraft.overtimeAuthorization` ist Pflicht (Dexie-`update`, wie `breaks`).
+- **Hinweise nach dem Arbeitszeitgesetz (AUF-037):** `arbzgHints(entries, day)` (`src/domain/arbzg.ts`,
+  rein) je Kalendertag über **alle** Beschäftigungen (§ 2 Abs. 1 Satz 1 ArbZG): mehr als 10 Stunden
+  (§ 3), Pausen 30/45 Minuten (§ 4 Satz 1; mit Uhrzeit nur Abschnitte ab 15 Minuten, Lücken zwischen
+  Einträgen ab 15 Minuten zählen), mehr als 6 Stunden am Stück (§ 4 Satz 3, nur wo die Pausen mit Uhrzeit
+  bekannt sind), Ruhezeit unter 11 Stunden seit der Arbeit an einem früheren Tag (§ 5 Abs. 1).
+  „Erfassung" (heute) und „Eintraege" (je Tag) zeigen sie als `error-text`; nichts wird gesperrt, nicht
+  im PDF. Die Voraussetzungen der Verlängerung nach § 3 und die Ausnahmen des Gesetzes sind nicht
+  abgebildet.
+- **Nicht abgebildet:** sonstige bezahlte Freistellung (außer Feiertagen und Krankheit) erzeugt
+  weiterhin Minusstunden; halbe Urlaubstage sind konstruktiv unmöglich (`taken` ist `.length`); kein
   Resturlaub-Übertrag (§ 7 III BUrlG); `VacationDay.note` existiert, ist in der UI aber tot.
   Ausgezahlte Überstunden lassen sich nicht buchen (das Konto behält sie als Guthaben), eine
-  Genehmigung von Überstunden kennt die App nicht.
+  Genehmigung von Überstunden kennt die App nicht — ihre Veranlassung lässt sich je Eintrag vermerken
+  (AUF-036).
 - **Pausen mit Uhrzeit (AUF-011):** `TimeEntry.breaks?: BreakInterval[]` (Beginn/Ende, epoch ms).
   Fehlt das Feld, sind keine Pausenzeiten bekannt (Einträge vor 1.7) und allein `breakMinutes`
   gilt. `breakMinutes` bleibt gespeichert und ist weiter die Rechengrundlage für `netMs`, PDF,
@@ -333,6 +389,17 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
   `skip`; die Schlüssel der regionalen Tage (`mariaehimmelfahrt`, `friedensfest`, `fronleichnam`) und die
   Länderkürzel in `src/domain/holidays.ts` (Preferences `employments` und Backup; umbenannt gelten die
   Feiertage als ausgeschaltet — das Konto zeigt wieder Minusstunden an jedem Feiertag)
+- `src/domain/employment.ts` → Feld `contractHistory` am `Employment` samt `validUntil`, `weeklyHours`,
+  `workdaysPerWeek`, `workWeekdays` (Preferences `employments` und Backup; umbenannt verwirft
+  `cleanEmployment` die früheren Stände, und das Konto rechnet alle Vormonate wieder mit dem heutigen
+  Vertrag)
+- `src/db/sickness.ts` → Preferences-Schlüssel `sickPeriods` und Backup-Feld `sickPeriods` samt
+  `employmentId`, `from`, `to`, `certificate` (umbenannt gehen alle Krankheitszeiten verloren — die
+  Minusstunden kehren zurück, Urlaubstage mit Bescheinigung zählen wieder als Urlaub)
+- `src/domain/types.ts` → Feld `trackedTimes` mit `start`/`end` am `TimeEntry` (Dexie und Backup;
+  umbenannt sieht jeder geänderte Stoppuhr-Eintrag wieder unverändert aus)
+- `src/domain/types.ts` → Feld `overtimeAuthorization` am `TimeEntry` (Dexie und Backup; umbenannt gehen
+  alle Vermerke zur Veranlassung verloren)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.

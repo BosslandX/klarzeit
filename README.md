@@ -60,15 +60,17 @@
 
 Start, Stopp, fertig. Die Stoppuhr läuft weiter, auch wenn du die App schließt
 oder das Handy neu startest. Vergessenes trägst du nach – Pausen mit Uhrzeit,
-Nachtschichten mit Folgetag.
+Nachtschichten mit Folgetag. War ein Tag zu lang oder die Pause zu kurz, sagt es
+dir ein Hinweis nach dem Arbeitszeitgesetz.
 
 </td>
 <td width="33%" valign="top">
 
 **📊 Arbeitszeitkonto**
 
-Soll und Ist je Monat, Saldo mit Übertrag. Urlaub entlastet das Konto,
-mit dem Gehalt abgegoltene Überstunden zieht es ab.
+Soll und Ist je Monat, Saldo mit Übertrag. Urlaub, Feiertage und Krankheit
+entlasten das Konto, mit dem Gehalt abgegoltene Überstunden zieht es ab. Ein
+neuer Vertrag gilt ab einem Stichtag.
 
 </td>
 <td width="33%" valign="top">
@@ -95,6 +97,8 @@ Konto, Urlaub und Nachweis.
 
 Stundennachweis für einen Eintrag, Tag, Woche, Monat oder freien Zeitraum,
 direkt ins Teilen-Menü. CSV mit Semikolon und Dezimalkomma für Excel.
+Geänderte Stoppuhr-Zeiten sind gekennzeichnet, die Veranlassung von
+Überstunden steht dabei.
 
 </td>
 <td width="33%" valign="top">
@@ -140,14 +144,15 @@ und zeigt die Grundlage dazu.
 ```math
 \text{Soll}_\text{Monat} = \text{Wochenstunden} \times \frac{52}{12}
 \qquad
-\text{Saldo}_\text{Monat} = \text{Ist} + \text{Urlaubsgutschrift} - \text{Soll}
+\text{Saldo}_\text{Monat} = \text{Ist} + \text{Gutschriften} - \text{Soll}
 ```
 
-- **Soll** – im Eintritts- und Austrittsmonat anteilig nach Kalendertagen.
+- **Soll** – im Eintritts- und Austrittsmonat anteilig nach Kalendertagen. Ändert sich der
+  Vertrag, zählt jeder Tag nach dem Vertrag, der an ihm galt.
 - **Ist** – erfasste Zeit abzüglich Pausen, begrenzt auf den Beschäftigungszeitraum.
-- **Urlaubsgutschrift** – jeder Urlaubstag füllt bis zum Tagessoll auf
-  (Wochenstunden ÷ Arbeitstage). Wer an dem Tag doch gearbeitet hat, bekommt nur die
-  Differenz; reiner Urlaub erzeugt nie Überstunden.
+- **Gutschriften** – Urlaubstage, gesetzliche Feiertage und Krankheitstage füllen an deinen
+  Arbeitstagen bis zum Tagessoll auf (Wochenstunden ÷ Arbeitstage). Wer an dem Tag doch
+  gearbeitet hat, bekommt nur die Differenz; zusammen nie mehr als das Monats-Soll.
 - **Übertrag** – der Saldo wird Monat für Monat fortgeschrieben.
 
 Ein Monat mit 20 Wochenstunden an vier Tagen und vier Urlaubstagen:
@@ -195,12 +200,31 @@ frei von Oberfläche und Datenbank, und ist in
 [`employment.test.ts`](src/domain/employment.test.ts) Paragraph für Paragraph getestet.
 Gesetzestext: [Bundesurlaubsgesetz](https://www.gesetze-im-internet.de/burlg/).
 
+### Feiertage, Krankheit, Nachweis
+
+| Thema | Fundstelle | Was Klarzeit tut |
+|---|---|---|
+| Feiertage | Feiertagsgesetze der Länder, [§ 2 Abs. 1 EntgFG](https://www.gesetze-im-internet.de/entgfg/__2.html) | je Beschäftigung das Bundesland des Arbeitsorts; regionale Tage zuschaltbar, eigene Tage dazu oder weg; ein Feiertag an einem Arbeitstag füllt bis zum Tagessoll auf |
+| Feiertag im Urlaub | [§ 3 Abs. 2 BUrlG](https://www.gesetze-im-internet.de/burlg/__3.html) | zählt nicht als Urlaubstag |
+| Krankheit | [§ 4 Abs. 1 EntgFG](https://www.gesetze-im-internet.de/entgfg/__4.html) | Krankheitstage an Arbeitstagen füllen bis zum Tagessoll auf |
+| Krank im Urlaub | [§ 9 BUrlG](https://www.gesetze-im-internet.de/burlg/__9.html) | mit ärztlicher Bescheinigung zählt der Tag nicht als Urlaub |
+| Sechs Wochen | [§ 3 Abs. 1 EntgFG](https://www.gesetze-im-internet.de/entgfg/__3.html) | Hinweis, wenn eine Krankheit länger dauert |
+| Vertragswechsel | – | „gilt ab" einem Stichtag; frühere Monate rechnen mit dem alten Vertrag |
+| Geänderte Stoppuhr-Zeit | – | „°" im PDF; die ursprünglichen Zeiten stehen in der App und in der CSV |
+| Veranlassung von Überstunden | [BAG, 04.05.2022 – 5 AZR 359/21](https://www.bundesarbeitsgericht.de/entscheidung/5-azr-359-21/) | je Eintrag: wer sie wann und wie angeordnet, gebilligt oder geduldet hat – im PDF und in der CSV |
+| Arbeitszeitgesetz | [§§ 3–5 ArbZG](https://www.gesetze-im-internet.de/arbzg/) | Hinweise in der App bei mehr als 10 Stunden, zu kurzen Pausen, mehr als 6 Stunden am Stück und weniger als 11 Stunden Ruhezeit – über alle Beschäftigungen zusammen ([§ 2 Abs. 1 ArbZG](https://www.gesetze-im-internet.de/arbzg/__2.html)); gesperrt wird nichts |
+
 <details>
 <summary><b>Was Klarzeit nicht rechnet</b></summary>
 <br>
 
-- **Feiertage, Krankheit und sonstige bezahlte Freistellung** kennt die App nicht – sie
-  erscheinen als Minusstunden.
+- **Sonstige bezahlte Freistellung** (etwa Sonderurlaub) kennt die App nicht – sie erscheint
+  als Minusstunden.
+- **Feiertage nach heutigem Recht.** Auch für frühere Jahre gilt die heutige Liste der Länder.
+- **Keine Wartezeit der Entgeltfortzahlung** ([§ 3 Abs. 3 EntgFG](https://www.gesetze-im-internet.de/entgfg/__3.html)).
+  Das Konto rechnet Stunden, nicht Lohn; Krankheit erzeugt auch nach sechs Wochen keine Minusstunden.
+- **Der Urlaubsanspruch** rechnet mit dem aktuellen Vertrag, auch wenn sich die Arbeitstage im
+  Lauf des Jahres geändert haben.
 - **Keine halben Urlaubstage.** Jeder eingetragene Urlaubstag zählt als ganzer Tag.
 - **Kein Übertrag ins Folgejahr** (§ 7 Abs. 3 BUrlG). Der Resturlaub gilt je Kalenderjahr.
 - **Kein Zusatzurlaub für schwerbehinderte Menschen** (§ 208 SGB IX).
@@ -307,7 +331,7 @@ flowchart TD
     PDF["pdf/<br/>Nachweis erzeugen"]
     CK["clockodo/<br/>Übertragung, Urlaubsanträge"]
     UPD["update/<br/>In-App-Update"]
-    DOM["domain/<br/>reine Logik: Zeit, Konto, BUrlG"]
+    DOM["domain/<br/>reine Logik: Zeit, Konto, Urlaub, Feiertage, ArbZG"]
     DB["db/<br/>einzige Stelle für Daten"]
 
     subgraph geraet["Auf dem Gerät"]
@@ -337,7 +361,7 @@ Zwei Regeln halten das zusammen:
    Den Clockodo-Schlüssel verwahrt `clockodo/key-store.ts` im Android KeyStore. Zeiten
    immer als Epoch-Millisekunden; formatiert wird nur in `domain/time.ts`.
 
-Dazu **287 Tests in 22 Dateien** (Stand 1.12.0, `npm test`).
+Dazu **375 Tests in 31 Dateien** (Stand 17.11.2026, `npm test`).
 
 <details>
 <summary><b>Verzeichnisse</b></summary>
