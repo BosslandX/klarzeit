@@ -453,7 +453,8 @@ wenn App-ID **und** Signatur übereinstimmen.
 
 | Version | Datum | Neu |
 |---|---|---|
-| **1.12.0** | 22.10.2026 | Ende folgt dem Beginn; Pausen nur noch als Uhrzeit |
+| **1.12.1** | 17.11.2026 | Sicherheitsupdate: PDF-Bibliothek und Capacitor aktualisiert |
+| 1.12.0 | 22.10.2026 | Ende folgt dem Beginn; Pausen nur noch als Uhrzeit |
 | 1.11.0 | 10.10.2026 | Clockodo-Sperrfrist; automatisch übertragen |
 | 1.10.0 | 10.10.2026 | Korrekturen erreichen Clockodo; Urlaubsantrag zurückziehen |
 | 1.9.0 | 01.10.2026 | Urlaubsanträge an Clockodo |
