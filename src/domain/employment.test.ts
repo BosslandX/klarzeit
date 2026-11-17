@@ -914,7 +914,6 @@ describe('Feiertage im Konto und beim Urlaub (AUF-029)', () => {
   });
 });
 
-
 describe('Vertrag gueltig ab (AUF-031)', () => {
   const d = (y: number, mo: number, dd: number) => new Date(y, mo - 1, dd).getTime();
   // Bis 31.03.2026: 20 h an Mo-Do (5 h/Tag); seit 01.04.2026: 30 h an Mo-Fr (6 h/Tag).

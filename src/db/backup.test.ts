@@ -1067,7 +1067,6 @@ describe('Feiertage einer Beschaeftigung im Backup (AUF-029)', () => {
   });
 });
 
-
 describe('Fruehere Vertragsstaende im Backup (AUF-031)', () => {
   beforeEach(async () => {
     prefStore.clear();
