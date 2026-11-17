@@ -345,7 +345,6 @@ export function publicHolidayMap(
   return tage;
 }
 
-
 /** Ein Tag der Vorschau im Formular (AUF-030). */
 export interface HolidayPreviewDay {
   date: number;

@@ -188,7 +188,6 @@ describe('Kontoblock PDF-Text (AUF-016)', () => {
   });
 });
 
-
 describe('Kontoblock mit Feiertagen (AUF-030)', () => {
   const bayern: Employment = {
     ...defaultEmployment,

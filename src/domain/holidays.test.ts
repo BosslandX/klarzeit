@@ -214,7 +214,6 @@ describe('Feiertage einer Beschaeftigung (AUF-029)', () => {
   });
 });
 
-
 describe('Feiertage im Formular (AUF-030)', () => {
   const by = { land: 'BY' as const, regional: [], extra: [], skip: [] };
 
