@@ -40,6 +40,12 @@ export interface Employment {
   weeklyHours: number;
   /** Arbeitstage pro Woche (Basis des gesetzlichen Urlaubsanspruchs). */
   workdaysPerWeek: number;
+  /**
+   * Feste Arbeitstage als Wochentage (0 = Sonntag ... 6 = Samstag), aufsteigend, 1 bis 6
+   * Tage. Fehlt = nicht gewaehlt, dann gilt die Regel von workWeekdaysOf. Ist das Feld
+   * gesetzt, ist workdaysPerWeek seine Laenge (cleanEmployment).
+   */
+  workWeekdays?: number[];
   /** Darstellung des Urlaubsanspruchs im Eintrittsjahr. */
   vacationYearMode: VacationYearMode;
   /** Anfangssaldo in ms zum Start (uebernommene Ueber-/Minusstunden). Default 0. */
@@ -329,14 +335,8 @@ export function buildBalanceLedger(
 // --- Urlaubstage erfassen ---
 
 /**
- * Arbeitstage eines Zeitraums als Tagesdaten (lokale Mitternacht), aufsteigend.
- *
- * Der Vertrag speichert nur die ANZAHL der Arbeitstage pro Woche, nicht welche
- * Wochentage das sind. Ausgeschlossen werden daher ausschliesslich die klaren
- * Nicht-Arbeitstage: immer der Sonntag, zusaetzlich der Samstag bei weniger als
- * sechs Arbeitstagen. Bei einer 3- oder 4-Tage-Woche liefert die Funktion also
- * bewusst zu viele Tage — der Nutzer korrigiert sie einzeln, statt dass die App
- * eine Wochentagsverteilung errät, die sie nicht kennt.
+ * Arbeitstage eines Zeitraums als Tagesdaten (lokale Mitternacht), aufsteigend: die
+ * Tage, deren Wochentag in workWeekdaysOf(emp) steht.
  *
  * Feiertage sind der App unbekannt und bleiben enthalten. `bis` vor `von`
  * ergibt eine leere Liste.
@@ -344,20 +344,64 @@ export function buildBalanceLedger(
 export function workdaysInRange(
   fromEpoch: number,
   toEpoch: number,
-  workdaysPerWeek: number,
+  emp: Pick<Employment, 'workdaysPerWeek' | 'workWeekdays'>,
 ): number[] {
   const from = startOfDay(fromEpoch);
   const to = startOfDay(toEpoch);
   if (to.getTime() < from.getTime()) return [];
-  const includeSaturday = workdaysPerWeek >= WERKTAGE_PER_WEEK;
+  const days = workWeekdaysOf(emp);
   return eachDayOfInterval({ start: from, end: to })
-    .filter((d) => {
-      const wd = getDay(d); // 0 = Sonntag, 6 = Samstag
-      if (wd === 0) return false;
-      if (wd === 6) return includeSaturday;
-      return true;
-    })
+    .filter((d) => days.includes(getDay(d)))
     .map((d) => d.getTime());
+}
+
+/**
+ * Wochentage, an denen die Beschaeftigung arbeitet (0 = Sonntag ... 6 = Samstag),
+ * aufsteigend. Ohne gewaehlte Wochentage die bisherige Regel: Montag bis Freitag, ab
+ * sechs Arbeitstagen auch der Samstag, nie der Sonntag. Bei 1 bis 4 Arbeitstagen sind
+ * das bewusst zu viele Tage -- die App raet keine Verteilung, die sie nicht kennt.
+ */
+export function workWeekdaysOf(
+  emp: Pick<Employment, 'workdaysPerWeek' | 'workWeekdays'>,
+): number[] {
+  if (emp.workWeekdays && emp.workWeekdays.length > 0) return [...emp.workWeekdays];
+  return emp.workdaysPerWeek >= WERKTAGE_PER_WEEK ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
+}
+
+/**
+ * Gespeicherte Wochentage pruefen: ganze Zahlen 0 bis 6, Doppelte entfernt, aufsteigend,
+ * 1 bis 6 Tage. Alles andere ergibt undefined (= nicht gewaehlt).
+ */
+export function cleanWorkWeekdays(raw: unknown): number[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  if (!raw.every((v) => Number.isInteger(v) && v >= 0 && v <= 6)) return undefined;
+  const days = [...new Set(raw as number[])].sort((a, b) => a - b);
+  return days.length >= 1 && days.length <= WERKTAGE_PER_WEEK ? days : undefined;
+}
+
+/**
+ * Wochentage, die das Formular als gewaehlt zeigt: die gespeicherten; ohne solche bei 5
+ * oder 6 Arbeitstagen die der bisherigen Regel, bei 1 bis 4 keine.
+ */
+export function displayedWorkWeekdays(
+  emp: Pick<Employment, 'workdaysPerWeek' | 'workWeekdays'>,
+): number[] {
+  if (emp.workWeekdays && emp.workWeekdays.length > 0) return [...emp.workWeekdays];
+  return emp.workdaysPerWeek >= 5 ? workWeekdaysOf(emp) : [];
+}
+
+/**
+ * Einen Wochentag an- oder abwaehlen. null, wenn das nicht geht: der letzte Tag bleibt,
+ * und mehr als sechs Tage gibt es nicht (Werktage-Basis des § 3 BUrlG).
+ */
+export function toggleWorkWeekday(
+  current: readonly number[],
+  day: number,
+): number[] | null {
+  const next = current.includes(day)
+    ? current.filter((d) => d !== day)
+    : [...current, day].sort((a, b) => a - b);
+  return next.length >= 1 && next.length <= WERKTAGE_PER_WEEK ? next : null;
 }
 
 /**

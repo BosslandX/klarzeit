@@ -43,7 +43,7 @@ export function vacationRequestRanges(
     const gapFrom = addDays(startOfDay(prev), 1).getTime();
     const gapTo = addDays(startOfDay(next), -1).getTime();
     if (gapTo < gapFrom) return true;
-    return workdaysInRange(gapFrom, gapTo, emp.workdaysPerWeek).length === 0;
+    return workdaysInRange(gapFrom, gapTo, emp).length === 0;
   };
 
   for (let i = 1; i < open.length; i++) {

@@ -36,6 +36,7 @@ import { shareTextFile } from '../../pdf/share';
 import { ClockodoSettings } from '../components/ClockodoSettings';
 import { VacationClockodo } from '../components/VacationClockodo';
 import { VacationDayRow } from '../components/VacationDayRow';
+import { WorkWeekdaysField } from '../components/WorkWeekdaysField';
 import { removeClockodoKey } from '../../clockodo/key-store';
 import { removeClockodoLists } from '../../db/clockodo-lists';
 import { removeClockodoLock } from '../../db/clockodo-lock';
@@ -184,7 +185,7 @@ export function MoreScreen() {
       : workdaysInRange(
           fromDateInput(vacFrom),
           fromDateInput(vacTo),
-          vacEmp != null ? vacEmp.workdaysPerWeek : 5,
+          vacEmp ?? { workdaysPerWeek: 5 },
         );
 
   const handleAddVacationRange = async () => {
@@ -460,19 +461,13 @@ export function MoreScreen() {
             onChange={(e) => setEmpField('weeklyHours', Number(e.target.value) || 0)}
           />
         </label>
-        <label className="field">
-          <span>Arbeitstage pro Woche</span>
-          <select
-            value={emp.workdaysPerWeek}
-            onChange={(e) => setEmpField('workdaysPerWeek', Number(e.target.value))}
-          >
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
+        <WorkWeekdaysField
+          emp={emp}
+          onChange={(next) => {
+            if (!editDraft) return;
+            setEditDraft({ ...editDraft, workWeekdays: next, workdaysPerWeek: next.length });
+          }}
+        />
         <label className="field">
           <span>Urlaubsanspruch laut Vertrag (Tage/Jahr)</span>
           <input
@@ -684,7 +679,7 @@ export function MoreScreen() {
           {rangeTooLong
             ? `Der Zeitraum ist zu lang (max. ${MAX_VACATION_RANGE_DAYS} Tage am Stueck). Bitte Datum pruefen.`
             : vacRangeMsg ||
-              'Sonntage werden immer uebersprungen, Samstage ab 6 Arbeitstagen/Woche mitgezaehlt. Feiertage kennt die App nicht — einzelne Tage danach gegebenenfalls wieder entfernen.'}
+              'Es zaehlen die Wochentage der Beschaeftigung; ohne gewaehlte Wochentage Montag bis Freitag, ab 6 Arbeitstagen auch der Samstag. Feiertage kennt die App nicht — einzelne Tage danach gegebenenfalls wieder entfernen.'}
         </p>
 
         <VacationClockodo employment={vacEmp} days={vacDays} onDone={refreshVac} />

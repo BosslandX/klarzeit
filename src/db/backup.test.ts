@@ -957,3 +957,58 @@ describe('Uebertragungsstand im Backup', () => {
     expect(imported[0].clockodoSync).toBeUndefined();
   });
 });
+describe('Arbeitstage als Wochentage (AUF-027)', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+  });
+
+  it('cleanEmployment traegt gueltige Wochentage, workdaysPerWeek folgt ihrer Zahl', () => {
+    const base = { ...defaultEmployment, id: 'x', workdaysPerWeek: 5 };
+    const e = cleanEmployment({ ...base, workWeekdays: [4, 1, 3, 2] });
+    expect(e.workWeekdays).toEqual([1, 2, 3, 4]);
+    expect(e.workdaysPerWeek).toBe(4);
+    const kaputt = cleanEmployment({ ...base, workWeekdays: [1, 2, 3, 4, 5, 6, 0] });
+    expect('workWeekdays' in kaputt).toBe(false);
+    expect(kaputt.workdaysPerWeek).toBe(5);
+    expect('workWeekdays' in cleanEmployment(base)).toBe(false);
+  });
+
+  it('Rundreise workWeekdays ueber Backup', async () => {
+    prefStore.set(
+      'employments',
+      JSON.stringify([emp(INITIAL_EMPLOYMENT_ID, 'H', 20)]),
+    );
+    await updateEmployment(INITIAL_EMPLOYMENT_ID, {
+      workWeekdays: [1, 2, 3, 4],
+      workdaysPerWeek: 4,
+    });
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const list = await getEmployments();
+    expect(list[0].workWeekdays).toEqual([1, 2, 3, 4]);
+    expect(list[0].workdaysPerWeek).toBe(4);
+  });
+
+  it('fillEmptyEmployment uebernimmt die Wochentage nur mit dem Vertrag', () => {
+    const local = cleanEmployment({ id: 'emp-1', workWeekdays: [1, 2] });
+    const incoming = cleanEmployment({
+      id: 'emp-1',
+      weeklyHours: 30,
+      workWeekdays: [2, 3, 4],
+    });
+    expect(fillEmptyEmployment(local, incoming).workWeekdays).toEqual([2, 3, 4]);
+    const localMitStd = cleanEmployment({
+      id: 'emp-1',
+      weeklyHours: 20,
+      workWeekdays: [1, 2],
+    });
+    expect(fillEmptyEmployment(localMitStd, incoming).workWeekdays).toEqual([1, 2]);
+  });
+});

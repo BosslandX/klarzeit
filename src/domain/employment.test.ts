@@ -15,6 +15,10 @@ import {
   waitingFulfilledInYear,
   waitingPeriodEnd,
   workdaysInRange,
+  workWeekdaysOf,
+  cleanWorkWeekdays,
+  displayedWorkWeekdays,
+  toggleWorkWeekday,
   type Employment,
 } from './employment';
 import type { TimeEntry } from './types';
@@ -387,7 +391,7 @@ describe('Arbeitstage eines Zeitraums', () => {
 
   it('Mo-Fr bei 5 Arbeitstagen: Wochenende uebersprungen', () => {
     // 08.06.2026 = Mo, 19.06.2026 = Fr -> 2 volle Wochen ohne Sa/So
-    const days = workdaysInRange(d(2026, 6, 8), d(2026, 6, 19), 5);
+    const days = workdaysInRange(d(2026, 6, 8), d(2026, 6, 19), { workdaysPerWeek: 5 });
     expect(days).toHaveLength(10);
     expect(days[0]).toBe(d(2026, 6, 8));
     expect(days[days.length - 1]).toBe(d(2026, 6, 19));
@@ -396,28 +400,28 @@ describe('Arbeitstage eines Zeitraums', () => {
   });
 
   it('bei 6 Arbeitstagen zaehlt der Samstag mit, der Sonntag nie', () => {
-    const days = workdaysInRange(d(2026, 6, 8), d(2026, 6, 19), 6);
+    const days = workdaysInRange(d(2026, 6, 8), d(2026, 6, 19), { workdaysPerWeek: 6 });
     expect(days).toHaveLength(11); // 10 + Sa 13.06.
     expect(days).toContain(d(2026, 6, 13));
     expect(days).not.toContain(d(2026, 6, 14));
   });
 
   it('reines Wochenende ergibt bei 5 Arbeitstagen nichts', () => {
-    expect(workdaysInRange(d(2026, 6, 13), d(2026, 6, 14), 5)).toEqual([]);
+    expect(workdaysInRange(d(2026, 6, 13), d(2026, 6, 14), { workdaysPerWeek: 5 })).toEqual([]);
   });
 
   it('einzelner Tag: von = bis', () => {
-    expect(workdaysInRange(d(2026, 6, 10), d(2026, 6, 10), 5)).toEqual([d(2026, 6, 10)]);
+    expect(workdaysInRange(d(2026, 6, 10), d(2026, 6, 10), { workdaysPerWeek: 5 })).toEqual([d(2026, 6, 10)]);
   });
 
   it('bis vor von ergibt eine leere Liste', () => {
-    expect(workdaysInRange(d(2026, 6, 19), d(2026, 6, 8), 5)).toEqual([]);
+    expect(workdaysInRange(d(2026, 6, 19), d(2026, 6, 8), { workdaysPerWeek: 5 })).toEqual([]);
   });
 
   it('Uhrzeiten in den Eingaben stoeren nicht (Normalisierung auf Mitternacht)', () => {
     const from = new Date(2026, 5, 8, 17, 45).getTime();
     const to = new Date(2026, 5, 9, 3, 10).getTime();
-    expect(workdaysInRange(from, to, 5)).toEqual([d(2026, 6, 8), d(2026, 6, 9)]);
+    expect(workdaysInRange(from, to, { workdaysPerWeek: 5 })).toEqual([d(2026, 6, 8), d(2026, 6, 9)]);
   });
 });
 
@@ -731,5 +735,89 @@ describe('Mit dem Gehalt abgegoltene Ueberstunden (AUF-016)', () => {
     expect(l.target.saldoMs).toBe(6 * HOUR);
     expect(l.target.includedOvertimeMs).toBe(6 * HOUR);
     expect(l.closing).toBe(0);
+  });
+});
+describe('Arbeitstage als Wochentage (AUF-027)', () => {
+  const d = (y: number, mo: number, dd: number) => new Date(y, mo - 1, dd).getTime();
+  // 08.06.2026 ist ein Montag, 14.06.2026 ein Sonntag.
+  const woche = (tage: number[]) =>
+    workdaysInRange(d(2026, 6, 8), d(2026, 6, 14), {
+      workdaysPerWeek: tage.length,
+      workWeekdays: tage,
+    });
+
+  it('workWeekdaysOf: ohne Auswahl die bisherige Regel, mit Auswahl genau die Auswahl', () => {
+    expect(workWeekdaysOf({ workdaysPerWeek: 5 })).toEqual([1, 2, 3, 4, 5]);
+    expect(workWeekdaysOf({ workdaysPerWeek: 6 })).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(workWeekdaysOf({ workdaysPerWeek: 4 })).toEqual([1, 2, 3, 4, 5]);
+    expect(workWeekdaysOf({ workdaysPerWeek: 4, workWeekdays: [1, 2, 3, 4] })).toEqual([
+      1, 2, 3, 4,
+    ]);
+  });
+
+  it('workdaysInRange: Montag bis Donnerstag, der Freitag faellt heraus', () => {
+    expect(woche([1, 2, 3, 4])).toEqual([
+      d(2026, 6, 8),
+      d(2026, 6, 9),
+      d(2026, 6, 10),
+      d(2026, 6, 11),
+    ]);
+  });
+
+  it('workdaysInRange: Dienstag bis Samstag, ohne Montag, mit Samstag', () => {
+    expect(woche([2, 3, 4, 5, 6])).toEqual([
+      d(2026, 6, 9),
+      d(2026, 6, 10),
+      d(2026, 6, 11),
+      d(2026, 6, 12),
+      d(2026, 6, 13),
+    ]);
+  });
+
+  it('workdaysInRange: ein gewaehlter Sonntag zaehlt', () => {
+    expect(woche([0, 3, 4, 5, 6])).toEqual([
+      d(2026, 6, 10),
+      d(2026, 6, 11),
+      d(2026, 6, 12),
+      d(2026, 6, 13),
+      d(2026, 6, 14),
+    ]);
+  });
+
+  it('cleanWorkWeekdays: sortiert, ohne Doppelte, nur 1 bis 6 gueltige Tage', () => {
+    expect(cleanWorkWeekdays([4, 1, 3, 2])).toEqual([1, 2, 3, 4]);
+    expect(cleanWorkWeekdays([1, 1, 2])).toEqual([1, 2]);
+    expect(cleanWorkWeekdays([0, 6])).toEqual([0, 6]);
+    const kaputt: unknown[] = [
+      [],
+      [0, 1, 2, 3, 4, 5, 6],
+      [1, 7],
+      [-1],
+      [1.5],
+      ['1'],
+      'Mo',
+      null,
+      undefined,
+    ];
+    for (const k of kaputt) {
+      expect(cleanWorkWeekdays(k)).toBeUndefined();
+    }
+  });
+
+  it('displayedWorkWeekdays: gewaehlte Tage; sonst bei 5 und 6 die bisherige Regel, bei 1 bis 4 keine', () => {
+    expect(displayedWorkWeekdays({ workdaysPerWeek: 3, workWeekdays: [2, 4, 6] })).toEqual([
+      2, 4, 6,
+    ]);
+    expect(displayedWorkWeekdays({ workdaysPerWeek: 5 })).toEqual([1, 2, 3, 4, 5]);
+    expect(displayedWorkWeekdays({ workdaysPerWeek: 6 })).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(displayedWorkWeekdays({ workdaysPerWeek: 4 })).toEqual([]);
+  });
+
+  it('toggleWorkWeekday: an- und abwaehlen, der letzte Tag bleibt, hoechstens sechs', () => {
+    expect(toggleWorkWeekday([1, 3], 2)).toEqual([1, 2, 3]);
+    expect(toggleWorkWeekday([1, 2, 3], 2)).toEqual([1, 3]);
+    expect(toggleWorkWeekday([], 0)).toEqual([0]);
+    expect(toggleWorkWeekday([5], 5)).toBeNull();
+    expect(toggleWorkWeekday([1, 2, 3, 4, 5, 6], 0)).toBeNull();
   });
 });
