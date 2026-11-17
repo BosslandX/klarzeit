@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { differenceInCalendarDays, format } from 'date-fns';
+import { differenceInCalendarDays, format, startOfMonth } from 'date-fns';
 import { useProfile } from '../../db/profile';
 import {
   getEmployments,
@@ -37,15 +37,13 @@ import { ClockodoSettings } from '../components/ClockodoSettings';
 import { VacationClockodo } from '../components/VacationClockodo';
 import { VacationDayRow } from '../components/VacationDayRow';
 import { WorkWeekdaysField } from '../components/WorkWeekdaysField';
-import { HolidaySettingsField } from '../components/HolidaySettingsField';
+import { HolidaySettingsField } from '../components/HolidaySettingsField';
+import { ContractChangeField } from '../components/ContractChangeField';
+import { historyAfterChange } from '../../domain/contract-change';
+import { UpdateSection } from '../components/UpdateSection';
 import { removeClockodoKey } from '../../clockodo/key-store';
 import { removeClockodoLists } from '../../db/clockodo-lists';
 import { removeClockodoLock } from '../../db/clockodo-lock';
-import {
-  checkForUpdate,
-  downloadAndInstall,
-  type UpdateInfo,
-} from '../../update/updater';
 
 /**
  * Groesster am Stueck eintragbarer Urlaubszeitraum (Kalendertage). Ein Jahr ist
@@ -71,9 +69,9 @@ export function MoreScreen() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [updateBusy, setUpdateBusy] = useState(false);
-  const [updateMsg, setUpdateMsg] = useState('');
-  const [available, setAvailable] = useState<UpdateInfo | null>(null);
+  const [aenderungAb, setAenderungAb] = useState<number | null>(() =>
+    startOfMonth(Date.now()).getTime(),
+  );
   const {
     employments,
     loading: empListLoading,
@@ -116,6 +114,7 @@ export function MoreScreen() {
   const openEdit = (e: Employment) => {
     setEditingId(e.id);
     setEditDraft({ ...e });
+    setAenderungAb(startOfMonth(Date.now()).getTime());
   };
 
   const closeEdit = () => {
@@ -136,7 +135,12 @@ export function MoreScreen() {
     if (!editingId || !editDraft) return;
     const { id: _omit, ...patch } = editDraft;
     const vorher = employments.find((e) => e.id === editingId);
-    await updateEmployment(editingId, patch);
+    const historie = vorher ? historyAfterChange(vorher, patch, aenderungAb) : patch.contractHistory;
+    if (historie === null) {
+      window.alert('"Gilt ab" muss nach dem Beginn und nach dem letzten frueheren Vertragsstand liegen.');
+      return;
+    }
+    await updateEmployment(editingId, { ...patch, contractHistory: historie });
     if (vorher?.clockodo && patch.clockodo === null) {
       await removeClockodoKey(editingId);
       await removeClockodoLists(editingId);
@@ -289,41 +293,6 @@ export function MoreScreen() {
     window.alert('Alle Eintraege geloescht.');
   };
 
-  const onCheckUpdate = async () => {
-    setUpdateBusy(true);
-    setUpdateMsg('');
-    setAvailable(null);
-    try {
-      const info = await checkForUpdate();
-      if (info) {
-        setAvailable(info);
-        setUpdateMsg(
-          `Neue Version ${info.versionName} verfuegbar (installiert: ${info.currentVersionName}).`,
-        );
-      } else {
-        setUpdateMsg('Du hast bereits die neueste Version.');
-      }
-    } catch (e) {
-      setUpdateMsg(`Update-Pruefung fehlgeschlagen: ${msg(e)}`);
-    } finally {
-      setUpdateBusy(false);
-    }
-  };
-
-  const onInstallUpdate = async () => {
-    if (!available) return;
-    setUpdateBusy(true);
-    setUpdateMsg('Lade Update herunter …');
-    try {
-      await downloadAndInstall(available);
-      setUpdateMsg('Installation gestartet – bitte den System-Dialog bestaetigen.');
-    } catch (e) {
-      setUpdateMsg(`Update fehlgeschlagen: ${msg(e)}`);
-    } finally {
-      setUpdateBusy(false);
-    }
-  };
-
   if (loading || empListLoading) return <div className="screen center muted">Lade…</div>;
 
   return (
@@ -468,6 +437,13 @@ export function MoreScreen() {
             if (!editDraft) return;
             setEditDraft({ ...editDraft, workWeekdays: next, workdaysPerWeek: next.length });
           }}
+        />
+        <ContractChangeField
+          saved={employments.find((e) => e.id === editingId)}
+          draft={emp}
+          ab={aenderungAb}
+          onAb={setAenderungAb}
+          onDraft={setEditDraft}
         />
         <HolidaySettingsField
           value={emp.publicHolidays}
@@ -761,26 +737,7 @@ export function MoreScreen() {
         </p>
       </section>
 
-      <section className="card-section">
-        <h2>App-Update</h2>
-        <p className="muted small">
-          Sucht auf dem Server nach einer neueren Version und installiert sie.
-        </p>
-        <button className="btn" onClick={onCheckUpdate} disabled={updateBusy}>
-          Nach Update suchen
-        </button>
-        {available && (
-          <button
-            className="btn btn-primary"
-            onClick={onInstallUpdate}
-            disabled={updateBusy}
-          >
-            Update {available.versionName} installieren
-          </button>
-        )}
-        {updateMsg && <p className="muted small">{updateMsg}</p>}
-        {available?.notes && <p className="muted small">{available.notes}</p>}
-      </section>
+      <UpdateSection />
 
       <section className="card-section">
         <h2>Ueber</h2>
