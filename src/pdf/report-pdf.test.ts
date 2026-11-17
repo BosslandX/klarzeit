@@ -315,4 +315,3 @@ describe('Veranlassung im PDF (AUF-036)', () => {
     expect(ohne.output()).not.toContain('Veranlassung:');
   });
 });
-
