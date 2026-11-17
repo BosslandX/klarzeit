@@ -196,6 +196,7 @@ describe('Urlaubsantrag zurueckziehen: Tage eines Antrags (AUF-023)', () => {
     expect(daysOfAbsence(days, 'emp-1', 99)).toEqual([]);
   });
 });
+
 describe('Urlaubsantraege bei festen Wochentagen (AUF-027)', () => {
   it('vacationRequestRanges: bei Montag bis Donnerstag trennt der freie Freitag nicht', () => {
     // 08.10.2026 ist ein Donnerstag, 12.10.2026 ein Montag.

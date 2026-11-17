@@ -957,6 +957,7 @@ describe('Uebertragungsstand im Backup', () => {
     expect(imported[0].clockodoSync).toBeUndefined();
   });
 });
+
 describe('Arbeitstage als Wochentage (AUF-027)', () => {
   beforeEach(async () => {
     prefStore.clear();

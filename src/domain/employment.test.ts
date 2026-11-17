@@ -737,6 +737,7 @@ describe('Mit dem Gehalt abgegoltene Ueberstunden (AUF-016)', () => {
     expect(l.closing).toBe(0);
   });
 });
+
 describe('Arbeitstage als Wochentage (AUF-027)', () => {
   const d = (y: number, mo: number, dd: number) => new Date(y, mo - 1, dd).getTime();
   // 08.06.2026 ist ein Montag, 14.06.2026 ein Sonntag.
