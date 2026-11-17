@@ -17,9 +17,9 @@
     "icons": "node tools/gen-icons.mjs && npx capacitor-assets generate --android && node tools/optimize-png.mjs"
   },
   "dependencies": {
-    "@capacitor/android": "^8.1.0",
+    "@capacitor/android": "^8.6.2",
     "@capacitor/app": "^8.0.0",
-    "@capacitor/core": "^8.1.0",
+    "@capacitor/core": "^8.6.2",
     "@capacitor/filesystem": "^8.0.0",
     "@capacitor/preferences": "^8.0.0",
     "@capacitor/share": "^8.0.0",
@@ -28,21 +28,21 @@
     "date-fns": "^4.1.0",
     "dexie": "^4.0.11",
     "dexie-react-hooks": "^1.1.7",
-    "jspdf": "^2.5.2",
-    "jspdf-autotable": "^3.8.4",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "^8.1.0",
+    "@capacitor/cli": "^8.6.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",
     "fake-indexeddb": "^6.2.5",
-    "puppeteer-core": "^25.5.0",
+    "puppeteer-core": "^25.17.0",
     "typescript": "~5.9.3",
-    "vite": "^7.3.1",
-    "vitest": "^4.1.9"
+    "vite": "^7.3.8",
+    "vitest": "^4.1.12"
   }
 }
