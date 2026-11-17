@@ -377,23 +377,55 @@ function Get-Fingerabdruck {
     Patch fuer 'git apply' unbrauchbar.
 #>
 function Arbeit-Sichern {
+    # Rueckgabe: $true = gesichert (oder nichts zu sichern), $false = NICHT gesichert.
     param([string]$Ort, [string]$Ziel)
-    if (-not (Test-Path $Ort)) { return }
+    if (-not (Test-Path $Ort)) { return $true }
+    # NUR DER EIGENE ARBEITSBAUM (klarzeit AUF-010). Ein verknuepfter Worktree traegt in
+    # seiner Wurzel eine DATEI .git. Ein leerer Restordner nach gescheitertem 'worktree
+    # remove' besteht Test-Path, hat sie aber nicht -- 'git -C' lief dann nach oben in den
+    # HAUPTBAUM ('rev-parse --show-toplevel' = Hauptbaum, gemessen), 'git add -A' wirkte
+    # dort, und der Patch wurde ueberschrieben.
+    if (-not (Test-Path (Join-Path $Ort ".git") -PathType Leaf)) {
+        Sagen "  [!] $Ort ist kein Arbeitsbaum (keine Datei .git) -- NICHTS gesichert, nichts veraendert."
+        return $false
+    }
     $null = Native git @("-C", $Ort, "add", "-A")
     New-Item -ItemType Directory -Force (Split-Path -Parent $Ziel) | Out-Null
-    $r = Native git @("-C", $Ort, "diff", "--cached", "HEAD", "--output=$Ziel")
+    # NIE UEBERSCHREIBEN (klarzeit AUF-009 und AUF-026). Hat der Orchestrator auf dem
+    # Auftragszweig committet, diffed ein zweiter Aufruf (-Aufraeumen) gegen den neuen HEAD
+    # und machte aus dem Patch den Rest: 22.742 -> 2.162 und 14.370 -> 2.162 Bytes. Gibt es
+    # die Datei schon, kommt der neue Patch mit Zeitstempel daneben; gleicher Inhalt faellt weg.
+    $schreib = $Ziel
+    if (Test-Path $Ziel) {
+        $schreib = Join-Path (Split-Path -Parent $Ziel) ([IO.Path]::GetFileNameWithoutExtension($Ziel) +
+            "." + (Get-Date -Format "yyyyMMdd-HHmmss") + ".patch")
+        if (Test-Path $schreib) { Sagen "  [!] $(Split-Path -Leaf $schreib) gibt es schon -- NICHTS gesichert."; return $false }
+    }
+    $r = Native git @("-C", $Ort, "diff", "--cached", "HEAD", "--output=$schreib")
     if ($r.Code -ne 0) {
         Sagen "  [!] Patch konnte nicht gebildet werden -- die Arbeit ist NICHT gesichert:"
         Sagen "      $($r.Ausgabe.Trim())"
-        return
+        return $false
     }
-    if (-not (Test-Path $Ziel)) { Sagen "  [!] Patchdatei fehlt nach dem Schreiben."; return }
-    $gr = (Get-Item $Ziel).Length
+    if (-not (Test-Path $schreib)) { Sagen "  [!] Patchdatei fehlt nach dem Schreiben."; return $false }
+    $gr = (Get-Item $schreib).Length
+    if ($schreib -ne $Ziel) {
+        if ((Get-FileHash $schreib).Hash -eq (Get-FileHash $Ziel).Hash) {
+            Remove-Item $schreib
+            Sagen "  Arbeit unveraendert          : $(Split-Path -Leaf $Ziel)  ($gr Bytes, schon gesichert)"
+        } else {
+            Sagen "  [!] Patch weicht vom gesicherten ab -- NICHT ueberschrieben:"
+            Sagen "      bisher : $(Split-Path -Leaf $Ziel)  ($((Get-Item $Ziel).Length) Bytes)"
+            Sagen "      neu    : $(Split-Path -Leaf $schreib)  ($gr Bytes)"
+        }
+        return $true
+    }
     if ($gr -eq 0) {
         Sagen "  Arbeit des Ausfuehrenden     : KEINE Aenderung ausserhalb der Ergebnisse."
     } else {
         Sagen "  Arbeit gesichert             : $(Split-Path -Leaf $Ziel)  ($gr Bytes Patch)"
     }
+    return $true
 }
 
 function Vergleich {
@@ -450,8 +482,11 @@ if ($Aufraeumen) {
             if ($gerettet -eq 0) { Sagen "  Nichts zu sichern (alles liegt schon im Hauptbaum)." }
         }
         # 1b DIE ARBEIT SICHERN, bevor der Worktree faellt. Siehe Arbeit-Sichern: der
-        #    Ausfuehrende kann nicht committen, sein Code lebt nur hier.
-        Arbeit-Sichern -Ort $wt -Ziel (Join-Path $repo "auftraege\_ergebnisse\${auf}_arbeit.patch")
+        #    Ausfuehrende kann nicht committen, sein Code lebt nur hier. Ist sie NICHT
+        #    gesichert, bleibt der Arbeitsort stehen -- 'worktree remove --force' naehme sie mit.
+        if (-not (Arbeit-Sichern -Ort $wt -Ziel (Join-Path $repo "auftraege\_ergebnisse\${auf}_arbeit.patch"))) {
+            Abbruch "Die Arbeit ist nicht gesichert; der Arbeitsort bleibt stehen. Erst ansehen, dann von Hand sichern oder entfernen."
+        }
         Sagen "  Worktree entfernen: .wt\$auf"
         $r = Native git @("-C", $repo, "worktree", "remove", "--force", ".wt/$auf")
         if ($r.Code -ne 0) { Abbruch "git worktree remove ging nicht durch:`n$($r.Ausgabe)" }
@@ -1086,7 +1121,7 @@ Sagen "  Agent beendet, Exit $code"
 
 # SOFORT sichern, nicht erst beim Aufraeumen. Zwischen Lauf und Aufraeumen liegen
 # Abnahme, Nachlesen und Merge -- und in AUF-004 lag dazwischen der Datenverlust.
-Arbeit-Sichern -Ort $wt -Ziel (Join-Path $repo "auftraege\_ergebnisse\${auf}_arbeit.patch")
+$null = Arbeit-Sichern -Ort $wt -Ziel (Join-Path $repo "auftraege\_ergebnisse\${auf}_arbeit.patch")
 
 $lief = Join-Path $wt ($lieferung -replace '/', '\')
 if (Test-Path $lief) {
