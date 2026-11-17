@@ -8,6 +8,7 @@ import {
 } from '../../db/employment';
 import { useClockodoLocks } from '../../db/clockodo-lock';
 import { countLockStates, lockHint } from '../../domain/clockodo-lock';
+import { arbzgHints } from '../../domain/arbzg';
 import {
   autoTransferHint,
   startAutoTransfer,
@@ -133,6 +134,12 @@ export function HomeScreen({ tracker }: Props) {
           </p>
         ) : null;
       })}
+
+      {arbzgHints(alleEintraege, Date.now()).map((h) => (
+        <p key={h} className="error-text">
+          Arbeitszeitgesetz: {h}
+        </p>
+      ))}
 
       {running ? (
         <div className="tracker-card running">

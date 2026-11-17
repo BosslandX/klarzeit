@@ -24,6 +24,7 @@ import {
 import { useClockodoLocks } from '../../db/clockodo-lock';
 import type { ClockodoConfig } from '../../domain/clockodo';
 import { groupByDay } from '../../domain/aggregate';
+import { arbzgHints } from '../../domain/arbzg';
 import type { Period } from '../../domain/aggregate';
 import type { TimeEntry } from '../../domain/types';
 import { changedTrackedTimes } from '../../domain/tracked-times';
@@ -339,6 +340,11 @@ export function EntriesScreen() {
               <span>{day.label}</span>
               <span className="day-total">{formatDuration(day.totalMs)}</span>
             </div>
+            {arbzgHints(entries ?? [], day.entries[0].start).map((h) => (
+              <p key={h} className="error-text">
+                Arbeitszeitgesetz: {h}
+              </p>
+            ))}
             {[...day.entries].reverse().map((e) => (
               <article key={e.id} className="entry-card">
                 <div className="entry-main">
