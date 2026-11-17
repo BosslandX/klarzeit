@@ -22,6 +22,7 @@ import {
   type Employment,
   type VacationStatus,
 } from '../domain/employment';
+import { BUNDESLAENDER } from '../domain/holidays';
 import { displayName } from '../db/profile';
 
 /** Zusatzdaten fuer Monatsreports: Arbeitszeitkonto + Urlaub. */
@@ -331,6 +332,13 @@ export function buildKontoPanelText(
       tone: 'pos',
     });
   }
+  if (t.holidayDays > 0) {
+    rows.push({
+      label: `Feiertage (${formatDays(t.holidayDays)})`,
+      value: formatSignedDuration(t.holidayCreditMs),
+      tone: 'pos',
+    });
+  }
   rows.push({ label: 'Saldo (Monat)', value: formatSignedDuration(t.saldoMs), tone: saldoTone });
   if (t.includedOvertimeMs > 0) {
     rows.push({
@@ -365,13 +373,21 @@ export function buildKontoPanelText(
         ? `, in diesem Teilmonat anteilig ${dec(includedOvertimeCapMs(emp, t.monthStart))} Std.`
         : '.');
   }
+  const land = BUNDESLAENDER.find((l) => l.code === emp.publicHolidays?.land)?.name;
+  const feiertagHinweis =
+    t.holidayDays > 0 && land !== undefined
+      ? ` Feiertage (${land}) entlasten an Arbeitstagen das Soll um bis zu ` +
+        `${dec(dailyTargetMs(emp))} Std./Tag (§ 2 EntgFG), abzueglich am selben Tag ` +
+        `erfasster Zeit.`
+      : '';
   const hinweis = emp.balanceNote.trim();
   const kontohinweis = hinweis !== '' ? ` ${hinweis}` : '';
   const foot =
     `Basis: ${String(emp.weeklyHours).replace('.', ',')} Std./Woche x 52/12 = ${monatlSoll} Std./Monat. ` +
     `Beschaeftigt seit ${formatDate(emp.startDate)}.${kontohinweis}` +
     abgeltungHinweis +
-    urlaubHinweis;
+    urlaubHinweis +
+    feiertagHinweis;
   return { rows, foot };
 }
 

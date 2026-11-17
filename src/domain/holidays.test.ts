@@ -8,6 +8,13 @@ import {
   cleanPublicHolidays,
   holidaysOf,
   publicHolidayMap,
+  addExtraHoliday,
+  holidayNameOn,
+  holidayPreview,
+  removeExtraHoliday,
+  toggleRegionalHoliday,
+  toggleSkippedHoliday,
+  withHolidayLand,
   type Bundesland,
   type Feiertag,
 } from './holidays';
@@ -204,5 +211,77 @@ describe('Feiertage einer Beschaeftigung (AUF-029)', () => {
     expect(m.size).toBe(12);
     expect(publicHolidayMap(undefined, 2026, 2026).size).toBe(0);
     expect(publicHolidayMap(bayern, 2026, 2027).size).toBe(25);
+  });
+});
+
+
+describe('Feiertage im Formular (AUF-030)', () => {
+  const by = { land: 'BY' as const, regional: [], extra: [], skip: [] };
+
+  it('withHolidayLand: leer schaltet aus, ein neues Land behaelt eigene und gestrichene Tage', () => {
+    expect(withHolidayLand(by, '')).toBeUndefined();
+    expect(withHolidayLand(undefined, 'HE')).toEqual({ land: 'HE', regional: [], extra: [], skip: [] });
+    const voll = {
+      land: 'BY' as const,
+      regional: ['mariaehimmelfahrt' as const],
+      extra: [tag(2026, 12, 24)],
+      skip: [tag(2026, 1, 6)],
+    };
+    expect(withHolidayLand(voll, 'SN')).toEqual({
+      land: 'SN',
+      regional: [],
+      extra: [tag(2026, 12, 24)],
+      skip: [tag(2026, 1, 6)],
+    });
+    expect(withHolidayLand(voll, 'XX')).toBe(voll);
+  });
+
+  it('toggleRegionalHoliday: an und ab, nur was das Land anbietet', () => {
+    const mit = toggleRegionalHoliday(by, 'friedensfest');
+    expect(mit.regional).toEqual(['friedensfest']);
+    expect(toggleRegionalHoliday(mit, 'friedensfest').regional).toEqual([]);
+    expect(toggleRegionalHoliday(by, 'fronleichnam').regional).toEqual([]);
+  });
+
+  it('streichen und eigene Tage: auf Mitternacht, ohne Doppelte, aufsteigend', () => {
+    const gestrichen = toggleSkippedHoliday(by, tag(2026, 1, 6) + 3_600_000);
+    expect(gestrichen.skip).toEqual([tag(2026, 1, 6)]);
+    expect(toggleSkippedHoliday(gestrichen, tag(2026, 1, 6) + 7_200_000).skip).toEqual([]);
+    const eigen = addExtraHoliday(addExtraHoliday(by, tag(2026, 12, 31)), tag(2026, 12, 24) + 60_000);
+    expect(eigen.extra).toEqual([tag(2026, 12, 24), tag(2026, 12, 31)]);
+    expect(addExtraHoliday(eigen, tag(2026, 12, 24)).extra).toHaveLength(2);
+    expect(removeExtraHoliday(eigen, tag(2026, 12, 24) + 60_000).extra).toEqual([tag(2026, 12, 31)]);
+  });
+
+  it('holidayPreview: Landesfeiertage samt gestrichenen, dazu eigene, nach Datum', () => {
+    const p = holidayPreview(
+      { ...by, extra: [tag(2026, 12, 24), tag(2027, 1, 2)], skip: [tag(2026, 1, 6)] },
+      2026,
+    );
+    expect(p).toHaveLength(13);
+    expect(p[1]).toEqual({
+      date: tag(2026, 1, 6),
+      name: 'Heilige Drei Koenige',
+      eigen: false,
+      gestrichen: true,
+    });
+    expect(p.find((h) => h.date === tag(2026, 12, 24))).toEqual({
+      date: tag(2026, 12, 24),
+      name: 'Eigener Feiertag',
+      eigen: true,
+      gestrichen: false,
+    });
+    expect(p.map((h) => h.date)).toEqual([...p.map((h) => h.date)].sort((a, b) => a - b));
+    expect(holidayPreview(undefined, 2026)).toEqual([]);
+  });
+
+  it('holidayNameOn: Name am Feiertag, sonst undefined', () => {
+    expect(holidayNameOn(by, tag(2026, 5, 14) + 7_200_000)).toBe('Christi Himmelfahrt');
+    expect(holidayNameOn(by, tag(2026, 5, 15))).toBeUndefined();
+    expect(holidayNameOn(undefined, tag(2026, 5, 14))).toBeUndefined();
+    expect(holidayNameOn({ ...by, skip: [tag(2026, 5, 14)] }, tag(2026, 5, 14))).toBeUndefined();
+    expect(holidayNameOn({ ...by, extra: [tag(2026, 12, 24)] }, tag(2026, 12, 24))).toBe(
+      'Eigener Feiertag',
+    );
   });
 });

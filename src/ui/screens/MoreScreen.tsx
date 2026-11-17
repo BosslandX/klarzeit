@@ -37,6 +37,7 @@ import { ClockodoSettings } from '../components/ClockodoSettings';
 import { VacationClockodo } from '../components/VacationClockodo';
 import { VacationDayRow } from '../components/VacationDayRow';
 import { WorkWeekdaysField } from '../components/WorkWeekdaysField';
+import { HolidaySettingsField } from '../components/HolidaySettingsField';
 import { removeClockodoKey } from '../../clockodo/key-store';
 import { removeClockodoLists } from '../../db/clockodo-lists';
 import { removeClockodoLock } from '../../db/clockodo-lock';
@@ -468,6 +469,10 @@ export function MoreScreen() {
             setEditDraft({ ...editDraft, workWeekdays: next, workdaysPerWeek: next.length });
           }}
         />
+        <HolidaySettingsField
+          value={emp.publicHolidays}
+          onChange={(next) => setEmpField('publicHolidays', next)}
+        />
         <label className="field">
           <span>Urlaubsanspruch laut Vertrag (Tage/Jahr)</span>
           <input
@@ -679,7 +684,7 @@ export function MoreScreen() {
           {rangeTooLong
             ? `Der Zeitraum ist zu lang (max. ${MAX_VACATION_RANGE_DAYS} Tage am Stueck). Bitte Datum pruefen.`
             : vacRangeMsg ||
-              'Es zaehlen die Wochentage der Beschaeftigung; ohne gewaehlte Wochentage Montag bis Freitag, ab 6 Arbeitstagen auch der Samstag. Feiertage kennt die App nicht — einzelne Tage danach gegebenenfalls wieder entfernen.'}
+              'Es zaehlen die Wochentage der Beschaeftigung; ohne gewaehlte Wochentage Montag bis Freitag, ab 6 Arbeitstagen auch der Samstag. Feiertage der Beschaeftigung werden uebersprungen.'}
         </p>
 
         <VacationClockodo employment={vacEmp} days={vacDays} onDone={refreshVac} />
@@ -693,9 +698,7 @@ export function MoreScreen() {
                 day={d}
                 days={vacDays}
                 employmentLabel={empLabel(d.employmentId)}
-                showClockodo={
-                  employments.find((e) => e.id === d.employmentId)?.clockodo != null
-                }
+                employment={employments.find((e) => e.id === d.employmentId)}
                 onRemove={() => void removeVac(d.date, d.employmentId)}
                 onWithdrawn={refreshVac}
               />

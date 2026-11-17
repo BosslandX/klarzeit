@@ -305,6 +305,14 @@ export function ReportsScreen() {
                 </strong>
               </div>
             )}
+            {ledger.target.holidayDays > 0 && (
+              <div className="konto-row">
+                <span>Feiertage ({formatDays(ledger.target.holidayDays)})</span>
+                <strong className="pos">
+                  {formatSignedDuration(ledger.target.holidayCreditMs)}
+                </strong>
+              </div>
+            )}
             <div className="konto-row">
               <span>Saldo (Monat)</span>
               <strong className={ledger.target.saldoMs >= 0 ? 'pos' : 'neg'}>

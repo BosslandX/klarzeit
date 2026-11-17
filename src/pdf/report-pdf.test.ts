@@ -187,3 +187,31 @@ describe('Kontoblock PDF-Text (AUF-016)', () => {
     );
   });
 });
+
+
+describe('Kontoblock mit Feiertagen (AUF-030)', () => {
+  const bayern: Employment = {
+    ...defaultEmployment,
+    startDate: new Date(2026, 0, 1).getTime(),
+    weeklyHours: 40,
+    workdaysPerWeek: 5,
+    balanceNote: '',
+    publicHolidays: { land: 'BY', regional: [], extra: [], skip: [] },
+  };
+
+  it('Kontoblock: Zeile Feiertage und Fussnote, wenn der Monat Feiertage hat', () => {
+    const ledger = buildBalanceLedger(bayern, [], new Date(2026, 4, 31).getTime())!;
+    const { rows, foot } = buildKontoPanelText(ledger, bayern);
+    expect(rows.map((r) => [r.label, r.value])).toContainEqual(['Feiertage (3 Tage)', '+24:00 h']);
+    expect(foot).toContain(
+      'Feiertage (Bayern) entlasten an Arbeitstagen das Soll um bis zu 8,00 Std./Tag (§ 2 EntgFG)',
+    );
+  });
+
+  it('Kontoblock: ohne Feiertag im Monat keine Zeile und kein Satz', () => {
+    const ledger = buildBalanceLedger(bayern, [], new Date(2026, 6, 31).getTime())!;
+    const { rows, foot } = buildKontoPanelText(ledger, bayern);
+    expect(rows.some((r) => r.label.startsWith('Feiertage'))).toBe(false);
+    expect(foot).not.toContain('EntgFG');
+  });
+});

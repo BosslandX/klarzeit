@@ -344,3 +344,96 @@ export function publicHolidayMap(
   for (const d of settings.skip) tage.delete(d);
   return tage;
 }
+
+
+/** Ein Tag der Vorschau im Formular (AUF-030). */
+export interface HolidayPreviewDay {
+  date: number;
+  name: string;
+  /** Eigener Tag (aus extra). */
+  eigen: boolean;
+  /** Gestrichen (in skip). */
+  gestrichen: boolean;
+}
+
+/**
+ * Land waehlen: '' schaltet die Feiertage aus; regionale Tage, die das neue Land nicht kennt,
+ * fallen weg, eigene und gestrichene bleiben. Ein unbekanntes Land aendert nichts.
+ */
+export function withHolidayLand(
+  settings: PublicHolidays | undefined,
+  land: string,
+): PublicHolidays | undefined {
+  if (land === '') return undefined;
+  const neu = cleanPublicHolidays({
+    land,
+    regional: settings?.regional ?? [],
+    extra: settings?.extra ?? [],
+    skip: settings?.skip ?? [],
+  });
+  return neu ?? settings;
+}
+
+/** Einen regionalen Feiertag an- oder abwaehlen; was das Land nicht anbietet, aendert nichts. */
+export function toggleRegionalHoliday(
+  settings: PublicHolidays,
+  key: RegionalerFeiertag,
+): PublicHolidays {
+  const regional = settings.regional.includes(key)
+    ? settings.regional.filter((k) => k !== key)
+    : [...settings.regional, key];
+  return cleanPublicHolidays({ ...settings, regional }) ?? settings;
+}
+
+/** Einen Feiertag streichen oder zurueckholen. */
+export function toggleSkippedHoliday(settings: PublicHolidays, date: number): PublicHolidays {
+  const tag = startOfDay(date).getTime();
+  const skip = settings.skip.includes(tag)
+    ? settings.skip.filter((d) => d !== tag)
+    : [...settings.skip, tag];
+  return { ...settings, skip: tagesliste(skip) };
+}
+
+/** Einen eigenen Feiertag hinzufuegen; derselbe Tag zweimal aendert nichts. */
+export function addExtraHoliday(settings: PublicHolidays, date: number): PublicHolidays {
+  return { ...settings, extra: tagesliste([...settings.extra, date]) };
+}
+
+/** Einen eigenen Feiertag entfernen. */
+export function removeExtraHoliday(settings: PublicHolidays, date: number): PublicHolidays {
+  const weg = startOfDay(date).getTime();
+  return { ...settings, extra: settings.extra.filter((d) => d !== weg) };
+}
+
+/** Feiertage eines Jahres fuer das Formular: die des Landes (gestrichene markiert) und eigene. */
+export function holidayPreview(
+  settings: PublicHolidays | undefined,
+  year: number,
+): HolidayPreviewDay[] {
+  if (settings === undefined) return [];
+  const landTage = holidaysOf(year, settings.land, settings.regional).map((h) => ({
+    date: h.date,
+    name: h.name,
+    eigen: false,
+    gestrichen: settings.skip.includes(h.date),
+  }));
+  const eigene = settings.extra
+    .filter((d) => new Date(d).getFullYear() === year && !landTage.some((h) => h.date === d))
+    .map((d) => ({
+      date: d,
+      name: 'Eigener Feiertag',
+      eigen: true,
+      gestrichen: settings.skip.includes(d),
+    }));
+  return [...landTage, ...eigene].sort((a, b) => a.date - b.date);
+}
+
+/** Name des Feiertags an diesem Tag fuer die Einstellung, sonst undefined. */
+export function holidayNameOn(
+  settings: PublicHolidays | undefined,
+  date: number,
+): string | undefined {
+  const am = startOfDay(date).getTime();
+  const jahr = new Date(am).getFullYear();
+  return publicHolidayMap(settings, jahr, jahr).get(am);
+}
