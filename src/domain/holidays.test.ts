@@ -5,7 +5,9 @@ import {
   REGIONALE_FEIERTAGE,
   bussUndBettag,
   easterSunday,
+  cleanPublicHolidays,
   holidaysOf,
+  publicHolidayMap,
   type Bundesland,
   type Feiertag,
 } from './holidays';
@@ -158,5 +160,50 @@ describe('Feiertage je Land (AUF-028)', () => {
         for (const h of liste) expect(new Date(h.date).getHours()).toBe(0);
       }
     }
+  });
+});
+
+
+describe('Feiertage einer Beschaeftigung (AUF-029)', () => {
+  it('cleanPublicHolidays: Land Pflicht, regionale nur aus dem Angebot, Tage auf Mitternacht', () => {
+    expect(
+      cleanPublicHolidays({
+        land: 'BY',
+        regional: ['friedensfest', 'fronleichnam', 'friedensfest'],
+        extra: [tag(2026, 12, 24) + 3_600_000, tag(2026, 12, 24), 'x'],
+        skip: [tag(2026, 1, 6)],
+      }),
+    ).toEqual({
+      land: 'BY',
+      regional: ['friedensfest'],
+      extra: [tag(2026, 12, 24)],
+      skip: [tag(2026, 1, 6)],
+    });
+    expect(cleanPublicHolidays({ land: 'HE' })).toEqual({
+      land: 'HE',
+      regional: [],
+      extra: [],
+      skip: [],
+    });
+    expect(cleanPublicHolidays({ land: 'XX', regional: [] })).toBeUndefined();
+    expect(cleanPublicHolidays(null)).toBeUndefined();
+    expect(cleanPublicHolidays('BY')).toBeUndefined();
+  });
+
+  it('publicHolidayMap: Land, eigene Tage dazu, gestrichene weg, nur in den Jahren', () => {
+    const bayern = {
+      land: 'BY' as const,
+      regional: [],
+      extra: [tag(2026, 12, 24), tag(2027, 12, 24)],
+      skip: [tag(2026, 1, 6)],
+    };
+    const m = publicHolidayMap(bayern, 2026, 2026);
+    expect(m.get(tag(2026, 12, 24))).toBe('Eigener Feiertag');
+    expect(m.has(tag(2026, 1, 6))).toBe(false);
+    expect(m.has(tag(2027, 12, 24))).toBe(false);
+    expect(m.get(tag(2026, 10, 3))).toBe('Tag der Deutschen Einheit');
+    expect(m.size).toBe(12);
+    expect(publicHolidayMap(undefined, 2026, 2026).size).toBe(0);
+    expect(publicHolidayMap(bayern, 2026, 2027).size).toBe(25);
   });
 });

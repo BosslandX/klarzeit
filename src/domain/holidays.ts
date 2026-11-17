@@ -1,4 +1,4 @@
-import { addDays, getDay } from 'date-fns';
+import { addDays, getDay, startOfDay } from 'date-fns';
 
 /**
  * Gesetzliche Feiertage je Bundesland, offline berechnet (AUF-028).
@@ -283,4 +283,65 @@ export function holidaysOf(
   return [...jeDatum.entries()]
     .sort(([a], [b]) => a - b)
     .map(([date, alle]) => ({ date, name: alle.join(' / ') }));
+}
+
+
+/** Feiertage am Arbeitsort einer Beschaeftigung (AUF-029). */
+export interface PublicHolidays {
+  /** Bundesland des Arbeitsorts. */
+  land: Bundesland;
+  /** Zugeschaltete regionale Feiertage dieses Landes. */
+  regional: RegionalerFeiertag[];
+  /** Eigene zusaetzliche Feiertage (lokale Mitternacht, aufsteigend). */
+  extra: number[];
+  /** Gestrichene Feiertage (lokale Mitternacht, aufsteigend). */
+  skip: number[];
+}
+
+/**
+ * Gespeicherte Einstellung pruefen. Ohne gueltiges Land undefined (keine Feiertage).
+ * Regionale Tage nur, wenn das Land sie anbietet; Tage auf lokale Mitternacht, ohne
+ * Doppelte, aufsteigend.
+ */
+export function cleanPublicHolidays(raw: unknown): PublicHolidays | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const x = raw as Record<string, unknown>;
+  const land = BUNDESLAENDER.find((l) => l.code === x.land)?.code;
+  if (land === undefined) return undefined;
+  const gewaehlt = Array.isArray(x.regional) ? (x.regional as unknown[]) : [];
+  const regional = REGIONALE_FEIERTAGE[land]
+    .map((r) => r.key)
+    .filter((k) => gewaehlt.includes(k));
+  return { land, regional, extra: tagesliste(x.extra), skip: tagesliste(x.skip) };
+}
+
+/** Tage aus einer gespeicherten Liste: endliche Zahlen auf lokale Mitternacht, aufsteigend. */
+function tagesliste(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  const tage = raw
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+    .map((v) => startOfDay(v).getTime());
+  return [...new Set(tage)].sort((a, b) => a - b);
+}
+
+/**
+ * Feiertage einer Beschaeftigung in den Jahren von..bis als Datum -> Name: die des Landes
+ * samt zugeschalteten regionalen, dazu eigene, ohne gestrichene. Ohne Einstellung leer.
+ */
+export function publicHolidayMap(
+  settings: PublicHolidays | undefined,
+  fromYear: number,
+  toYear: number,
+): Map<number, string> {
+  const tage = new Map<number, string>();
+  if (settings === undefined) return tage;
+  for (let jahr = fromYear; jahr <= toYear; jahr++) {
+    for (const h of holidaysOf(jahr, settings.land, settings.regional)) tage.set(h.date, h.name);
+  }
+  for (const d of settings.extra) {
+    const jahr = new Date(d).getFullYear();
+    if (jahr >= fromYear && jahr <= toYear && !tage.has(d)) tage.set(d, 'Eigener Feiertag');
+  }
+  for (const d of settings.skip) tage.delete(d);
+  return tage;
 }

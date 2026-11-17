@@ -1013,3 +1013,57 @@ describe('Arbeitstage als Wochentage (AUF-027)', () => {
     expect(fillEmptyEmployment(localMitStd, incoming).workWeekdays).toEqual([1, 2]);
   });
 });
+
+
+describe('Feiertage einer Beschaeftigung im Backup (AUF-029)', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+  });
+
+  const bayern = {
+    land: 'BY',
+    regional: ['mariaehimmelfahrt'],
+    extra: [new Date(2026, 11, 24).getTime()],
+    skip: [],
+  };
+
+  it('cleanEmployment traegt die Feiertage, ein ungueltiges Land faellt weg', () => {
+    const base = { ...defaultEmployment, id: 'x' };
+    expect(cleanEmployment({ ...base, publicHolidays: bayern }).publicHolidays).toEqual(bayern);
+    expect('publicHolidays' in cleanEmployment({ ...base, publicHolidays: { land: 'XX' } })).toBe(
+      false,
+    );
+    expect('publicHolidays' in cleanEmployment(base)).toBe(false);
+  });
+
+  it('Rundreise publicHolidays ueber Backup', async () => {
+    prefStore.set('employments', JSON.stringify([emp(INITIAL_EMPLOYMENT_ID, 'H', 20)]));
+    await updateEmployment(INITIAL_EMPLOYMENT_ID, {
+      publicHolidays: { land: 'BY', regional: ['mariaehimmelfahrt'], extra: [], skip: [] },
+    });
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const list = await getEmployments();
+    expect(list[0].publicHolidays).toEqual({
+      land: 'BY',
+      regional: ['mariaehimmelfahrt'],
+      extra: [],
+      skip: [],
+    });
+  });
+
+  it('fillEmptyEmployment uebernimmt die Feiertage nur mit dem Vertrag', () => {
+    const local = cleanEmployment({ id: 'emp-1' });
+    const incoming = cleanEmployment({ id: 'emp-1', weeklyHours: 30, publicHolidays: bayern });
+    expect(fillEmptyEmployment(local, incoming).publicHolidays).toEqual(bayern);
+    const localMitStd = cleanEmployment({ id: 'emp-1', weeklyHours: 20 });
+    expect(fillEmptyEmployment(localMitStd, incoming).publicHolidays).toBeUndefined();
+  });
+});

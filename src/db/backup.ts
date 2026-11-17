@@ -181,8 +181,9 @@ function employmentFromLegacyBackup(data: BackupData): Employment {
 /**
  * Zusammenfuehren: fuellt leere Feldgruppen der lokalen Beschaeftigung aus incoming.
  * Eine Gruppe kommt nur als Ganzes und nur, wenn sie lokal leer ist:
- * - Vertrag (Beginn, Ende, Wochenstunden, Arbeitstage/Wochentage, Urlaubsmodus, Anfangssaldo,
- *   Vertragsurlaub, abgegoltene Ueberstunden, Kontohinweis): lokal 0 Wochenstunden und
+ * - Vertrag (Beginn, Ende, Wochenstunden, Arbeitstage/Wochentage, Feiertage, Urlaubsmodus,
+ *   Anfangssaldo, Vertragsurlaub, abgegoltene Ueberstunden, Kontohinweis): lokal 0
+ *   Wochenstunden und
  *   incoming mit mehr als 0. Der brauchbare Vertrag ersetzt dann auch lokal gesetzte
  *   Einzelwerte wie die Arbeitstage.
  * - Stammdaten (Arbeitgeber, Personalnummer, Abteilung): alle drei lokal leer.
@@ -214,6 +215,7 @@ export function fillEmptyEmployment(
       weeklyHours: incomingClean.weeklyHours,
       workdaysPerWeek: incomingClean.workdaysPerWeek,
       workWeekdays: incomingClean.workWeekdays,
+      publicHolidays: incomingClean.publicHolidays,
       vacationYearMode: incomingClean.vacationYearMode,
       openingBalanceMs: incomingClean.openingBalanceMs,
       contractVacationDays: incomingClean.contractVacationDays,

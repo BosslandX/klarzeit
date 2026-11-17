@@ -15,6 +15,7 @@ import {
   type ClockodoAbsenceRef,
 } from '../domain/clockodo';
 import { applyAbsenceRef, daysOfAbsence } from '../domain/clockodo-absence';
+import { cleanPublicHolidays } from '../domain/holidays';
 import { getProfile } from './profile';
 import { removeClockodoKey } from '../clockodo/key-store';
 import { removeClockodoLists } from './clockodo-lists';
@@ -61,6 +62,7 @@ export function cleanEmployment(raw: unknown): Employment {
   const wdRaw = Math.round(num(x.workdaysPerWeek, defaultEmployment.workdaysPerWeek));
   const workdaysPerWeek = Math.min(6, Math.max(1, wdRaw));
   const workWeekdays = cleanWorkWeekdays(x.workWeekdays);
+  const publicHolidays = cleanPublicHolidays(x.publicHolidays);
   let contractVacationDays: number | null = null;
   if (
     typeof x.contractVacationDays === 'number' &&
@@ -107,6 +109,7 @@ export function cleanEmployment(raw: unknown): Employment {
     weeklyHours,
     workdaysPerWeek: workWeekdays ? workWeekdays.length : workdaysPerWeek,
     ...(workWeekdays ? { workWeekdays } : {}),
+    ...(publicHolidays ? { publicHolidays } : {}),
     vacationYearMode: mode,
     openingBalanceMs: num(x.openingBalanceMs, 0),
     contractVacationDays,

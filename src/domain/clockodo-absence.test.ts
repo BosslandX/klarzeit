@@ -210,3 +210,19 @@ describe('Urlaubsantraege bei festen Wochentagen (AUF-027)', () => {
     ]);
   });
 });
+
+
+describe('Urlaubsantraege ueber einen Feiertag (AUF-029)', () => {
+  it('vacationRequestRanges: Himmelfahrt dazwischen trennt nicht', () => {
+    // 13.05.2026 Mittwoch, 14.05. Christi Himmelfahrt (Bayern), 15.05. Freitag.
+    const days = [tag(2026, 5, 13), tag(2026, 5, 15)];
+    const bayern = { land: 'BY' as const, regional: [], extra: [], skip: [] };
+    expect(spannen(days, empMit({ publicHolidays: bayern }))).toEqual([
+      ['2026-05-13', '2026-05-15'],
+    ]);
+    expect(spannen(days, empMit())).toEqual([
+      ['2026-05-13', '2026-05-13'],
+      ['2026-05-15', '2026-05-15'],
+    ]);
+  });
+});

@@ -822,3 +822,93 @@ describe('Arbeitstage als Wochentage (AUF-027)', () => {
     expect(toggleWorkWeekday([1, 2, 3, 4, 5, 6], 0)).toBeNull();
   });
 });
+
+
+describe('Feiertage im Konto und beim Urlaub (AUF-029)', () => {
+  const d = (y: number, mo: number, dd: number) => new Date(y, mo - 1, dd).getTime();
+  const bayern = { land: 'BY' as const, regional: [], extra: [], skip: [] };
+  // 40 Stunden an Mo-Fr, 8 h Tagessoll; Mai 2026 in Bayern: 1. Mai (Fr), Christi
+  // Himmelfahrt 14.05. (Do), Pfingstmontag 25.05. (Mo).
+  const vollzeit: Employment = {
+    ...emp,
+    startDate: d(2026, 1, 1),
+    weeklyHours: 40,
+    workdaysPerWeek: 5,
+    publicHolidays: bayern,
+  };
+  const MAI_SOLL = 10_400 * MINUTE; // 40 h x 52/12 = 173 h 20 min
+  const eintrag = (y: number, mo: number, dd: number, h: number): TimeEntry => ({
+    employmentId: 'emp-1',
+    start: new Date(y, mo - 1, dd, 8).getTime(),
+    end: new Date(y, mo - 1, dd, 8 + h).getTime(),
+    breakMinutes: 0,
+    activity: '',
+    note: '',
+    source: 'manual',
+    createdAt: 0,
+    updatedAt: 0,
+  });
+
+  it('Feiertage an eigenen Arbeitstagen fuellen das Tagessoll auf', () => {
+    const l = buildBalanceLedger(vollzeit, [], d(2026, 5, 15))!;
+    expect(l.target.holidayDays).toBe(3);
+    expect(l.target.holidayCreditMs).toBe(24 * HOUR);
+    expect(l.target.saldoMs).toBe(24 * HOUR - MAI_SOLL);
+  });
+
+  it('nur an eigenen Arbeitstagen: bei Mo-Do zaehlt der 1. Mai (Fr) nicht', () => {
+    const moDo: Employment = { ...vollzeit, weeklyHours: 28, workdaysPerWeek: 4, workWeekdays: [1, 2, 3, 4] };
+    const l = buildBalanceLedger(moDo, [], d(2026, 5, 15))!;
+    expect(l.target.holidayDays).toBe(2);
+    expect(l.target.holidayCreditMs).toBe(14 * HOUR);
+  });
+
+  it('Arbeit am Feiertag zaehlt als Ist, gutgeschrieben wird nur der Rest', () => {
+    const l = buildBalanceLedger(vollzeit, [eintrag(2026, 5, 14, 4)], d(2026, 5, 15))!;
+    expect(l.target.istMs).toBe(4 * HOUR);
+    expect(l.target.holidayCreditMs).toBe(20 * HOUR);
+  });
+
+  it('ein Urlaubstag am Feiertag zaehlt einmal, als Feiertag', () => {
+    const l = buildBalanceLedger(vollzeit, [], d(2026, 5, 15), [d(2026, 5, 14), d(2026, 5, 15)])!;
+    expect(l.target.vacationDays).toBe(1);
+    expect(l.target.vacationCreditMs).toBe(8 * HOUR);
+    expect(l.target.holidayDays).toBe(3);
+    expect(l.target.holidayCreditMs).toBe(24 * HOUR);
+  });
+
+  it('ohne Feiertagseinstellung rechnet das Konto wie bisher', () => {
+    const ohne: Employment = { ...vollzeit, publicHolidays: undefined };
+    const l = buildBalanceLedger(ohne, [], d(2026, 5, 15))!;
+    expect(l.target.holidayDays).toBe(0);
+    expect(l.target.holidayCreditMs).toBe(0);
+    expect(l.target.saldoMs).toBe(-MAI_SOLL);
+  });
+
+  it('Urlaub und Feiertage zusammen hoechstens das Monats-Soll', () => {
+    // Dezember 2026: 23 Werktage Mo-Fr, Feiertag am 25.12. (Fr); Urlaub an allen anderen.
+    const urlaub = workdaysInRange(d(2026, 12, 1), d(2026, 12, 31), vollzeit);
+    expect(urlaub).toHaveLength(22);
+    const l = buildBalanceLedger(vollzeit, [], d(2026, 12, 15), urlaub)!;
+    expect(l.target.vacationCreditMs + l.target.holidayCreditMs).toBe(l.target.sollMs);
+    expect(l.target.saldoMs).toBe(0);
+  });
+
+  it('workdaysInRange laesst Feiertage aus, ohne Einstellung nicht', () => {
+    expect(workdaysInRange(d(2026, 5, 11), d(2026, 5, 17), vollzeit)).toEqual([
+      d(2026, 5, 11),
+      d(2026, 5, 12),
+      d(2026, 5, 13),
+      d(2026, 5, 15),
+    ]);
+    expect(workdaysInRange(d(2026, 5, 11), d(2026, 5, 17), { workdaysPerWeek: 5 })).toHaveLength(5);
+  });
+
+  it('buildVacationStatus: ein Urlaubstag am Feiertag ist nicht genommen', () => {
+    expect(buildVacationStatus(vollzeit, [d(2026, 5, 14), d(2026, 5, 15)], 2026).taken).toBe(1);
+    expect(
+      buildVacationStatus({ ...vollzeit, publicHolidays: undefined }, [d(2026, 5, 14), d(2026, 5, 15)], 2026)
+        .taken,
+    ).toBe(2);
+  });
+});

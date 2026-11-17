@@ -17,6 +17,7 @@ import { de } from 'date-fns/locale';
 import { HOUR, MINUTE, netMs } from './time';
 import type { TimeEntry } from './types';
 import type { ClockodoAbsenceRef, ClockodoConfig } from './clockodo';
+import { publicHolidayMap, type PublicHolidays } from './holidays';
 
 /**
  * Beschaeftigungs-/Vertragsdaten fuer Arbeitszeitkonto und gesetzlichen Urlaub.
@@ -46,6 +47,8 @@ export interface Employment {
    * gesetzt, ist workdaysPerWeek seine Laenge (cleanEmployment).
    */
   workWeekdays?: number[];
+  /** Feiertage am Arbeitsort (AUF-029); fehlt = keine, wie bis 1.12. */
+  publicHolidays?: PublicHolidays;
   /** Darstellung des Urlaubsanspruchs im Eintrittsjahr. */
   vacationYearMode: VacationYearMode;
   /** Anfangssaldo in ms zum Start (uebernommene Ueber-/Minusstunden). Default 0. */
@@ -182,7 +185,9 @@ export interface MonthBalance {
   istMs: number;
   vacationDays: number; // im Monat genommene Urlaubstage (im Beschaeftigungsfenster)
   vacationCreditMs: number; // Gutschrift dafuer, gedeckelt auf sollMs
-  saldoMs: number; // istMs + vacationCreditMs - sollMs (positiv = Ueberstunden)
+  holidayDays: number; // Feiertage an eigenen Arbeitstagen im Monat (im Beschaeftigungsfenster)
+  holidayCreditMs: number; // Gutschrift dafuer, mit dem Urlaub zusammen gedeckelt auf sollMs
+  saldoMs: number; // istMs + vacationCreditMs + holidayCreditMs - sollMs (positiv = Ueberstunden)
   includedOvertimeMs: number; // mit Gehalt abgegolten dieses Monats (ms), nie negativ
 }
 
@@ -242,8 +247,15 @@ function vacationOfMonth(
   const mEnd = endOfMonth(monthRef).getTime();
   const empStart = startOfDay(emp.startDate).getTime();
   const empEnd = emp.endDate != null ? endOfDay(emp.endDate).getTime() : Infinity;
+  // Ein Urlaubstag auf einem Feiertag zaehlt als Feiertag, nicht als Urlaub (§ 3 Abs. 2 BUrlG).
+  const feiertage = publicHolidayMap(emp.publicHolidays, getYear(monthRef), getYear(monthRef));
   const inMonth = vacationDates.filter(
-    (d) => d >= mStart && d <= mEnd && d >= empStart && d <= empEnd,
+    (d) =>
+      d >= mStart &&
+      d <= mEnd &&
+      d >= empStart &&
+      d <= empEnd &&
+      !feiertage.has(startOfDay(d).getTime()),
   );
   const perDay = dailyTargetMs(emp);
   const creditMs = inMonth.reduce((sum, day) => {
@@ -260,6 +272,49 @@ function vacationOfMonth(
   }, 0);
   return {
     days: inMonth.length,
+    creditMs: Math.round(creditMs / MINUTE) * MINUTE,
+  };
+}
+
+/**
+ * Feiertage eines Monats an eigenen Arbeitstagen und die Gutschrift dafuer (AUF-029). Wie
+ * beim Urlaub fuellt sie nur bis zum Tagessoll auf: Arbeit am Feiertag zaehlt als Ist,
+ * gutgeschrieben wird der Rest. Grundlage: das Entgelt fuer Arbeitszeit, die infolge eines
+ * gesetzlichen Feiertages ausfaellt (§ 2 Abs. 1 EntgFG).
+ */
+function holidaysOfMonth(
+  emp: Employment,
+  entries: readonly TimeEntry[],
+  monthRef: number,
+): { days: number; creditMs: number } {
+  const mStart = startOfMonth(monthRef).getTime();
+  const mEnd = endOfMonth(monthRef).getTime();
+  const empStart = startOfDay(emp.startDate).getTime();
+  const empEnd = emp.endDate != null ? endOfDay(emp.endDate).getTime() : Infinity;
+  const arbeitstage = workWeekdaysOf(emp);
+  const jahr = getYear(monthRef);
+  const tage = [...publicHolidayMap(emp.publicHolidays, jahr, jahr).keys()].filter(
+    (d) =>
+      d >= mStart &&
+      d <= mEnd &&
+      d >= empStart &&
+      d <= empEnd &&
+      arbeitstage.includes(getDay(d)),
+  );
+  const perDay = dailyTargetMs(emp);
+  const creditMs = tage.reduce((sum, day) => {
+    const dayEnd = endOfDay(day).getTime();
+    const istOfDay = entries.reduce(
+      (s, e) =>
+        e.start >= day && e.start <= dayEnd && e.start >= empStart && e.start <= empEnd
+          ? s + netMs(e)
+          : s,
+      0,
+    );
+    return sum + Math.max(0, perDay - istOfDay);
+  }, 0);
+  return {
+    days: tage.length,
     creditMs: Math.round(creditMs / MINUTE) * MINUTE,
   };
 }
@@ -306,7 +361,10 @@ export function buildBalanceLedger(
     // vacationOfMonth bereits TAGGENAU erledigt; ein zweiter Abzug auf
     // Monatsebene wuerde Arbeit an urlaubsfreien Tagen entwerten.
     const vacationCreditMs = Math.min(vac.creditMs, sollMs);
-    const saldoMs = istMs + vacationCreditMs - sollMs;
+    // Feiertage teilen sich den Deckel mit dem Urlaub: zusammen hoechstens das Soll.
+    const hol = holidaysOfMonth(emp, entries, m.getTime());
+    const holidayCreditMs = Math.min(hol.creditMs, sollMs - vacationCreditMs);
+    const saldoMs = istMs + vacationCreditMs + holidayCreditMs - sollMs;
     const includedOvertimeMs = Math.min(
       includedOvertimeCapMs(emp, m.getTime()),
       Math.max(0, saldoMs),
@@ -318,6 +376,8 @@ export function buildBalanceLedger(
       istMs,
       vacationDays,
       vacationCreditMs,
+      holidayDays: hol.days,
+      holidayCreditMs,
       saldoMs,
       includedOvertimeMs,
     };
@@ -338,20 +398,21 @@ export function buildBalanceLedger(
  * Arbeitstage eines Zeitraums als Tagesdaten (lokale Mitternacht), aufsteigend: die
  * Tage, deren Wochentag in workWeekdaysOf(emp) steht.
  *
- * Feiertage sind der App unbekannt und bleiben enthalten. `bis` vor `von`
- * ergibt eine leere Liste.
+ * Feiertage der Beschaeftigung (publicHolidays) zaehlen nicht: an ihnen gibt es keinen
+ * Urlaubstag (§ 3 Abs. 2 BUrlG). `bis` vor `von` ergibt eine leere Liste.
  */
 export function workdaysInRange(
   fromEpoch: number,
   toEpoch: number,
-  emp: Pick<Employment, 'workdaysPerWeek' | 'workWeekdays'>,
+  emp: Pick<Employment, 'workdaysPerWeek' | 'workWeekdays' | 'publicHolidays'>,
 ): number[] {
   const from = startOfDay(fromEpoch);
   const to = startOfDay(toEpoch);
   if (to.getTime() < from.getTime()) return [];
   const days = workWeekdaysOf(emp);
+  const feiertage = publicHolidayMap(emp.publicHolidays, from.getFullYear(), to.getFullYear());
   return eachDayOfInterval({ start: from, end: to })
-    .filter((d) => days.includes(getDay(d)))
+    .filter((d) => days.includes(getDay(d)) && !feiertage.has(d.getTime()))
     .map((d) => d.getTime());
 }
 
@@ -570,7 +631,11 @@ export function buildVacationStatus(
     entitlement = waitingFulfilled ? annualFull : prorataRounded;
   }
 
-  const taken = takenDates.filter((d) => getYear(d) === year).length;
+  // Urlaubstage auf Feiertagen zaehlen nicht (§ 3 Abs. 2 BUrlG).
+  const feiertage = publicHolidayMap(emp.publicHolidays, year, year);
+  const taken = takenDates.filter(
+    (d) => getYear(d) === year && !feiertage.has(startOfDay(d).getTime()),
+  ).length;
   return {
     year,
     workdaysPerWeek: emp.workdaysPerWeek,
