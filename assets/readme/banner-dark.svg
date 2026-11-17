@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-labelledby="titel beschreibung">
+  <title id="titel">Klarzeit</title>
+  <desc id="beschreibung">Klarzeit – Deine Arbeitszeit. Dein Gerät. Sonst niemand. Eine Uhr mit laufendem Sekundenzeiger und eine Stoppuhr, die beim Öffnen der Seite zu zählen beginnt.</desc>
+  <style>
+    /* Farben: eine Zeile je Rolle. Die dunkle Fassung tauscht nur diesen Block. */
+    svg {
+      --card-a: #101b2f; --card-b: #0b0f17; --card-line: #233044;
+      --grid: #1f2b3f; --glow: #3b82f6;
+      --face: #161b25; --track: #253041; --crown: #334155;
+      --tick: #4b5563; --tick-major: #9aa4b2; --hand: #f3f4f6;
+      --green: #22c55e; --accent: #3b82f6; --text: #f3f4f6; --muted: #9aa4b2;
+      --pill: #111827; --pill-line: #1d4d32; --shadow: rgba(0, 0, 0, 0.5);
+    }
+    .font { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+    .bg-a { stop-color: var(--card-a); }
+    .bg-b { stop-color: var(--card-b); }
+    .glow-a { stop-color: var(--glow); stop-opacity: 0.16; }
+    .glow-b { stop-color: var(--glow); stop-opacity: 0; }
+    .card { stroke: var(--card-line); stroke-width: 1.5; }
+    .gridline { fill: none; stroke: var(--grid); stroke-width: 1; }
+    .face { fill: var(--face); filter: drop-shadow(0 6px 14px var(--shadow)); }
+    .track { fill: none; stroke: var(--track); stroke-width: 14; }
+    .crown { fill: var(--crown); }
+    .ring { fill: none; stroke: var(--green); stroke-width: 14; stroke-linecap: round;
+            stroke-dasharray: 753.98; stroke-dashoffset: 753.98; animation: ring 60s linear infinite; }
+    .tick { stroke: var(--tick); stroke-width: 3; stroke-linecap: round; }
+    .tick-major { stroke: var(--tick-major); stroke-width: 5; stroke-linecap: round; }
+    .hand { stroke: var(--hand); stroke-linecap: round; }
+    .sec { animation: spin 60s linear infinite; }
+    .sec line { stroke: var(--green); stroke-width: 3.5; stroke-linecap: round; }
+    .cap { fill: var(--hand); }
+    .cap-dot, .dot { fill: var(--green); }
+    .ripple { fill: var(--green); animation: ripple 2s ease-out infinite; }
+    .word { font-size: 128px; font-weight: 800; letter-spacing: -3px; fill: var(--text); }
+    .word .acc { fill: var(--accent); }
+    .tag { font-size: 32px; font-weight: 500; fill: var(--muted); }
+    .pill { fill: var(--pill); stroke: var(--pill-line); stroke-width: 1.5; }
+    .digits { font-size: 28px; font-weight: 700; fill: var(--text); text-anchor: middle;
+              font-variant-numeric: tabular-nums; }
+    .live { font-size: 22px; font-weight: 600; fill: var(--green); }
+    /* Stoppuhr: jede Ziffer ist ein Streifen 0–9 (bzw. 0–5), der stufenweise hochrutscht. */
+    .s1 { animation: zehn 10s steps(10) infinite; }
+    .s10 { animation: sechs 60s steps(6) infinite; }
+    .m1 { animation: zehn 600s steps(10) infinite; }
+    .m10 { animation: sechs 3600s steps(6) infinite; }
+    .h1 { animation: zehn 36000s steps(10) infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes ring { to { stroke-dashoffset: 0; } }
+    @keyframes ripple { from { transform: scale(1); opacity: 0.55; } to { transform: scale(2.6); opacity: 0; } }
+    @keyframes zehn { to { transform: translateY(-360px); } }
+    @keyframes sechs { to { transform: translateY(-216px); } }
+    @media (prefers-reduced-motion: reduce) {
+      .ring, .sec, .ripple, .s1, .s10, .m1, .m10, .h1 { animation: none; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" class="bg-a"/>
+      <stop offset="1" class="bg-b"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" class="glow-a"/>
+      <stop offset="1" class="glow-b"/>
+    </radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" class="gridline"/>
+    </pattern>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="0.6" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="gridmask">
+      <rect width="1280" height="400" fill="url(#fade)"/>
+    </mask>
+    <clipPath id="cardclip">
+      <rect width="1280" height="400" rx="28"/>
+    </clipPath>
+  </defs>
+
+  <!-- Karte mit Raster (Stundenzettel) und Lichthof hinter der Uhr -->
+  <rect x="0.75" y="0.75" width="1278.5" height="398.5" rx="28" fill="url(#bg)" class="card"/>
+  <g clip-path="url(#cardclip)">
+    <rect width="1280" height="400" fill="url(#grid)" mask="url(#gridmask)"/>
+    <circle cx="250" cy="200" r="260" fill="url(#glow)"/>
+  </g>
+
+  <!-- Uhr: Ring füllt sich in 60 s, synchron mit dem Sekundenzeiger -->
+  <rect x="236" y="46" width="28" height="14" rx="5" class="crown"/>
+  <rect x="244" y="56" width="12" height="20" rx="3" class="crown"/>
+  <circle cx="250" cy="200" r="106" class="face"/>
+  <circle cx="250" cy="200" r="120" class="track"/>
+  <circle cx="250" cy="200" r="120" class="ring" transform="rotate(-90 250 200)"/>
+  <g transform="translate(250 200)">
+    <line x1="0" y1="-98" x2="0" y2="-80" class="tick-major"/>
+    <line x1="0" y1="-97" x2="0" y2="-88" class="tick" transform="rotate(30)"/>
+    <line x1="0" y1="-97" x2="0" y2="-88" class="tick" transform="rotate(60)"/>
+    <line x1="0" y1="-98" x2="0" y2="-80" class="tick-major" transform="rotate(90)"/>
+    <line x1="0" y1="-97" x2="0" y2="-88" class="tick" transform="rotate(120)"/>
+    <line x1="0" y1="-97" x2="0" y2="-88" class="tick" transform="rotate(150)"/>
+    <line x1="0" y1="-98" x2="0" y2="-80" class="tick-major" transform="rotate(180)"/>
+    <line x1="0" y1="-97" x2="0" y2="-88" class="tick" transform="rotate(210)"/>
+    <line x1="0" y1="-97" x2="0" y2="-88" class="tick" transform="rotate(240)"/>
+    <line x1="0" y1="-98" x2="0" y2="-80" class="tick-major" transform="rotate(270)"/>
+    <line x1="0" y1="-97" x2="0" y2="-88" class="tick" transform="rotate(300)"/>
+    <line x1="0" y1="-97" x2="0" y2="-88" class="tick" transform="rotate(330)"/>
+    <line x1="0" y1="12" x2="0" y2="-54" class="hand" stroke-width="9" transform="rotate(-55)"/>
+    <line x1="0" y1="14" x2="0" y2="-80" class="hand" stroke-width="6" transform="rotate(60)"/>
+    <g class="sec">
+      <line x1="0" y1="22" x2="0" y2="-92"/>
+    </g>
+    <circle r="8" class="cap"/>
+    <circle r="3.5" class="cap-dot"/>
+  </g>
+
+  <!-- Wortmarke und Leitsatz -->
+  <text x="452" y="200" class="font word">Klar<tspan class="acc">zeit</tspan></text>
+  <text x="456" y="254" class="font tag">Deine Arbeitszeit. Dein Gerät. Sonst niemand.</text>
+
+  <!-- Stoppuhr: läuft ab dem Öffnen der Seite -->
+  <g transform="translate(456 286)" class="font">
+    <rect width="198" height="50" rx="25" class="pill"/>
+    <g transform="translate(28 25)">
+      <circle r="7" class="ripple"/>
+    </g>
+    <circle cx="28" cy="25" r="7" class="dot"/>
+    <text x="57" y="35" class="digits">0</text>
+    <svg x="66" y="7" width="18" height="36">
+      <g class="h1"><text x="9" y="28" class="digits">0</text><text x="9" y="64" class="digits">1</text><text x="9" y="100" class="digits">2</text><text x="9" y="136" class="digits">3</text><text x="9" y="172" class="digits">4</text><text x="9" y="208" class="digits">5</text><text x="9" y="244" class="digits">6</text><text x="9" y="280" class="digits">7</text><text x="9" y="316" class="digits">8</text><text x="9" y="352" class="digits">9</text></g>
+    </svg>
+    <text x="89" y="33" class="digits">:</text>
+    <svg x="94" y="7" width="18" height="36">
+      <g class="m10"><text x="9" y="28" class="digits">0</text><text x="9" y="64" class="digits">1</text><text x="9" y="100" class="digits">2</text><text x="9" y="136" class="digits">3</text><text x="9" y="172" class="digits">4</text><text x="9" y="208" class="digits">5</text></g>
+    </svg>
+    <svg x="112" y="7" width="18" height="36">
+      <g class="m1"><text x="9" y="28" class="digits">0</text><text x="9" y="64" class="digits">1</text><text x="9" y="100" class="digits">2</text><text x="9" y="136" class="digits">3</text><text x="9" y="172" class="digits">4</text><text x="9" y="208" class="digits">5</text><text x="9" y="244" class="digits">6</text><text x="9" y="280" class="digits">7</text><text x="9" y="316" class="digits">8</text><text x="9" y="352" class="digits">9</text></g>
+    </svg>
+    <text x="135" y="33" class="digits">:</text>
+    <svg x="140" y="7" width="18" height="36">
+      <g class="s10"><text x="9" y="28" class="digits">0</text><text x="9" y="64" class="digits">1</text><text x="9" y="100" class="digits">2</text><text x="9" y="136" class="digits">3</text><text x="9" y="172" class="digits">4</text><text x="9" y="208" class="digits">5</text></g>
+    </svg>
+    <svg x="158" y="7" width="18" height="36">
+      <g class="s1"><text x="9" y="28" class="digits">0</text><text x="9" y="64" class="digits">1</text><text x="9" y="100" class="digits">2</text><text x="9" y="136" class="digits">3</text><text x="9" y="172" class="digits">4</text><text x="9" y="208" class="digits">5</text><text x="9" y="244" class="digits">6</text><text x="9" y="280" class="digits">7</text><text x="9" y="316" class="digits">8</text><text x="9" y="352" class="digits">9</text></g>
+    </svg>
+    <text x="216" y="33" class="live">Erfassung läuft</text>
+  </g>
+</svg>
