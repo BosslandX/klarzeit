@@ -19,8 +19,18 @@ npm run apk:release         # signierte Release-APK (braucht android/keystore.pr
 npm run icons               # Icon/Splash neu generieren (tools/gen-icons.mjs + capacitor-assets)
 node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverzeichnis
                             # + Git-Historie auf private Angaben vor dem Push
+python -I tools/apk_pruefen.py <apk> <neues-verzeichnis> <neu> <alt>
+                            # APK entpacken, Versions-Strings im Web-Bundle zaehlen
+node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname> <alter-versionCode>
+                            # version.json fuer den Update-Kanal + vier Negativkontrollen
 # APK: android/app/build/outputs/apk/{debug,release}/
 ```
+- **Prüfwerkzeuge des Orchestrators** (seit 2026-11-17 versioniert, vorher nur im Scratchpad):
+  `tools/zitat-pruefen.mjs` und `tools/kontext.mjs` prüfen Zitate gegen den Seitentext (Chrome
+  kopflos über `puppeteer-core`, eigenes Profil); `tools/oberflaeche/aufNNN_ui.mjs` sind die
+  Oberflächenproben der Aufträge 027–037 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
+  `npm run dev`, Stand ihres Auftrags). Einspiel-Vorlage, Auftragstext-Erzeuger und Stückprüfung
+  liegen im Baukasten unter `C:\gamedev\composer-kit\orchestrator\` und werden von dort gerufen.
 - Android SDK-Pfad in `android/local.properties` (`sdk.dir=...`, gitignored, rechnerspezifisch).
 - JDK 21 (`JAVA_HOME`), Gradle-Wrapper 8.14.x, compileSdk/targetSdk 36, minSdk 24.
 - **Release-Signing:** `android/app/build.gradle` liest `android/keystore.properties`
@@ -422,7 +432,12 @@ Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
   (`klarzeit-<version>-release.apk`), also die **Tag-URL**
   `https://github.com/BosslandX/klarzeit-releases/releases/download/vX.Y/…` verwenden,
   nicht `releases/latest/download/…`.
-- **Vor jedem Push:** `node tools/privacy-scan.mjs` muss null Treffer melden.
+- **Vor jedem Push:** `node tools/privacy-scan.mjs` — in den versionierten Dateien **0 Treffer**,
+  in der Historie **keine neue Kategorie** (Stand 1.13.0: 320 Treffer in den 4 bekannten
+  Kategorien Vorname, Nachname, Keystore-Passwort, Key-Passwort). Eine neue Kategorie stoppt den
+  Push. Entscheidung des Users 2026-11-17; so wurden 1.11.0 bis 1.13.0 gepusht. Der Scan liest nur
+  **versionierte** Dateien — neue Dateien vor dem ersten Commit gesondert prüfen (Kopie in einen
+  Ordner ohne Git: `node tools/privacy-scan.mjs <ordner>` liest dann alles).
 - `docs/` ist gitignored (persönliches Arbeitsjournal, nicht Teil der Veröffentlichung).
 
 ---
