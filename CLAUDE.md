@@ -94,6 +94,15 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   Woche, wird der Vertragswert **nicht** umgerechnet. Backupformat bleibt Version 3
   (`cleanEmployment` trägt das Feld, ältere Backups ergeben `null`). Der Text des
   PDF-Urlaubsblocks entsteht in `buildVacationPanelText` (rein, getestet).
+- **Arbeitstage als Wochentage (AUF-027):** `Employment.workWeekdays?: number[]` (0 = Sonntag …
+  6 = Samstag, aufsteigend, 1–6 Tage); fehlt = nicht gewählt. `cleanWorkWeekdays` prüft,
+  `cleanEmployment` setzt `workdaysPerWeek` dann auf die Länge — die Zahl bleibt gespeichert, weil
+  Tagessoll, Urlaubsanspruch, ältere App-Versionen und Backups sie lesen. `workdaysInRange(von, bis,
+  emp)` zählt nur `workWeekdaysOf(emp)`; ohne Auswahl gilt die alte Regel (Mo–Fr, ab sechs Tagen auch
+  Sa) — die App rät keine Verteilung. Formular `WorkWeekdaysField` (sieben Knöpfe, höchstens sechs
+  Tage, der letzte bleibt, `toggleWorkWeekday`); bei 1–4 Tagen ohne Auswahl keine Vorbelegung, sondern
+  ein Hinweis (`displayedWorkWeekdays`). Feldgruppe Vertrag in `fillEmptyEmployment`; Backupformat
+  bleibt 3. `vacationRequestRanges` bündelt über freie Wochentage hinweg.
 - **Urlaub entlastet das Konto (seit 1.4):** `buildBalanceLedger(emp, entries, ref, vacationDates?)`
   weist je Monat `vacationDays` + `vacationCreditMs` aus; `saldoMs = istMs + vacationCreditMs − sollMs`.
   Ohne den 4. Parameter rechnet die Funktion unverändert. **Zwei Deckel nicht verwechseln:**
@@ -301,6 +310,9 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
 - `src/db/clockodo-lock.ts` → Preferences-Schlüssel `clockodoLock:<employmentId>` mit `days`/`at`
   (umbenannt gilt die Sperrfrist als unbekannt, bis zum nächsten Übertragen oder „Verbindung
   testen" — kein Datenverlust, aber bis dahin fehlen die Fristwarnungen)
+- `src/domain/employment.ts` → Feld `workWeekdays` am `Employment` (Preferences `employments` und
+  Backup; umbenannt verwirft `cleanEmployment` die Auswahl, und jeder Urlaubszeitraum zählt wieder
+  Montag bis Freitag)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
