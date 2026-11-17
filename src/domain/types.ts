@@ -18,6 +18,12 @@ export interface BreakInterval {
   end: number;
 }
 
+/** Zeiten eines Stoppuhr-Eintrags vor seiner ersten Aenderung (AUF-035), epoch ms. */
+export interface TrackedTimes {
+  start: number;
+  end: number;
+}
+
 /** Ein abgeschlossener Arbeitszeit-Eintrag. Zeiten als Epoch-Millisekunden. */
 export interface TimeEntry {
   id?: number; // Dexie Auto-Increment Primaerschluessel
@@ -34,6 +40,11 @@ export interface TimeEntry {
   activity: string; // Taetigkeit / Beschreibung
   note: string; // optionale Notiz
   source: EntrySource;
+  /**
+   * Stoppuhr-Zeiten vor der ersten Aenderung von Beginn oder Ende (AUF-035); fehlt = nie geaendert
+   * oder kein Stoppuhr-Eintrag.
+   */
+  trackedTimes?: TrackedTimes;
   createdAt: number;
   updatedAt: number;
 }

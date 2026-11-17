@@ -26,6 +26,7 @@ import type { ClockodoConfig } from '../../domain/clockodo';
 import { groupByDay } from '../../domain/aggregate';
 import type { Period } from '../../domain/aggregate';
 import type { TimeEntry } from '../../domain/types';
+import { changedTrackedTimes } from '../../domain/tracked-times';
 import {
   formatClock,
   formatDateTime,
@@ -349,6 +350,14 @@ export function EntriesScreen() {
                     {e.source === 'manual' && (
                       <span className="badge">nachgetragen</span>
                     )}
+                    {(() => {
+                      const t = changedTrackedTimes(e);
+                      return t ? (
+                        <span className="badge">
+                          geaendert, Stoppuhr {formatClock(t.start)}–{formatClock(t.end)}
+                        </span>
+                      ) : null;
+                    })()}
                     {showEmploymentInfo && (
                       <span className="badge entry-employment">
                         {employmentName(e.employmentId)}

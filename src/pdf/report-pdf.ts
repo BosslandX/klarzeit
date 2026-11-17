@@ -23,6 +23,7 @@ import {
   type VacationStatus,
 } from '../domain/employment';
 import { BUNDESLAENDER } from '../domain/holidays';
+import { changedTrackedTimes } from '../domain/tracked-times';
 import { displayName } from '../db/profile';
 
 /** Zusatzdaten fuer Monatsreports: Arbeitszeitkonto + Urlaub. */
@@ -447,6 +448,22 @@ function drawKontoUndUrlaub(
   return Math.max(leftB, rightB);
 }
 
+/** Zeichen vor der Taetigkeit: "*" nachgetragen, "°" Stoppuhr-Zeit geaendert (AUF-035). */
+export function entryMark(e: TimeEntry): string {
+  if (e.source === 'manual') return '* ';
+  return changedTrackedTimes(e) ? '° ' : '';
+}
+
+/** Legende unter der Tabelle: je benutztes Zeichen eine Zeile. */
+export function entryLegend(entries: readonly TimeEntry[]): string[] {
+  return [
+    ...(entries.some((e) => e.source === 'manual') ? ['*  manuell nachgetragener Eintrag'] : []),
+    ...(entries.some((e) => changedTrackedTimes(e) !== undefined)
+      ? ['°  Stoppuhr-Zeit nachtraeglich geaendert']
+      : []),
+  ];
+}
+
 /** Baut einen vollstaendigen PDF-Report (Kopfband, Mitarbeiter, KPIs, Tabelle). */
 export function buildReportPdf(
   profile: Profile,
@@ -493,18 +510,16 @@ export function buildReportPdf(
   y += 20;
 
   // Tabelle, nach Tag gruppiert. Tagessumme nur bei >1 Eintrag pro Tag.
-  let hasManual = false;
   const body: RowInput[] = [];
   for (const day of days) {
     for (const e of day.entries) {
-      if (e.source === 'manual') hasManual = true;
       body.push([
         formatDate(e.start),
         formatClock(e.start),
         formatClock(e.end),
         e.breakMinutes ? String(e.breakMinutes) : '–',
         formatDuration(netMs(e)),
-        (e.source === 'manual' ? '* ' : '') + (e.activity || '–'),
+        entryMark(e) + (e.activity || '–'),
       ]);
     }
     if (day.entries.length > 1) {
@@ -576,14 +591,15 @@ export function buildReportPdf(
     },
   });
 
-  // Legende fuer manuell nachgetragene Eintraege.
-  if (hasManual) {
+  // Legende fuer die Zeichen vor der Taetigkeit (AUF-035).
+  const legende = entryLegend(entries);
+  if (legende.length > 0) {
     const afterTable = (doc as unknown as { lastAutoTable: { finalY: number } })
       .lastAutoTable.finalY;
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
     ink(doc, MUTED);
-    doc.text('*  manuell nachgetragener Eintrag', MARGIN_X, afterTable + 14);
+    legende.forEach((zeile, i) => doc.text(zeile, MARGIN_X, afterTable + 14 + i * 10));
   }
 
   stampPageNumbers(doc);

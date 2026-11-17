@@ -4,6 +4,7 @@ import { getActiveEmploymentId, getEmployments } from './employment';
 import type { ClockodoSync } from '../domain/clockodo';
 import type { TimeEntry } from '../domain/types';
 import { addClockodoDeletes } from './clockodo-deletes';
+import { withTrackedTimes } from '../domain/tracked-times';
 
 export type NewEntry = Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -129,6 +130,8 @@ export async function updateEntryWithClockodo(
   patch: Partial<TimeEntry>,
 ): Promise<void> {
   if (entry.id == null) return;
+  // Stoppuhr-Zeiten beim ersten Aendern von Beginn oder Ende merken (AUF-035).
+  const mitZeiten = withTrackedTimes(entry, patch);
   const sync = entry.clockodoSync;
   const employments = await getEmployments();
   if (
@@ -137,10 +140,10 @@ export async function updateEntryWithClockodo(
     leavesClockodoSync(entry, patch, employments)
   ) {
     await addClockodoDeletes(entry.employmentId, sync.ids);
-    await updateEntry(entry.id, { ...patch, clockodoSync: undefined });
+    await updateEntry(entry.id, { ...mitZeiten, clockodoSync: undefined });
     return;
   }
-  await updateEntry(entry.id, patch);
+  await updateEntry(entry.id, mitZeiten);
 }
 
 // --- React-Hooks (reaktiv via Dexie liveQuery) ---

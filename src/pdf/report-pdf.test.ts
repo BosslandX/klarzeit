@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildEmployeePanelFields, buildKontoPanelText, buildVacationPanelText } from './report-pdf';
+import {
+  buildEmployeePanelFields,
+  buildKontoPanelText,
+  buildVacationPanelText,
+  entryLegend,
+  entryMark,
+} from './report-pdf';
 import type { Profile, TimeEntry } from '../domain/types';
 import {
   buildBalanceLedger,
@@ -246,5 +252,39 @@ describe('Kontoblock mit Krankheit (AUF-034)', () => {
     const { rows, foot } = buildKontoPanelText(ledger, vollzeit);
     expect(rows.some((r) => r.label.startsWith('Krankheit'))).toBe(false);
     expect(foot).not.toContain('Krankheitstage');
+  });
+});
+
+describe('Zeichen vor der Taetigkeit (AUF-035)', () => {
+  const H = 3_600_000;
+  const basis: TimeEntry = {
+    employmentId: 'emp-1',
+    start: 8 * H,
+    end: 16 * H,
+    breakMinutes: 0,
+    activity: 'a',
+    note: '',
+    source: 'tracked',
+    createdAt: 0,
+    updatedAt: 0,
+  };
+  const geaendert: TimeEntry = { ...basis, end: 17 * H, trackedTimes: { start: 8 * H, end: 16 * H } };
+  const nachgetragen: TimeEntry = { ...basis, source: 'manual' };
+
+  it('entryMark: Stern fuer nachgetragen, Grad fuer geaenderte Stoppuhr-Zeit', () => {
+    expect([entryMark(basis), entryMark(nachgetragen), entryMark(geaendert)]).toEqual([
+      '',
+      '* ',
+      '° ',
+    ]);
+  });
+
+  it('entryLegend: je benutztes Zeichen eine Zeile', () => {
+    expect(entryLegend([basis])).toEqual([]);
+    expect(entryLegend([geaendert, nachgetragen])).toEqual([
+      '*  manuell nachgetragener Eintrag',
+      '°  Stoppuhr-Zeit nachtraeglich geaendert',
+    ]);
+    expect(entryLegend([geaendert])).toEqual(['°  Stoppuhr-Zeit nachtraeglich geaendert']);
   });
 });

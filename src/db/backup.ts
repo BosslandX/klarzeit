@@ -16,6 +16,7 @@ import {
 } from './employment';
 import type { BreakInterval, Profile, TimeEntry } from '../domain/types';
 import { cleanClockodoEntryRef, cleanClockodoSync } from '../domain/clockodo';
+import { changedTrackedTimes, cleanTrackedTimes } from '../domain/tracked-times';
 import { defaultEmployment, mergeVacationDays } from '../domain/employment';
 import type { Employment, VacationDay } from '../domain/employment';
 import { cleanSickPeriods, mergeSickPeriods, type SickPeriod } from '../domain/sickness';
@@ -128,6 +129,7 @@ function cleanEntry(e: TimeEntry): TimeEntry {
   const clockodoSync = cleanClockodoSync(
     (e as { clockodoSync?: unknown }).clockodoSync,
   );
+  const trackedTimes = cleanTrackedTimes((e as { trackedTimes?: unknown }).trackedTimes);
   return {
     id: e.id,
     employmentId,
@@ -137,6 +139,7 @@ function cleanEntry(e: TimeEntry): TimeEntry {
     ...(breaks !== undefined ? { breaks } : {}),
     ...(clockodo !== null ? { clockodo } : {}),
     ...(clockodoSync !== null ? { clockodoSync } : {}),
+    ...(trackedTimes !== undefined ? { trackedTimes } : {}),
     activity: e.activity,
     note: e.note,
     source: e.source,
@@ -369,6 +372,13 @@ export async function restoreBackup(
   return entries.length;
 }
 
+/** Spalte Quelle: manuell, erfasst oder erfasst mit den urspruenglichen Stoppuhr-Zeiten (AUF-035). */
+function csvSource(e: TimeEntry): string {
+  if (e.source === 'manual') return 'manuell';
+  const t = changedTrackedTimes(e);
+  return t ? `erfasst, geaendert (Stoppuhr ${formatClock(t.start)}-${formatClock(t.end)})` : 'erfasst';
+}
+
 function csvCell(value: string | number): string {
   let s = String(value);
   if (/^[=+\-@\t\r]/.test(s)) {
@@ -415,7 +425,7 @@ export function entriesToCsv(
         formatClock(e.end),
         e.breakMinutes,
         decimalHours(netMs(e)).toFixed(2).replace('.', ','),
-        e.source === 'manual' ? 'manuell' : 'erfasst',
+        csvSource(e),
         employmentNameForCsv(e.employmentId, employments),
         e.activity,
         e.note,
