@@ -49,6 +49,11 @@ export interface Employment {
   workWeekdays?: number[];
   /** Feiertage am Arbeitsort (AUF-029); fehlt = keine, wie bis 1.12. */
   publicHolidays?: PublicHolidays;
+  /**
+   * Fruehere Vertragsstaende (AUF-031), aufsteigend nach validUntil; fehlt = der Vertrag galt
+   * immer wie oben. Ein Stand gilt bis einschliesslich validUntil, danach der naechste.
+   */
+  contractHistory?: ContractPeriod[];
   /** Darstellung des Urlaubsanspruchs im Eintrittsjahr. */
   vacationYearMode: VacationYearMode;
   /** Anfangssaldo in ms zum Start (uebernommene Ueber-/Minusstunden). Default 0. */
@@ -70,6 +75,73 @@ export interface Employment {
  * - both:    voller Anspruch als Hauptzahl, Zwoelftelung zusaetzlich nachrichtlich
  */
 export type VacationYearMode = 'full' | 'prorata' | 'both';
+
+/** Ein frueherer Vertragsstand: galt bis einschliesslich validUntil (lokale Mitternacht). */
+export interface ContractPeriod {
+  validUntil: number;
+  weeklyHours: number;
+  workdaysPerWeek: number;
+  workWeekdays?: number[];
+}
+
+/** Die Vertragsbedingungen, die mit einem Vertragsstand wechseln. */
+export type ContractTerms = Pick<Employment, 'weeklyHours' | 'workdaysPerWeek' | 'workWeekdays'>;
+
+/**
+ * Vertragsbedingungen an einem Tag (AUF-031): der erste fruehere Stand, der den Tag noch
+ * umfasst, sonst der heutige Vertrag.
+ */
+export function contractAt(
+  emp: ContractTerms & Pick<Employment, 'contractHistory'>,
+  date: number,
+): ContractTerms {
+  const tag = startOfDay(date).getTime();
+  const stand = (emp.contractHistory ?? []).find((c) => tag <= c.validUntil) ?? emp;
+  return {
+    weeklyHours: stand.weeklyHours,
+    workdaysPerWeek: stand.workdaysPerWeek,
+    ...(stand.workWeekdays ? { workWeekdays: stand.workWeekdays } : {}),
+  };
+}
+
+/**
+ * Gespeicherte Vertragsstaende pruefen: validUntil auf Mitternacht, Wochenstunden ueber 0,
+ * 1 bis 6 Arbeitstage (gewaehlte Wochentage setzen ihre Zahl), aufsteigend, je Tag einer.
+ * Bleibt keiner, undefined.
+ */
+export function cleanContractHistory(raw: unknown): ContractPeriod[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const jeTag = new Map<number, ContractPeriod>();
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) continue;
+    const x = item as Record<string, unknown>;
+    if (typeof x.validUntil !== 'number' || !Number.isFinite(x.validUntil)) continue;
+    if (typeof x.weeklyHours !== 'number' || !Number.isFinite(x.weeklyHours)) continue;
+    if (x.weeklyHours <= 0) continue;
+    const wochentage = cleanWorkWeekdays(x.workWeekdays);
+    const zahl = typeof x.workdaysPerWeek === 'number' ? Math.round(x.workdaysPerWeek) : Number.NaN;
+    const workdaysPerWeek = wochentage ? wochentage.length : zahl;
+    if (!(workdaysPerWeek >= 1 && workdaysPerWeek <= WERKTAGE_PER_WEEK)) continue;
+    const validUntil = startOfDay(x.validUntil).getTime();
+    jeTag.set(validUntil, {
+      validUntil,
+      weeklyHours: x.weeklyHours,
+      workdaysPerWeek,
+      ...(wochentage ? { workWeekdays: wochentage } : {}),
+    });
+  }
+  const liste = [...jeTag.values()].sort((a, b) => a.validUntil - b.validUntil);
+  return liste.length > 0 ? liste : undefined;
+}
+
+/** Wochentage, an denen am Tag gearbeitet wird: nach dem Vertragsstand, der den Tag umfasst. */
+function wochentageAm(
+  emp: Pick<Employment, 'workdaysPerWeek' | 'workWeekdays' | 'contractHistory'>,
+  date: number,
+): number[] {
+  const tag = startOfDay(date).getTime();
+  return workWeekdaysOf((emp.contractHistory ?? []).find((c) => tag <= c.validUntil) ?? emp);
+}
 
 /** Ein genommener Urlaubstag (jeweils 1 Arbeitstag), als Tagesdatum (epoch ms). */
 export interface VacationDay {
@@ -167,6 +239,20 @@ export function dailyTargetMs(emp: Employment): number {
  */
 export function monthSollMs(emp: Employment, monthRef: number): number {
   // Auf volle Minuten runden, damit Soll/Ist/Saldo in der Anzeige aufgehen.
+  if (emp.contractHistory && emp.contractHistory.length > 0) {
+    // Je beschaeftigtem Kalendertag der Anteil des Vertrags, der an diesem Tag galt (AUF-031).
+    const anfang = startOfMonth(monthRef);
+    const tageImMonat = getDaysInMonth(anfang);
+    const empStart = startOfDay(emp.startDate).getTime();
+    const empEnd = emp.endDate != null ? endOfDay(emp.endDate).getTime() : Infinity;
+    const roh = eachDayOfInterval({ start: anfang, end: endOfMonth(anfang) })
+      .filter((t) => t.getTime() >= empStart && t.getTime() <= empEnd)
+      .reduce(
+        (s, t) => s + fullMonthlyTargetMs(contractAt(emp, t.getTime()).weeklyHours) / tageImMonat,
+        0,
+      );
+    return Math.round(roh / MINUTE) * MINUTE;
+  }
   return (
     Math.round(
       (fullMonthlyTargetMs(emp.weeklyHours) * employedFractionOfMonth(emp, monthRef)) /
@@ -257,8 +343,8 @@ function vacationOfMonth(
       d <= empEnd &&
       !feiertage.has(startOfDay(d).getTime()),
   );
-  const perDay = dailyTargetMs(emp);
   const creditMs = inMonth.reduce((sum, day) => {
+    const perDay = dailyTargetMs({ ...emp, ...contractAt(emp, day) });
     const dayStart = startOfDay(day).getTime();
     const dayEnd = endOfDay(day).getTime();
     const istOfDay = entries.reduce(
@@ -291,7 +377,6 @@ function holidaysOfMonth(
   const mEnd = endOfMonth(monthRef).getTime();
   const empStart = startOfDay(emp.startDate).getTime();
   const empEnd = emp.endDate != null ? endOfDay(emp.endDate).getTime() : Infinity;
-  const arbeitstage = workWeekdaysOf(emp);
   const jahr = getYear(monthRef);
   const tage = [...publicHolidayMap(emp.publicHolidays, jahr, jahr).keys()].filter(
     (d) =>
@@ -299,10 +384,10 @@ function holidaysOfMonth(
       d <= mEnd &&
       d >= empStart &&
       d <= empEnd &&
-      arbeitstage.includes(getDay(d)),
+      wochentageAm(emp, d).includes(getDay(d)),
   );
-  const perDay = dailyTargetMs(emp);
   const creditMs = tage.reduce((sum, day) => {
+    const perDay = dailyTargetMs({ ...emp, ...contractAt(emp, day) });
     const dayEnd = endOfDay(day).getTime();
     const istOfDay = entries.reduce(
       (s, e) =>
@@ -404,15 +489,17 @@ export function buildBalanceLedger(
 export function workdaysInRange(
   fromEpoch: number,
   toEpoch: number,
-  emp: Pick<Employment, 'workdaysPerWeek' | 'workWeekdays' | 'publicHolidays'>,
+  emp: Pick<Employment, 'workdaysPerWeek' | 'workWeekdays' | 'publicHolidays' | 'contractHistory'>,
 ): number[] {
   const from = startOfDay(fromEpoch);
   const to = startOfDay(toEpoch);
   if (to.getTime() < from.getTime()) return [];
-  const days = workWeekdaysOf(emp);
   const feiertage = publicHolidayMap(emp.publicHolidays, from.getFullYear(), to.getFullYear());
   return eachDayOfInterval({ start: from, end: to })
-    .filter((d) => days.includes(getDay(d)) && !feiertage.has(d.getTime()))
+    .filter(
+      (d) =>
+        wochentageAm(emp, d.getTime()).includes(getDay(d)) && !feiertage.has(d.getTime()),
+    )
     .map((d) => d.getTime());
 }
 

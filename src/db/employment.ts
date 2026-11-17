@@ -1,6 +1,7 @@
 import { Preferences } from '@capacitor/preferences';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  cleanContractHistory,
   cleanWorkWeekdays,
   defaultEmployment,
   mergeVacationDays,
@@ -63,6 +64,7 @@ export function cleanEmployment(raw: unknown): Employment {
   const workdaysPerWeek = Math.min(6, Math.max(1, wdRaw));
   const workWeekdays = cleanWorkWeekdays(x.workWeekdays);
   const publicHolidays = cleanPublicHolidays(x.publicHolidays);
+  const contractHistory = cleanContractHistory(x.contractHistory);
   let contractVacationDays: number | null = null;
   if (
     typeof x.contractVacationDays === 'number' &&
@@ -110,6 +112,7 @@ export function cleanEmployment(raw: unknown): Employment {
     workdaysPerWeek: workWeekdays ? workWeekdays.length : workdaysPerWeek,
     ...(workWeekdays ? { workWeekdays } : {}),
     ...(publicHolidays ? { publicHolidays } : {}),
+    ...(contractHistory ? { contractHistory } : {}),
     vacationYearMode: mode,
     openingBalanceMs: num(x.openingBalanceMs, 0),
     contractVacationDays,

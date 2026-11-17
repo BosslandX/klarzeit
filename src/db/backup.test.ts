@@ -1066,3 +1066,43 @@ describe('Feiertage einer Beschaeftigung im Backup (AUF-029)', () => {
     expect(fillEmptyEmployment(localMitStd, incoming).publicHolidays).toBeUndefined();
   });
 });
+
+
+describe('Fruehere Vertragsstaende im Backup (AUF-031)', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+  });
+
+  const stand = [{ validUntil: new Date(2026, 2, 31).getTime(), weeklyHours: 20, workdaysPerWeek: 5 }];
+
+  it('cleanEmployment traegt fruehere Vertragsstaende, eine leere Liste faellt weg', () => {
+    const base = { ...defaultEmployment, id: 'x' };
+    expect(cleanEmployment({ ...base, contractHistory: stand }).contractHistory).toEqual(stand);
+    expect('contractHistory' in cleanEmployment({ ...base, contractHistory: [] })).toBe(false);
+    expect('contractHistory' in cleanEmployment(base)).toBe(false);
+  });
+
+  it('Rundreise contractHistory ueber Backup', async () => {
+    prefStore.set('employments', JSON.stringify([emp(INITIAL_EMPLOYMENT_ID, 'H', 30)]));
+    await updateEmployment(INITIAL_EMPLOYMENT_ID, { contractHistory: stand });
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const list = await getEmployments();
+    expect(list[0].contractHistory).toEqual(stand);
+  });
+
+  it('fillEmptyEmployment uebernimmt die Vertragsstaende nur mit dem Vertrag', () => {
+    const local = cleanEmployment({ id: 'emp-1' });
+    const incoming = cleanEmployment({ id: 'emp-1', weeklyHours: 30, contractHistory: stand });
+    expect(fillEmptyEmployment(local, incoming).contractHistory).toEqual(stand);
+    const localMitStd = cleanEmployment({ id: 'emp-1', weeklyHours: 20 });
+    expect(fillEmptyEmployment(localMitStd, incoming).contractHistory).toBeUndefined();
+  });
+});

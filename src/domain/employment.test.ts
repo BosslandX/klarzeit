@@ -16,6 +16,8 @@ import {
   waitingPeriodEnd,
   workdaysInRange,
   workWeekdaysOf,
+  cleanContractHistory,
+  contractAt,
   cleanWorkWeekdays,
   displayedWorkWeekdays,
   toggleWorkWeekday,
@@ -909,5 +911,112 @@ describe('Feiertage im Konto und beim Urlaub (AUF-029)', () => {
       buildVacationStatus({ ...vollzeit, publicHolidays: undefined }, [d(2026, 5, 14), d(2026, 5, 15)], 2026)
         .taken,
     ).toBe(2);
+  });
+});
+
+
+describe('Vertrag gueltig ab (AUF-031)', () => {
+  const d = (y: number, mo: number, dd: number) => new Date(y, mo - 1, dd).getTime();
+  // Bis 31.03.2026: 20 h an Mo-Do (5 h/Tag); seit 01.04.2026: 30 h an Mo-Fr (6 h/Tag).
+  const gewechselt: Employment = {
+    ...emp,
+    startDate: d(2026, 1, 1),
+    weeklyHours: 30,
+    workdaysPerWeek: 5,
+    contractHistory: [
+      { validUntil: d(2026, 3, 31), weeklyHours: 20, workdaysPerWeek: 4, workWeekdays: [1, 2, 3, 4] },
+    ],
+  };
+
+  it('contractAt: bis einschliesslich validUntil der fruehere Stand, danach der heutige', () => {
+    expect(contractAt(gewechselt, d(2026, 3, 31) + 20 * HOUR)).toEqual({
+      weeklyHours: 20,
+      workdaysPerWeek: 4,
+      workWeekdays: [1, 2, 3, 4],
+    });
+    expect(contractAt(gewechselt, d(2026, 4, 1))).toEqual({ weeklyHours: 30, workdaysPerWeek: 5 });
+    expect(contractAt({ ...gewechselt, contractHistory: undefined }, d(2026, 1, 5))).toEqual({
+      weeklyHours: 30,
+      workdaysPerWeek: 5,
+    });
+  });
+
+  it('cleanContractHistory: Mitternacht, aufsteigend, je Tag einer, Ungueltiges faellt weg', () => {
+    expect(
+      cleanContractHistory([
+        { validUntil: d(2026, 6, 30) + 5 * HOUR, weeklyHours: 25, workdaysPerWeek: 5 },
+        { validUntil: d(2026, 3, 31), weeklyHours: 20, workdaysPerWeek: 5, workWeekdays: [1, 2, 3] },
+        { validUntil: d(2026, 6, 30), weeklyHours: 28, workdaysPerWeek: 4 },
+        { validUntil: d(2026, 1, 31), weeklyHours: 0, workdaysPerWeek: 5 },
+        { validUntil: d(2026, 2, 28), weeklyHours: 10, workdaysPerWeek: 7 },
+        { validUntil: 'x', weeklyHours: 10, workdaysPerWeek: 5 },
+      ]),
+    ).toEqual([
+      { validUntil: d(2026, 3, 31), weeklyHours: 20, workdaysPerWeek: 3, workWeekdays: [1, 2, 3] },
+      { validUntil: d(2026, 6, 30), weeklyHours: 28, workdaysPerWeek: 4 },
+    ]);
+    expect(cleanContractHistory([])).toBeUndefined();
+    expect(cleanContractHistory('x')).toBeUndefined();
+  });
+
+  it('monthSollMs: jeder Monat mit dem Vertrag, der in ihm galt', () => {
+    expect(monthSollMs(gewechselt, d(2026, 3, 15))).toBe(5_200 * MINUTE); // 20 h x 52/12
+    expect(monthSollMs(gewechselt, d(2026, 4, 15))).toBe(7_800 * MINUTE); // 30 h x 52/12
+  });
+
+  it('monthSollMs: Wechsel mitten im Monat nach Kalendertagen', () => {
+    const mitte: Employment = {
+      ...gewechselt,
+      contractHistory: [{ validUntil: d(2026, 4, 15), weeklyHours: 20, workdaysPerWeek: 5 }],
+    };
+    // April: 15 Tage zu 20 h, 15 Tage zu 30 h -> 25 h x 52/12 = 108 h 20 min.
+    expect(monthSollMs(mitte, d(2026, 4, 15))).toBe(6_500 * MINUTE);
+  });
+
+  it('ohne fruehere Staende rechnet monthSollMs wie bisher', () => {
+    const ohne: Employment = { ...gewechselt, contractHistory: undefined };
+    expect(monthSollMs(ohne, d(2026, 3, 15))).toBe(7_800 * MINUTE);
+  });
+
+  it('Urlaubsgutschrift mit dem Tagessoll des Tages', () => {
+    const l = buildBalanceLedger(gewechselt, [], d(2026, 4, 30), [d(2026, 3, 31), d(2026, 4, 1)])!;
+    expect(l.months[2].vacationCreditMs).toBe(5 * HOUR);
+    expect(l.target.vacationCreditMs).toBe(6 * HOUR);
+  });
+
+  it('Feiertage nur an den Arbeitstagen des Vertrags, der am Tag galt', () => {
+    // Bayern: Karfreitag 03.04.2026 (Fr), Ostermontag 06.04.2026 (Mo).
+    const bisApril: Employment = {
+      ...gewechselt,
+      publicHolidays: { land: 'BY', regional: [], extra: [], skip: [] },
+      contractHistory: [
+        { validUntil: d(2026, 4, 30), weeklyHours: 20, workdaysPerWeek: 4, workWeekdays: [1, 2, 3, 4] },
+      ],
+    };
+    const l = buildBalanceLedger(bisApril, [], d(2026, 5, 31))!;
+    expect(l.months[3].holidayDays).toBe(1);
+    expect(l.target.holidayDays).toBe(3);
+  });
+
+  it('workdaysInRange: die Wochentage des Vertrags, der am Tag galt', () => {
+    const bisApril: Employment = {
+      ...gewechselt,
+      contractHistory: [
+        { validUntil: d(2026, 4, 30), weeklyHours: 20, workdaysPerWeek: 4, workWeekdays: [1, 2, 3, 4] },
+      ],
+    };
+    // 20.04. (Mo) bis 03.05.2026 (So): bis 30.04. Mo-Do (der Freitag 24.04. faellt heraus),
+    // Freitag 01.05. nach dem neuen Vertrag.
+    expect(workdaysInRange(d(2026, 4, 20), d(2026, 5, 3), bisApril)).toEqual([
+      d(2026, 4, 20),
+      d(2026, 4, 21),
+      d(2026, 4, 22),
+      d(2026, 4, 23),
+      d(2026, 4, 27),
+      d(2026, 4, 28),
+      d(2026, 4, 29),
+      d(2026, 4, 30),
+      d(2026, 5, 1),
+    ]);
   });
 });
