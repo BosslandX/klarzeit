@@ -85,6 +85,7 @@ export function HomeScreen({ tracker }: Props) {
       source: 'tracked',
       employmentId: running.employmentId,
       clockodo: null,
+      overtimeAuthorization: '',
     });
   };
 

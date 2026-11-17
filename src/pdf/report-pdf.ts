@@ -24,6 +24,7 @@ import {
 } from '../domain/employment';
 import { BUNDESLAENDER } from '../domain/holidays';
 import { changedTrackedTimes } from '../domain/tracked-times';
+import { overtimeAuthorizationLine } from '../domain/overtime-authorization';
 import { displayName } from '../db/profile';
 
 /** Zusatzdaten fuer Monatsreports: Arbeitszeitkonto + Urlaub. */
@@ -521,6 +522,13 @@ export function buildReportPdf(
         formatDuration(netMs(e)),
         entryMark(e) + (e.activity || '–'),
       ]);
+      // Veranlassung von Ueberstunden als Zeile unter dem Eintrag (AUF-036).
+      const veranlassung = overtimeAuthorizationLine(e);
+      if (veranlassung !== undefined) {
+        body.push([
+          { content: veranlassung, colSpan: 6, styles: { fontStyle: 'italic', textColor: MUTED } },
+        ]);
+      }
     }
     if (day.entries.length > 1) {
       body.push([

@@ -3,6 +3,7 @@ import type { BreakInterval, EntrySource } from '../../domain/types';
 import type { ClockodoEntryRef, ClockodoLists } from '../../domain/clockodo';
 import { defaultEntryRef } from '../../domain/clockodo';
 import { resolveBreakMinutes, validateBreaks } from '../../domain/breaks';
+import { VERANLASSUNG_MAX } from '../../domain/overtime-authorization';
 import {
   breakTimeOnEntry,
   followStartDate,
@@ -31,6 +32,8 @@ export interface EntryDraft {
   source: EntrySource;
   employmentId?: string;
   clockodo: ClockodoEntryRef | null;
+  /** Veranlassung von Ueberstunden (AUF-036); leer = keine Angabe. */
+  overtimeAuthorization: string;
 }
 
 interface Props {
@@ -91,6 +94,7 @@ export function EntryFormModal({
   );
   const [activity, setActivity] = useState(initial.activity);
   const [note, setNote] = useState(initial.note);
+  const [veranlassung, setVeranlassung] = useState(initial.overtimeAuthorization);
   const [employmentId, setEmploymentId] = useState(initial.employmentId ?? '');
   const [clockodoSel, setClockodoSel] = useState<ClockodoEntryRef | null>(
     initial.clockodo,
@@ -286,6 +290,7 @@ export function EntryFormModal({
         source: initial.source,
         employmentId,
         clockodo: clockodoOut,
+        overtimeAuthorization: veranlassung.trim(),
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.');
@@ -493,6 +498,22 @@ export function EntryFormModal({
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
+
+        <label className="field">
+          <span>Veranlassung von Ueberstunden (optional)</span>
+          <input
+            type="text"
+            maxLength={VERANLASSUNG_MAX}
+            placeholder="z. B. angeordnet von der Teamleitung am 03.11. per E-Mail"
+            value={veranlassung}
+            onChange={(e) => setVeranlassung(e.target.value)}
+          />
+        </label>
+        <p className="muted small">
+          Wer Ueberstundenverguetung einklagt, muss auch ihre Veranlassung durch den Arbeitgeber
+          darlegen: wer sie wann und wie angeordnet, gebilligt oder geduldet hat (BAG, Urteil vom
+          04.05.2022 – 5 AZR 359/21).
+        </p>
 
         <div className="modal-duration">
           Dauer: <strong>{formatDuration(dauerMs)}</strong>

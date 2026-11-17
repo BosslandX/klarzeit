@@ -3,9 +3,11 @@ import {
   buildEmployeePanelFields,
   buildKontoPanelText,
   buildVacationPanelText,
+  buildReportPdf,
   entryLegend,
   entryMark,
 } from './report-pdf';
+import { monthPeriod } from '../domain/aggregate';
 import type { Profile, TimeEntry } from '../domain/types';
 import {
   buildBalanceLedger,
@@ -288,3 +290,29 @@ describe('Zeichen vor der Taetigkeit (AUF-035)', () => {
     expect(entryLegend([geaendert])).toEqual(['°  Stoppuhr-Zeit nachtraeglich geaendert']);
   });
 });
+
+describe('Veranlassung im PDF (AUF-036)', () => {
+  it('PDF: Zeile unter dem Eintrag, nur wenn eine Veranlassung eingetragen ist', () => {
+    const H = 3_600_000;
+    const tag = new Date(2026, 10, 9).getTime();
+    const emp: Employment = { ...defaultEmployment, startDate: new Date(2026, 0, 1).getTime(), weeklyHours: 40 };
+    const profil: Profile = { vorname: 'Max', nachname: 'Muster', personalnummer: '', arbeitgeber: '', abteilung: '' };
+    const eintrag: TimeEntry = {
+      employmentId: emp.id,
+      start: tag + 8 * H,
+      end: tag + 18 * H,
+      breakMinutes: 30,
+      activity: 'Montage',
+      note: '',
+      source: 'manual',
+      createdAt: 0,
+      updatedAt: 0,
+      overtimeAuthorization: 'angeordnet von der Teamleitung am 09.11. per E-Mail',
+    };
+    const mit = buildReportPdf(profil, monthPeriod(tag), [eintrag], emp).output();
+    expect(mit).toContain('Veranlassung: angeordnet von der Teamleitung am 09.11. per E-Mail');
+    const ohne = buildReportPdf(profil, monthPeriod(tag), [{ ...eintrag, overtimeAuthorization: '' }], emp);
+    expect(ohne.output()).not.toContain('Veranlassung:');
+  });
+});
+

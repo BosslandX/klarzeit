@@ -27,6 +27,7 @@ import { groupByDay } from '../../domain/aggregate';
 import type { Period } from '../../domain/aggregate';
 import type { TimeEntry } from '../../domain/types';
 import { changedTrackedTimes } from '../../domain/tracked-times';
+import { overtimeAuthorizationLine } from '../../domain/overtime-authorization';
 import {
   formatClock,
   formatDateTime,
@@ -59,6 +60,7 @@ function defaultManualDraft(): EntryDraft {
     note: '',
     source: 'manual',
     clockodo: null,
+    overtimeAuthorization: '',
   };
 }
 
@@ -92,6 +94,7 @@ function entryToDraft(entry: TimeEntry): EntryDraft {
     source: entry.source,
     employmentId: entry.employmentId,
     clockodo: entry.clockodo ?? null,
+    overtimeAuthorization: entry.overtimeAuthorization ?? '',
   };
 }
 
@@ -379,6 +382,9 @@ export function EntriesScreen() {
                     ) : null;
                   })()}
                   {e.note && <div className="entry-note">{e.note}</div>}
+                  {overtimeAuthorizationLine(e) !== undefined && (
+                    <div className="entry-note">{overtimeAuthorizationLine(e)}</div>
+                  )}
                 </div>
                 <div className="entry-side">
                   <div className="entry-duration">{formatDuration(netMs(e))}</div>

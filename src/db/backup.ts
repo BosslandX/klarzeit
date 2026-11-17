@@ -17,6 +17,7 @@ import {
 import type { BreakInterval, Profile, TimeEntry } from '../domain/types';
 import { cleanClockodoEntryRef, cleanClockodoSync } from '../domain/clockodo';
 import { changedTrackedTimes, cleanTrackedTimes } from '../domain/tracked-times';
+import { cleanOvertimeAuthorization } from '../domain/overtime-authorization';
 import { defaultEmployment, mergeVacationDays } from '../domain/employment';
 import type { Employment, VacationDay } from '../domain/employment';
 import { cleanSickPeriods, mergeSickPeriods, type SickPeriod } from '../domain/sickness';
@@ -130,6 +131,9 @@ function cleanEntry(e: TimeEntry): TimeEntry {
     (e as { clockodoSync?: unknown }).clockodoSync,
   );
   const trackedTimes = cleanTrackedTimes((e as { trackedTimes?: unknown }).trackedTimes);
+  const overtimeAuthorization = cleanOvertimeAuthorization(
+    (e as { overtimeAuthorization?: unknown }).overtimeAuthorization,
+  );
   return {
     id: e.id,
     employmentId,
@@ -140,6 +144,7 @@ function cleanEntry(e: TimeEntry): TimeEntry {
     ...(clockodo !== null ? { clockodo } : {}),
     ...(clockodoSync !== null ? { clockodoSync } : {}),
     ...(trackedTimes !== undefined ? { trackedTimes } : {}),
+    ...(overtimeAuthorization !== undefined ? { overtimeAuthorization } : {}),
     activity: e.activity,
     note: e.note,
     source: e.source,
@@ -415,6 +420,7 @@ export function entriesToCsv(
     'Beschaeftigung',
     'Taetigkeit',
     'Notiz',
+    'Veranlassung',
   ];
   const lines = [header.join(';')];
   for (const e of entries) {
@@ -429,6 +435,7 @@ export function entriesToCsv(
         employmentNameForCsv(e.employmentId, employments),
         e.activity,
         e.note,
+        cleanOvertimeAuthorization(e.overtimeAuthorization) ?? '',
       ]
         .map(csvCell)
         .join(';'),

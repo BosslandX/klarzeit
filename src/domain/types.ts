@@ -45,6 +45,11 @@ export interface TimeEntry {
    * oder kein Stoppuhr-Eintrag.
    */
   trackedTimes?: TrackedTimes;
+  /**
+   * Veranlassung von Ueberstunden durch den Arbeitgeber: wer sie wann und wie angeordnet, gebilligt
+   * oder geduldet hat (AUF-036); fehlt oder leer = keine Angabe.
+   */
+  overtimeAuthorization?: string;
   createdAt: number;
   updatedAt: number;
 }
