@@ -285,7 +285,6 @@ export function holidaysOf(
     .map(([date, alle]) => ({ date, name: alle.join(' / ') }));
 }
 
-
 /** Feiertage am Arbeitsort einer Beschaeftigung (AUF-029). */
 export interface PublicHolidays {
   /** Bundesland des Arbeitsorts. */

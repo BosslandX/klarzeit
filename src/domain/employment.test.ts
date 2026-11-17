@@ -823,7 +823,6 @@ describe('Arbeitstage als Wochentage (AUF-027)', () => {
   });
 });
 
-
 describe('Feiertage im Konto und beim Urlaub (AUF-029)', () => {
   const d = (y: number, mo: number, dd: number) => new Date(y, mo - 1, dd).getTime();
   const bayern = { land: 'BY' as const, regional: [], extra: [], skip: [] };

@@ -1014,7 +1014,6 @@ describe('Arbeitstage als Wochentage (AUF-027)', () => {
   });
 });
 
-
 describe('Feiertage einer Beschaeftigung im Backup (AUF-029)', () => {
   beforeEach(async () => {
     prefStore.clear();

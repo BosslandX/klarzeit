@@ -163,7 +163,6 @@ describe('Feiertage je Land (AUF-028)', () => {
   });
 });
 
-
 describe('Feiertage einer Beschaeftigung (AUF-029)', () => {
   it('cleanPublicHolidays: Land Pflicht, regionale nur aus dem Angebot, Tage auf Mitternacht', () => {
     expect(

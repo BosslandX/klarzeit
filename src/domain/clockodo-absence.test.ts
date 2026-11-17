@@ -211,7 +211,6 @@ describe('Urlaubsantraege bei festen Wochentagen (AUF-027)', () => {
   });
 });
 
-
 describe('Urlaubsantraege ueber einen Feiertag (AUF-029)', () => {
   it('vacationRequestRanges: Himmelfahrt dazwischen trennt nicht', () => {
     // 13.05.2026 Mittwoch, 14.05. Christi Himmelfahrt (Bayern), 15.05. Freitag.
