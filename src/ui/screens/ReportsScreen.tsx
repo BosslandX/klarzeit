@@ -27,6 +27,8 @@ import {
   useEmployments,
   useVacationDays,
 } from '../../db/employment';
+import { getSickPeriods, useSickPeriods } from '../../db/sickness';
+import { splitVacationAndSickness } from '../../domain/sickness';
 import {
   decimalHours,
   formatClock,
@@ -112,13 +114,22 @@ export function ReportsScreen() {
   const vacationDates = vacationDays
     .filter((d) => d.employmentId === employmentId)
     .map((d) => d.date);
+  const { periods: sickPeriods } = useSickPeriods();
+  // Urlaub und Krankheit nach § 9 BUrlG getrennt (AUF-034).
+  const geteilt = splitVacationAndSickness(vacationDates, sickPeriods, employmentId);
   const ledger =
     isMonth && employment
-      ? buildBalanceLedger(employment, ledgerEntries, ref, vacationDates)
+      ? buildBalanceLedger(
+          employment,
+          ledgerEntries,
+          ref,
+          geteilt.vacationDates,
+          geteilt.sickDates,
+        )
       : null;
   const vacation =
     isMonth && employment
-      ? buildVacationStatus(employment, vacationDates, getYear(period.from))
+      ? buildVacationStatus(employment, geteilt.vacationDates, getYear(period.from))
       : null;
 
   const shift = (dir: -1 | 1) => {
@@ -142,8 +153,9 @@ export function ReportsScreen() {
       let extras: ReportExtras | undefined;
       let bodyEntries = entries;
       if (isMonth) {
-        const [vac, wide] = await Promise.all([
+        const [vac, krank, wide] = await Promise.all([
           getVacationDays(),
+          getSickPeriods(),
           getEntriesInRangeForEmployment(
             Math.min(employment.startDate, period.from),
             period.to,
@@ -154,14 +166,18 @@ export function ReportsScreen() {
         bodyEntries = wide.filter(
           (e) => e.start >= period.from && e.start <= period.to,
         );
-        const vacDates = vacForEmp.map((d) => d.date);
-        const led = buildBalanceLedger(employment, wide, ref, vacDates);
+        const teil = splitVacationAndSickness(
+          vacForEmp.map((d) => d.date),
+          krank,
+          employment.id,
+        );
+        const led = buildBalanceLedger(employment, wide, ref, teil.vacationDates, teil.sickDates);
         if (led) {
           extras = {
             ledger: led,
             vacation: buildVacationStatus(
               employment,
-              vacDates,
+              teil.vacationDates,
               getYear(period.from),
             ),
           };
@@ -310,6 +326,14 @@ export function ReportsScreen() {
                 <span>Feiertage ({formatDays(ledger.target.holidayDays)})</span>
                 <strong className="pos">
                   {formatSignedDuration(ledger.target.holidayCreditMs)}
+                </strong>
+              </div>
+            )}
+            {ledger.target.sickDays > 0 && (
+              <div className="konto-row">
+                <span>Krankheit ({formatDays(ledger.target.sickDays)})</span>
+                <strong className="pos">
+                  {formatSignedDuration(ledger.target.sickCreditMs)}
                 </strong>
               </div>
             )}

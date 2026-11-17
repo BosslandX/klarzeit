@@ -5,6 +5,9 @@ import {
   longSickRuns,
   mergeSickPeriods,
   splitVacationAndSickness,
+  longSickHint,
+  sickPeriodLabel,
+  sickPeriodOn,
   type SickPeriod,
 } from './sickness';
 import {
@@ -159,5 +162,29 @@ describe('Krankheit (AUF-033)', () => {
     expect(buildVacationStatus(vollzeit, mit.vacationDates, 2026).taken).toBe(3);
     const ohne = splitVacationAndSickness(urlaub, [p(d(2026, 6, 10), d(2026, 6, 11), false)], 'emp-1');
     expect(buildVacationStatus(vollzeit, ohne.vacationDates, 2026).taken).toBe(5);
+  });
+});
+
+describe('Krankheit in der Oberflaeche (AUF-034)', () => {
+  it('sickPeriodOn: der Zeitraum, in dem ein Tag liegt, je Beschaeftigung', () => {
+    const liste = [p(d(2026, 3, 10), d(2026, 3, 12)), p(d(2026, 3, 11), d(2026, 3, 11), false, 'emp-2')];
+    expect(sickPeriodOn(liste, 'emp-1', d(2026, 3, 12) + 15 * HOUR)).toEqual(liste[0]);
+    expect(sickPeriodOn(liste, 'emp-1', d(2026, 3, 13))).toBeUndefined();
+    expect(sickPeriodOn(liste, 'emp-2', d(2026, 3, 11))).toEqual(liste[1]);
+    expect(sickPeriodOn(liste, 'emp-2', d(2026, 3, 10))).toBeUndefined();
+  });
+
+  it('sickPeriodLabel und longSickHint: Texte fuer Liste und Hinweis', () => {
+    expect(sickPeriodLabel(p(d(2026, 11, 2), d(2026, 11, 13)))).toBe(
+      '02.11.2026 bis 13.11.2026 (12 Kalendertage), mit Bescheinigung',
+    );
+    expect(sickPeriodLabel(p(d(2026, 11, 2), d(2026, 11, 2), false))).toBe(
+      '02.11.2026 (1 Kalendertag), ohne Bescheinigung',
+    );
+    expect(longSickHint({ from: d(2026, 1, 5), to: d(2026, 2, 16), days: 43 })).toBe(
+      'Krank vom 05.01.2026 bis 16.02.2026 (43 Kalendertage): Die Entgeltfortzahlung durch den ' +
+        'Arbeitgeber dauert hoechstens sechs Wochen (§ 3 Abs. 1 EntgFG). Das Konto rechnet die ' +
+        'Tage weiter ohne Minusstunden.',
+    );
   });
 });

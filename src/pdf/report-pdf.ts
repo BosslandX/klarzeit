@@ -339,6 +339,13 @@ export function buildKontoPanelText(
       tone: 'pos',
     });
   }
+  if (t.sickDays > 0) {
+    rows.push({
+      label: `Krankheit (${formatDays(t.sickDays)})`,
+      value: formatSignedDuration(t.sickCreditMs),
+      tone: 'pos',
+    });
+  }
   rows.push({ label: 'Saldo (Monat)', value: formatSignedDuration(t.saldoMs), tone: saldoTone });
   if (t.includedOvertimeMs > 0) {
     rows.push({
@@ -380,6 +387,12 @@ export function buildKontoPanelText(
         `${dec(dailyTargetMs(emp))} Std./Tag (§ 2 EntgFG), abzueglich am selben Tag ` +
         `erfasster Zeit.`
       : '';
+  const krankHinweis =
+    t.sickDays > 0
+      ? ` Krankheitstage entlasten an Arbeitstagen das Soll um bis zu ` +
+        `${dec(dailyTargetMs(emp))} Std./Tag (§ 4 Abs. 1 EntgFG), abzueglich am selben Tag ` +
+        `erfasster Zeit.`
+      : '';
   const hinweis = emp.balanceNote.trim();
   const kontohinweis = hinweis !== '' ? ` ${hinweis}` : '';
   const foot =
@@ -387,7 +400,8 @@ export function buildKontoPanelText(
     `Beschaeftigt seit ${formatDate(emp.startDate)}.${kontohinweis}` +
     abgeltungHinweis +
     urlaubHinweis +
-    feiertagHinweis;
+    feiertagHinweis +
+    krankHinweis;
   return { rows, foot };
 }
 

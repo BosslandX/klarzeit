@@ -1,4 +1,5 @@
 import { addDays, differenceInCalendarDays, startOfDay } from 'date-fns';
+import { formatDate } from './time';
 
 /**
  * Ein Zeitraum der Arbeitsunfaehigkeit (AUF-033): Kalendertage von `from` bis `to`, beide als
@@ -121,4 +122,32 @@ export function longSickRuns(
   return laeufe
     .map((l) => ({ ...l, days: differenceInCalendarDays(l.to, l.from) + 1 }))
     .filter((l) => l.days > ENTGELTFORTZAHLUNG_TAGE);
+}
+
+/** Der Zeitraum einer Beschaeftigung, in dem ein Tag liegt; sonst undefined (AUF-034). */
+export function sickPeriodOn(
+  periods: readonly SickPeriod[],
+  employmentId: string,
+  date: number,
+): SickPeriod | undefined {
+  const tag = startOfDay(date).getTime();
+  return periods.find((p) => p.employmentId === employmentId && p.from <= tag && tag <= p.to);
+}
+
+/** Listenzeile, z. B. "02.11.2026 bis 13.11.2026 (12 Kalendertage), mit Bescheinigung". */
+export function sickPeriodLabel(p: SickPeriod): string {
+  const tage = differenceInCalendarDays(p.to, p.from) + 1;
+  const spanne =
+    p.from === p.to ? formatDate(p.from) : `${formatDate(p.from)} bis ${formatDate(p.to)}`;
+  const anzahl = `${tage} ${tage === 1 ? 'Kalendertag' : 'Kalendertage'}`;
+  return `${spanne} (${anzahl}), ${p.certificate ? 'mit' : 'ohne'} Bescheinigung`;
+}
+
+/** Hinweis zu einer zusammenhaengenden Krankheit ueber sechs Wochen (aus longSickRuns). */
+export function longSickHint(run: { from: number; to: number; days: number }): string {
+  return (
+    `Krank vom ${formatDate(run.from)} bis ${formatDate(run.to)} (${run.days} Kalendertage): ` +
+    'Die Entgeltfortzahlung durch den Arbeitgeber dauert hoechstens sechs Wochen ' +
+    '(§ 3 Abs. 1 EntgFG). Das Konto rechnet die Tage weiter ohne Minusstunden.'
+  );
 }

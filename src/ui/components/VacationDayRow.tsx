@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import type { Employment, VacationDay } from '../../domain/employment';
 import { holidayNameOn } from '../../domain/holidays';
+import { sickPeriodOn, type SickPeriod } from '../../domain/sickness';
 import { absenceStatusLabel, isVacationDayRemovable } from '../../domain/clockodo-absence';
 import { formatDateWithWeekday } from '../../domain/time';
 import {
@@ -17,6 +18,7 @@ export function VacationDayRow({
   employment,
   onRemove,
   onWithdrawn,
+  sickPeriods,
 }: {
   day: VacationDay;
   days: readonly VacationDay[];
@@ -24,10 +26,12 @@ export function VacationDayRow({
   employment: Employment | undefined;
   onRemove: () => void;
   onWithdrawn: () => Promise<void>;
+  sickPeriods: readonly SickPeriod[];
 }) {
   const native = Capacitor.isNativePlatform();
   const showClockodo = employment?.clockodo != null;
   const feiertag = holidayNameOn(employment?.publicHolidays, day.date);
+  const krank = sickPeriodOn(sickPeriods, day.employmentId, day.date);
   const [busy, setBusy] = useState(false);
   const removable = isVacationDayRemovable(day);
   const absenceId = day.clockodoAbsence?.id;
@@ -61,6 +65,15 @@ export function VacationDayRow({
           <span className="muted small">
             {' '}
             · Feiertag ({feiertag}), zaehlt nicht als Urlaub
+          </span>
+        )}
+        {krank !== undefined && (
+          <span className="muted small">
+            {' '}
+            ·{' '}
+            {krank.certificate
+              ? 'krank mit Bescheinigung, zaehlt nicht als Urlaub (§ 9 BUrlG)'
+              : 'krank ohne Bescheinigung, zaehlt als Urlaub'}
           </span>
         )}
         {showClockodo && (

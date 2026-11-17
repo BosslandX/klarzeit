@@ -1,4 +1,5 @@
 import { Preferences } from '@capacitor/preferences';
+import { useCallback, useEffect, useState } from 'react';
 import { cleanSickPeriods, sickPeriodsOverlap, type SickPeriod } from '../domain/sickness';
 
 /** Preferences-Schluessel der Krankheitszeitraeume (AUF-033); stabiler Bezeichner. */
@@ -42,4 +43,19 @@ export async function removeSickPeriod(
   );
   await saveSickPeriods(next);
   return next;
+}
+
+/** Krankheitszeitraeume fuer die Oberflaeche, mit Neuladen nach einer Aenderung (AUF-034). */
+export function useSickPeriods(): {
+  periods: SickPeriod[];
+  refresh: () => Promise<void>;
+} {
+  const [periods, setPeriods] = useState<SickPeriod[]>([]);
+  const refresh = useCallback(async () => {
+    setPeriods(await getSickPeriods());
+  }, []);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+  return { periods, refresh };
 }

@@ -36,6 +36,8 @@ import { shareTextFile } from '../../pdf/share';
 import { ClockodoSettings } from '../components/ClockodoSettings';
 import { VacationClockodo } from '../components/VacationClockodo';
 import { VacationDayRow } from '../components/VacationDayRow';
+import { SickPeriodsSection } from '../components/SickPeriodsSection';
+import { useSickPeriods } from '../../db/sickness';
 import { WorkWeekdaysField } from '../components/WorkWeekdaysField';
 import { HolidaySettingsField } from '../components/HolidaySettingsField';
 import { ContractChangeField } from '../components/ContractChangeField';
@@ -84,6 +86,7 @@ export function MoreScreen() {
     remove: removeVac,
     refresh: refreshVac,
   } = useVacationDays();
+  const { periods: sickPeriods, refresh: refreshSick } = useSickPeriods();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Employment | null>(null);
   const [empFlash, setEmpFlash] = useState(false);
@@ -677,10 +680,18 @@ export function MoreScreen() {
                 employment={employments.find((e) => e.id === d.employmentId)}
                 onRemove={() => void removeVac(d.date, d.employmentId)}
                 onWithdrawn={refreshVac}
+                sickPeriods={sickPeriods}
               />
             ))}
           </ul>
         )}
+
+        <SickPeriodsSection
+          employment={vacEmp}
+          periods={sickPeriods}
+          showName={employments.length > 1}
+          onChange={refreshSick}
+        />
       </section>
 
       <section className="card-section">

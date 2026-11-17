@@ -7,6 +7,7 @@ import {
   defaultEmployment,
   type Employment,
 } from '../domain/employment';
+import { splitVacationAndSickness } from '../domain/sickness';
 
 describe('PDF-Kopf je Beschaeftigung', () => {
   it('buildEmployeePanelFields traegt Vertragsfelder der Beschaeftigung, nicht des Profils', () => {
@@ -212,5 +213,38 @@ describe('Kontoblock mit Feiertagen (AUF-030)', () => {
     const { rows, foot } = buildKontoPanelText(ledger, bayern);
     expect(rows.some((r) => r.label.startsWith('Feiertage'))).toBe(false);
     expect(foot).not.toContain('EntgFG');
+  });
+});
+
+describe('Kontoblock mit Krankheit (AUF-034)', () => {
+  const vollzeit: Employment = {
+    ...defaultEmployment,
+    startDate: new Date(2026, 0, 1).getTime(),
+    weeklyHours: 40,
+    workdaysPerWeek: 5,
+    balanceNote: '',
+  };
+  const tag = (dd: number) => new Date(2026, 10, dd).getTime();
+
+  it('Kontoblock: Zeile Krankheit und Fussnote, wenn der Monat Krankheitstage hat', () => {
+    // Mo 09.11. bis So 15.11.2026 mit Bescheinigung: fuenf Arbeitstage.
+    const { sickDates } = splitVacationAndSickness(
+      [],
+      [{ employmentId: vollzeit.id, from: tag(9), to: tag(15), certificate: true }],
+      vollzeit.id,
+    );
+    const ledger = buildBalanceLedger(vollzeit, [], tag(20), [], sickDates)!;
+    const { rows, foot } = buildKontoPanelText(ledger, vollzeit);
+    expect(rows.map((r) => [r.label, r.value])).toContainEqual(['Krankheit (5 Tage)', '+40:00 h']);
+    expect(foot).toContain(
+      'Krankheitstage entlasten an Arbeitstagen das Soll um bis zu 8,00 Std./Tag (§ 4 Abs. 1 EntgFG)',
+    );
+  });
+
+  it('Kontoblock: ohne Krankheitstage keine Zeile und kein Satz', () => {
+    const ledger = buildBalanceLedger(vollzeit, [], tag(20))!;
+    const { rows, foot } = buildKontoPanelText(ledger, vollzeit);
+    expect(rows.some((r) => r.label.startsWith('Krankheit'))).toBe(false);
+    expect(foot).not.toContain('Krankheitstage');
   });
 });
