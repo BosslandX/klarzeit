@@ -273,7 +273,9 @@ export interface MonthBalance {
   vacationCreditMs: number; // Gutschrift dafuer, gedeckelt auf sollMs
   holidayDays: number; // Feiertage an eigenen Arbeitstagen im Monat (im Beschaeftigungsfenster)
   holidayCreditMs: number; // Gutschrift dafuer, mit dem Urlaub zusammen gedeckelt auf sollMs
-  saldoMs: number; // istMs + vacationCreditMs + holidayCreditMs - sollMs (positiv = Ueberstunden)
+  sickDays: number; // Krankheitstage an eigenen Arbeitstagen (ohne Feiertage und Urlaub)
+  sickCreditMs: number; // Gutschrift dafuer, mit Urlaub und Feiertagen gedeckelt auf sollMs
+  saldoMs: number; // istMs + alle Gutschriften - sollMs (positiv = Ueberstunden)
   includedOvertimeMs: number; // mit Gehalt abgegolten dieses Monats (ms), nie negativ
 }
 
@@ -312,6 +314,34 @@ function istMsOfMonth(
 }
 
 /**
+ * Gutschrift fuer Tage ohne Arbeitspflicht (Urlaub, Feiertag, Krankheit): je Tag bis zum
+ * Tagessoll des an ihm geltenden Vertrags, abzueglich der an diesem Tag erfassten Zeit -- so
+ * zaehlt kein Tag doppelt. Auf volle Minuten gerundet.
+ */
+function fillUpCreditMs(
+  emp: Employment,
+  entries: readonly TimeEntry[],
+  days: readonly number[],
+): number {
+  const empStart = startOfDay(emp.startDate).getTime();
+  const empEnd = emp.endDate != null ? endOfDay(emp.endDate).getTime() : Infinity;
+  const creditMs = days.reduce((sum, day) => {
+    const perDay = dailyTargetMs({ ...emp, ...contractAt(emp, day) });
+    const dayStart = startOfDay(day).getTime();
+    const dayEnd = endOfDay(day).getTime();
+    const istOfDay = entries.reduce(
+      (s, e) =>
+        e.start >= dayStart && e.start <= dayEnd && e.start >= empStart && e.start <= empEnd
+          ? s + netMs(e)
+          : s,
+      0,
+    );
+    return sum + Math.max(0, perDay - istOfDay);
+  }, 0);
+  return Math.round(creditMs / MINUTE) * MINUTE;
+}
+
+/**
  * Urlaubstage eines Monats und die Gutschrift dafuer.
  *
  * Symmetrisch zu istMsOfMonth/monthSollMs auf das Beschaeftigungsfenster
@@ -343,23 +373,7 @@ function vacationOfMonth(
       d <= empEnd &&
       !feiertage.has(startOfDay(d).getTime()),
   );
-  const creditMs = inMonth.reduce((sum, day) => {
-    const perDay = dailyTargetMs({ ...emp, ...contractAt(emp, day) });
-    const dayStart = startOfDay(day).getTime();
-    const dayEnd = endOfDay(day).getTime();
-    const istOfDay = entries.reduce(
-      (s, e) =>
-        e.start >= dayStart && e.start <= dayEnd && e.start >= empStart && e.start <= empEnd
-          ? s + netMs(e)
-          : s,
-      0,
-    );
-    return sum + Math.max(0, perDay - istOfDay);
-  }, 0);
-  return {
-    days: inMonth.length,
-    creditMs: Math.round(creditMs / MINUTE) * MINUTE,
-  };
+  return { days: inMonth.length, creditMs: fillUpCreditMs(emp, entries, inMonth) };
 }
 
 /**
@@ -386,22 +400,44 @@ function holidaysOfMonth(
       d <= empEnd &&
       wochentageAm(emp, d).includes(getDay(d)),
   );
-  const creditMs = tage.reduce((sum, day) => {
-    const perDay = dailyTargetMs({ ...emp, ...contractAt(emp, day) });
-    const dayEnd = endOfDay(day).getTime();
-    const istOfDay = entries.reduce(
-      (s, e) =>
-        e.start >= day && e.start <= dayEnd && e.start >= empStart && e.start <= empEnd
-          ? s + netMs(e)
-          : s,
-      0,
+  return { days: tage.length, creditMs: fillUpCreditMs(emp, entries, tage) };
+}
+
+/**
+ * Krankheitstage eines Monats an eigenen Arbeitstagen und die Gutschrift dafuer (AUF-033): bis
+ * zum Tagessoll, abzueglich am Tag erfasster Zeit -- fortgezahlt wird das Entgelt der
+ * massgebenden regelmaessigen Arbeitszeit (§ 4 Abs. 1 EntgFG). Ein Feiertag zaehlt als Feiertag,
+ * ein Urlaubstag als Urlaub; welche Urlaubstage krank zaehlen, entscheidet vorher
+ * splitVacationAndSickness (§ 9 BUrlG). Die App rechnet Krankheitstage auch nach sechs Wochen
+ * nicht als Minusstunden; dass die Entgeltfortzahlung endet, meldet longSickRuns.
+ */
+function sickOfMonth(
+  emp: Employment,
+  entries: readonly TimeEntry[],
+  sickDates: readonly number[],
+  vacationDates: readonly number[],
+  monthRef: number,
+): { days: number; creditMs: number } {
+  const mStart = startOfMonth(monthRef).getTime();
+  const mEnd = endOfMonth(monthRef).getTime();
+  const empStart = startOfDay(emp.startDate).getTime();
+  const empEnd = emp.endDate != null ? endOfDay(emp.endDate).getTime() : Infinity;
+  const jahr = getYear(monthRef);
+  const feiertage = publicHolidayMap(emp.publicHolidays, jahr, jahr);
+  const urlaub = new Set(vacationDates.map((d) => startOfDay(d).getTime()));
+  const tage = sickDates.filter((d) => {
+    const tag = startOfDay(d).getTime();
+    return (
+      d >= mStart &&
+      d <= mEnd &&
+      d >= empStart &&
+      d <= empEnd &&
+      wochentageAm(emp, d).includes(getDay(d)) &&
+      !feiertage.has(tag) &&
+      !urlaub.has(tag)
     );
-    return sum + Math.max(0, perDay - istOfDay);
-  }, 0);
-  return {
-    days: tage.length,
-    creditMs: Math.round(creditMs / MINUTE) * MINUTE,
-  };
+  });
+  return { days: tage.length, creditMs: fillUpCreditMs(emp, entries, tage) };
 }
 
 /**
@@ -418,6 +454,9 @@ function holidaysOfMonth(
  * dabei angerechnet, ein Tag zaehlt also nie doppelt. Ohne Urlaubstage rechnet
  * die Funktion exakt wie zuvor.
  *
+ * `sickDates` (Krankheitstage, vorher mit splitVacationAndSickness von den Urlaubstagen
+ * getrennt) entlasten ebenso (AUF-033); ohne sie rechnet die Funktion wie zuvor.
+ *
  * Mit Klausel fuer abgegoltene Ueberstunden: jeder Monat fuer sich — der Vertrag zaehlt
  * Ueberstunden pro Monat und kennt kein Konto; Minusstunden aus Vormonaten mindern die
  * Abgeltung nicht.
@@ -427,6 +466,7 @@ export function buildBalanceLedger(
   entries: readonly TimeEntry[],
   refEpoch: number,
   vacationDates: readonly number[] = [],
+  sickDates: readonly number[] = [],
 ): BalanceLedger | null {
   const firstMonth = startOfMonth(emp.startDate);
   const targetMonth = startOfMonth(refEpoch);
@@ -449,7 +489,10 @@ export function buildBalanceLedger(
     // Feiertage teilen sich den Deckel mit dem Urlaub: zusammen hoechstens das Soll.
     const hol = holidaysOfMonth(emp, entries, m.getTime());
     const holidayCreditMs = Math.min(hol.creditMs, sollMs - vacationCreditMs);
-    const saldoMs = istMs + vacationCreditMs + holidayCreditMs - sollMs;
+    // Krankheit teilt sich den Deckel mit Urlaub und Feiertagen.
+    const sick = sickOfMonth(emp, entries, sickDates, vacationDates, m.getTime());
+    const sickCreditMs = Math.min(sick.creditMs, sollMs - vacationCreditMs - holidayCreditMs);
+    const saldoMs = istMs + vacationCreditMs + holidayCreditMs + sickCreditMs - sollMs;
     const includedOvertimeMs = Math.min(
       includedOvertimeCapMs(emp, m.getTime()),
       Math.max(0, saldoMs),
@@ -463,6 +506,8 @@ export function buildBalanceLedger(
       vacationCreditMs,
       holidayDays: hol.days,
       holidayCreditMs,
+      sickDays: sick.days,
+      sickCreditMs,
       saldoMs,
       includedOvertimeMs,
     };

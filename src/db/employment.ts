@@ -21,6 +21,7 @@ import { getProfile } from './profile';
 import { removeClockodoKey } from '../clockodo/key-store';
 import { removeClockodoLists } from './clockodo-lists';
 import { removeClockodoLock } from './clockodo-lock';
+import { getSickPeriods } from './sickness';
 import { db } from './db';
 
 const KEY_EMP = 'employment';
@@ -269,7 +270,7 @@ export async function countEntriesOfEmployment(id: string): Promise<number> {
 }
 
 /**
- * Entfernt eine Beschaeftigung nur ohne haengende Zeiteintraege/Urlaubstage
+ * Entfernt eine Beschaeftigung nur ohne haengende Zeiteintraege/Urlaubstage/Krankheitszeiten
  * und nur wenn mindestens eine Beschaeftigung bleibt.
  */
 export async function removeEmployment(id: string): Promise<Employment[]> {
@@ -289,6 +290,14 @@ export async function removeEmployment(id: string): Promise<Employment[]> {
       'Loeschen nicht moeglich: ' +
         vacCount +
         ' Urlaubstag(e) haengen an dieser Beschaeftigung.',
+    );
+  }
+  const sickCount = (await getSickPeriods()).filter((p) => p.employmentId === id).length;
+  if (sickCount > 0) {
+    throw new Error(
+      'Loeschen nicht moeglich: ' +
+        sickCount +
+        ' Krankheitszeit(en) haengen an dieser Beschaeftigung.',
     );
   }
   if (list.length <= 1) {

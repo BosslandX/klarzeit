@@ -18,6 +18,8 @@ import type { BreakInterval, Profile, TimeEntry } from '../domain/types';
 import { cleanClockodoEntryRef, cleanClockodoSync } from '../domain/clockodo';
 import { defaultEmployment, mergeVacationDays } from '../domain/employment';
 import type { Employment, VacationDay } from '../domain/employment';
+import { cleanSickPeriods, mergeSickPeriods, type SickPeriod } from '../domain/sickness';
+import { getSickPeriods, saveSickPeriods } from './sickness';
 import { decimalHours, formatClock, formatDate, netMs } from '../domain/time';
 
 export interface BackupData {
@@ -36,16 +38,19 @@ export interface BackupData {
   vacations?: VacationDay[];
   employments?: Employment[];
   activeEmployment?: string;
+  /** Krankheitszeitraeume (AUF-033); fehlt in aelteren Backups. */
+  sickPeriods?: SickPeriod[];
 }
 
 export async function buildBackup(): Promise<BackupData> {
-  const [profile, entries, employments, activeEmployment, vacations] =
+  const [profile, entries, employments, activeEmployment, vacations, sickPeriods] =
     await Promise.all([
       getProfile(),
       getAllEntries(),
       getEmployments(),
       getActiveEmploymentId(),
       getVacationDays(),
+      getSickPeriods(),
     ]);
   return {
     app: 'zeiterfassung',
@@ -56,6 +61,7 @@ export async function buildBackup(): Promise<BackupData> {
     employments,
     activeEmployment,
     vacations,
+    sickPeriods,
   };
 }
 
@@ -351,6 +357,13 @@ export async function restoreBackup(
       mode === 'merge'
         ? mergeVacationDays(await getVacationDays(), incoming)
         : incoming,
+    );
+  }
+
+  if (Array.isArray(data.sickPeriods)) {
+    const incoming = cleanSickPeriods(data.sickPeriods);
+    await saveSickPeriods(
+      mode === 'merge' ? mergeSickPeriods(await getSickPeriods(), incoming) : incoming,
     );
   }
   return entries.length;
