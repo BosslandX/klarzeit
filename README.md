@@ -361,7 +361,7 @@ Zwei Regeln halten das zusammen:
    Den Clockodo-Schlüssel verwahrt `clockodo/key-store.ts` im Android KeyStore. Zeiten
    immer als Epoch-Millisekunden; formatiert wird nur in `domain/time.ts`.
 
-Dazu **375 Tests in 31 Dateien** (Stand 17.11.2026, `npm test`).
+Dazu **375 Tests in 31 Dateien** (Stand 1.13.0, `npm test`).
 
 <details>
 <summary><b>Verzeichnisse</b></summary>
@@ -477,7 +477,8 @@ wenn App-ID **und** Signatur übereinstimmen.
 
 | Version | Datum | Neu |
 |---|---|---|
-| **1.12.1** | 17.11.2026 | Sicherheitsupdate: PDF-Bibliothek und Capacitor aktualisiert |
+| **1.13.0** | 17.11.2026 | Arbeitstage als Wochentage, Feiertage je Bundesland, Vertrag gültig ab, Krankheit, geänderte Stoppuhr-Zeiten gekennzeichnet, Veranlassung von Überstunden, Hinweise nach dem Arbeitszeitgesetz |
+| 1.12.1 | 17.11.2026 | Sicherheitsupdate: PDF-Bibliothek und Capacitor aktualisiert |
 | 1.12.0 | 22.10.2026 | Ende folgt dem Beginn; Pausen nur noch als Uhrzeit |
 | 1.11.0 | 10.10.2026 | Clockodo-Sperrfrist; automatisch übertragen |
 | 1.10.0 | 10.10.2026 | Korrekturen erreichen Clockodo; Urlaubsantrag zurückziehen |
