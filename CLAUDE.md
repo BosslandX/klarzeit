@@ -129,7 +129,23 @@ node tools/privacy-scan.mjs # lokales Werkzeug (gitignored): prueft Arbeitsverze
   beginnen leer — die App erfindet keine Fundstelle. Feldgruppe Vertrag in
   `fillEmptyEmployment`: Eine frisch geöffnete App trägt eine Standard-Beschäftigung mit
   leerem Hinweis, den Satz eines v1/v2-Backups bringt beim Zusammenführen nur diese Gruppe.
-- **Nicht abgebildet:** Feiertage, Krankheit und sonstige bezahlte Freistellung erzeugen weiterhin
+- **Feiertage (AUF-028–030):** `src/domain/holidays.ts` (rein) berechnet die gesetzlichen Feiertage je
+  Bundesland (`holidaysOf`): Listen aus den 16 Landesgesetzen, 3. Oktober nach Art. 2 Abs. 2
+  Einigungsvertrag, Ostern nach der Rechenvorschrift der PTB (`easterSunday`, gegen deren Tabelle
+  1980–2031 getestet), Himmelfahrt/Pfingsten/Fronleichnam als Ostern + 39/49/60, Buß- und Bettag als
+  Mittwoch vor dem Sonntag vor dem 1. Advent; regional zuschaltbar Mariä Himmelfahrt und Friedensfest
+  (BY), Fronleichnam (SN, TH); einmalig der 17. Juni 2028 in Berlin; gleiche Tage ein Eintrag. Jedes Jahr
+  gilt die heutige Liste (ältere Rechtsstände nicht abgebildet), Sonntage zählen nicht. Quellen und
+  Prüfung: `docs/STATE.md`, Session 2026-11-17. Je Beschäftigung `Employment.publicHolidays?`
+  (`land`, `regional`, `extra`, `skip`; fehlt = keine Feiertage, wie bis 1.12), geprüft in
+  `cleanPublicHolidays`, Feldgruppe Vertrag in `fillEmptyEmployment`. Konto: ein Feiertag an einem
+  eigenen Arbeitstag füllt bis zum Tagessoll auf, abzüglich am Tag erfasster Zeit (§ 2 Abs. 1 EntgFG);
+  Urlaub und Feiertage zusammen höchstens das Monats-Soll; `MonthBalance.holidayDays/holidayCreditMs`.
+  Ein Urlaubstag auf einem Feiertag zählt weder als genommen noch in der Gutschrift, ein Zeitraum
+  überspringt Feiertage (§ 3 Abs. 2 BUrlG). Oberfläche: `HolidaySettingsField` (Land, regionale Tage,
+  Vorschau des Jahres zum Streichen, eigene Tage), Hinweis am Urlaubstag (`VacationDayRow` bekommt die
+  Beschäftigung), Zeile „Feiertage (n Tage)" in Auswertung und PDF-Kontoblock samt Fußnotensatz.
+- **Nicht abgebildet:** Krankheit und sonstige bezahlte Freistellung erzeugen weiterhin
   Minusstunden; halbe Urlaubstage sind konstruktiv unmöglich (`taken` ist `.length`); kein
   Resturlaub-Übertrag (§ 7 III BUrlG); `VacationDay.note` existiert, ist in der UI aber tot.
   Ausgezahlte Überstunden lassen sich nicht buchen (das Konto behält sie als Guthaben), eine
@@ -313,6 +329,10 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
 - `src/domain/employment.ts` → Feld `workWeekdays` am `Employment` (Preferences `employments` und
   Backup; umbenannt verwirft `cleanEmployment` die Auswahl, und jeder Urlaubszeitraum zählt wieder
   Montag bis Freitag)
+- `src/domain/employment.ts` → Feld `publicHolidays` am `Employment` samt `land`, `regional`, `extra`,
+  `skip`; die Schlüssel der regionalen Tage (`mariaehimmelfahrt`, `friedensfest`, `fronleichnam`) und die
+  Länderkürzel in `src/domain/holidays.ts` (Preferences `employments` und Backup; umbenannt gelten die
+  Feiertage als ausgeschaltet — das Konto zeigt wieder Minusstunden an jedem Feiertag)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
