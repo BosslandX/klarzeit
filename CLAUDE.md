@@ -28,7 +28,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Prüfwerkzeuge des Orchestrators** (seit 2026-11-17 versioniert, vorher nur im Scratchpad):
   `tools/zitat-pruefen.mjs` und `tools/kontext.mjs` prüfen Zitate gegen den Seitentext (Chrome
   kopflos über `puppeteer-core`, eigenes Profil); `tools/oberflaeche/aufNNN_ui.mjs` sind die
-  Oberflächenproben der Aufträge 027–039 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
+  Oberflächenproben der Aufträge 027–040 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
   `npm run dev`, Stand ihres Auftrags). Einspiel-Vorlage, Auftragstext-Erzeuger und Stückprüfung
   liegen im Baukasten unter `C:\gamedev\composer-kit\orchestrator\` und werden von dort gerufen.
 - Android SDK-Pfad in `android/local.properties` (`sdk.dir=...`, gitignored, rechnerspezifisch).
@@ -265,7 +265,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   `src/domain/clockodo-transfer.ts` (rein): je Arbeitsabschnitt zwischen den Pausen ein
   Clockodo-Eintrag (`workSegments`, `buildEntryPayloads`), UTC ohne Millisekunden, Prüfsumme
   `entrySyncHash` (FNV-1a über das Gesendete), `transferStatus` in fester Reihenfolge
-  (none, before-start, untimed-break, incomplete, pending, changed, synced). Der Clockodo-Kasten in
+  (none, done, before-start, untimed-break, incomplete, pending, changed, synced). Der Clockodo-Kasten in
   „Eintraege" zählt auch die Einträge vor „Uebertragen ab", jeder trägt den Stand „vor „Uebertragen
   ab" – wird nicht uebertragen" (`countTransferBuckets` in der Domäne; AUF-039, vorher fielen sie
   still heraus).
@@ -290,6 +290,15 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   Clockodo stehen bleibt. Rückt ein übertragener Eintrag vor „Uebertragen ab" (bisheriger Beginn am
   oder nach dem Tag, neuer davor), werden seine IDs ebenso vorgemerkt (AUF-039); lag er schon davor
   (etwa weil „Uebertragen ab" später gesetzt wurde), ändert ein Bearbeiten nichts an Clockodo.
+- **Von Hand erledigt (AUF-040), Entscheidung des Users „endgültig":** Ein offener, nie übertragener
+  Eintrag (ohne `clockodoSync`, Stand `pending`, `incomplete` oder `untimed-break`; `canMarkClockodoDone`)
+  lässt sich in „Eintraege" als in Clockodo erledigt markieren — für einen gesperrten Eintrag, den der
+  Vorgesetzte dort von Hand nachträgt. `TimeEntry.clockodoDone` = Zeitpunkt (`cleanClockodoDone`, im
+  Backup über `cleanEntry`); `transferStatus` liefert dann `done`, gleich nach `none` und **auch nach einer
+  Änderung**; der Lauf überspringt ihn (ohne Zählung, `TransferResult` unverändert), er zählt nicht als
+  offen, Stand „von Hand erledigt – wird nicht uebertragen". „wieder offen" entfernt das Feld
+  (`setEntryClockodoDone(id, null)`). Rückfragen mit Tag und Folge (`clockodoDoneQuestion`). Löschen
+  vermerkt nichts (keine IDs von Klarzeit in Clockodo).
 - **Urlaubsanträge an Clockodo — Bausteine (AUF-019):** `VacationDay.clockodoAbsence?` =
   `{ id, status, at }` des Clockodo-Antrags (Status 0 beantragt … 4 storniert, openapi
   `AbsenceStatus`); fehlt = nie beantragt, `cleanVacationDays` trägt einen gültigen Verweis,
@@ -422,6 +431,8 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
   umbenannt sieht jeder geänderte Stoppuhr-Eintrag wieder unverändert aus)
 - `src/domain/types.ts` → Feld `overtimeAuthorization` am `TimeEntry` (Dexie und Backup; umbenannt gehen
   alle Vermerke zur Veranlassung verloren)
+- `src/domain/types.ts` → Feld `clockodoDone` am `TimeEntry` (Dexie und Backup; umbenannt gilt jeder von
+  Hand erledigte Eintrag wieder als offen — der nächste Lauf bucht ihn in Clockodo **doppelt**)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
