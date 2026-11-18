@@ -1,7 +1,7 @@
 <!--
   Banner: assets/readme/banner-{light,dark}.svg – von Hand gebaut, per CSS animiert, ohne Skript.
   Titelbild und Screenshots: node tools/screenshots.mjs (Anleitung im Kopf der Datei).
-  Sobald das Logo vorliegt, ersetzt es die Uhr im Banner.
+  Logo: assets/source-logo.png (Pixelart, 32 x 32, aus tools/logo_bauen.py) – im Banner als Rechtecke eingebettet.
 -->
 
 <p align="center">
@@ -434,7 +434,9 @@ npm run apk:release
 > Keystore und Passwort sicher aufbewahren. Ohne beide lässt sich die App nicht mehr mit
 > derselben Signatur aktualisieren – alle müssten neu installieren.
 
-**Icons und Splash** entstehen aus `assets/source-logo.png` mit `npm run icons`.
+**Icons und Splash** entstehen aus `assets/source-logo.png` mit `npm run icons`. Das Logo ist Pixelart
+(32 × 32, erzeugt mit `python tools/logo_bauen.py <ordner>`); `tools/gen-icons.mjs` vergrößert es nur
+ganzzahlig und ohne Glätten, damit jedes Pixel ein scharfes Quadrat bleibt.
 
 **Screenshots und Titelbild** neu erzeugen:
 

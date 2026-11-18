@@ -36,6 +36,13 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Release-Signing:** `android/app/build.gradle` liest `android/keystore.properties`
   (gitignored, Vorlage: `keystore.properties.example`). Fehlt sie → unsigniert. Niemals
   Keystore/Passwort committen.
+- **Logo (seit 2026-11-18):** Pixelart-Stoppuhr, deren Zeiger einen Haken bilden, 32 × 32 mit transparentem
+  Grund in `assets/source-logo.png`, erzeugt von `tools/logo_bauen.py` (Raster, Farben aus der App: Ring
+  `#2563eb`, Haken `#16a34a`); im README-Banner als SVG-Rechtecke eingebettet. `tools/gen-icons.mjs`
+  vergrößert ein Motiv bis 128 px Kante nur ganzzahlig und ohne Glätten (`kernel: nearest`) — mit dem
+  Standardfilter verschwämmen die Pixelkanten. Der alte Schriftzug der Vorgänger-App ist damit aus allen
+  Icons und Splashs heraus (jede versionierte Bilddatei neu erzeugt, die einfarbig weißen Hintergründe
+  ausgenommen).
 - **Icons/Splash:** Quellen in `assets/`, Motiv in `tools/gen-icons.mjs`. Splash aktiv via
   `@capacitor/splash-screen` (Config in `capacitor.config.ts`); Android-12+-Theme-Attribute
   in `android/app/src/main/res/values/styles.xml` + Farbe in `values/colors.xml`;
@@ -460,16 +467,16 @@ Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehen
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
 
 ## Veröffentlichung
-- Repo `BosslandX/klarzeit` (MIT). **Derzeit noch PRIVAT** — public erst nach Logo-Lieferung,
-  weil sämtliche Icons noch den Schriftzug der Vorgänger-App tragen und `privacy-scan.mjs`
-  **keine Bilddateien prüft**. Vor dem Public-Schalten daher zusätzlich zum Scan die Icons
+- Repo `BosslandX/klarzeit` (MIT). **Derzeit noch PRIVAT** — public nur auf das Wort des Users. Die
+  Icons tragen seit dem Pixelart-Logo (2026-11-18) keinen Schriftzug der Vorgänger-App mehr; da
+  `privacy-scan.mjs` **keine Bilddateien prüft**, vor dem Public-Schalten zusätzlich zum Scan die Icons
   unter `assets/` und `android/app/src/main/res/mipmap-*`/`drawable-*` visuell kontrollieren.
 - **Releases (APK + `version.json`) liegen seit 1.5.1 im ÖFFENTLICHEN `BosslandX/klarzeit-releases`**
   — einem reinen Release-Repo ohne Quellcode (Muster `zeiterfassung-releases`).
   `src/update/updater.ts` zieht `releases/latest/download/version.json` von dort. Grund: Das private
   Code-Repo liefert unauthentifiziert **HTTP 404** (`CapacitorHttp` schickt kein Token), der Updater
-  war damit tot. Die öffentliche APK trägt noch die Icons der Vorgänger-App — vom User bewusst in Kauf genommen
-  (2026-09-23). Releases bis v1.4 liegen weiter im privaten Code-Repo und sind für den Updater
+  war damit tot. Die öffentliche APK trägt bis 1.14.0 noch die Icons der Vorgänger-App — vom User bewusst in
+  Kauf genommen (2026-09-23); die nächste APK bringt das Pixelart-Logo. Releases bis v1.4 liegen weiter im privaten Code-Repo und sind für den Updater
   unerreichbar: Wer eine ältere Version installiert hat, installiert 1.5.1 einmal von Hand.
 - Commits im Releases-Repo nur als `BosslandX <20750642+BosslandX@users.noreply.github.com>` —
   kein Klarname in öffentlicher Historie.
