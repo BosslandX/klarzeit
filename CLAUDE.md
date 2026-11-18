@@ -28,7 +28,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Prüfwerkzeuge des Orchestrators** (seit 2026-11-17 versioniert, vorher nur im Scratchpad):
   `tools/zitat-pruefen.mjs` und `tools/kontext.mjs` prüfen Zitate gegen den Seitentext (Chrome
   kopflos über `puppeteer-core`, eigenes Profil); `tools/oberflaeche/aufNNN_ui.mjs` sind die
-  Oberflächenproben der Aufträge 027–041 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
+  Oberflächenproben der Aufträge 027–042 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
   `npm run dev`, Stand ihres Auftrags). Einspiel-Vorlage, Auftragstext-Erzeuger und Stückprüfung
   liegen im Baukasten unter `C:\gamedev\composer-kit\orchestrator\` und werden von dort gerufen.
 - Android SDK-Pfad in `android/local.properties` (`sdk.dir=...`, gitignored, rechnerspezifisch).
@@ -144,8 +144,15 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   Einigungsvertrag, Ostern nach der Rechenvorschrift der PTB (`easterSunday`, gegen deren Tabelle
   1980–2031 getestet), Himmelfahrt/Pfingsten/Fronleichnam als Ostern + 39/49/60, Buß- und Bettag als
   Mittwoch vor dem Sonntag vor dem 1. Advent; regional zuschaltbar Mariä Himmelfahrt und Friedensfest
-  (BY), Fronleichnam (SN, TH); einmalig der 17. Juni 2028 in Berlin; gleiche Tage ein Eintrag. Jedes Jahr
-  gilt die heutige Liste (ältere Rechtsstände nicht abgebildet), Sonntage zählen nicht. Quellen und
+  (BY), Fronleichnam (SN, TH); einmalig der 17. Juni 2028 in Berlin; gleiche Tage ein Eintrag. **Frühere
+  Jahre nach damaligem Recht ab 2017 (AUF-042, Entscheidung des Users):** `SEIT` — später eingeführte
+  Feiertage zählen erst ab ihrem Tag (Frauentag BE ab 7.2.2019, MV ab 13.7.2022; Reformationstag HB und NI
+  ab 29.6.2018, HH ab 20.3.2018, SH ab 22.2.2018; Weltkindertag TH ab 28.2.2019) — und `EINMALIG`
+  (31.10.2017 in BE, BY, HB, HE, NI, NW; Berlin 8.5.2020, 8.5.2025, 17.6.2028); davor gilt der Stand von
+  2017. Für BW, HH, RP, SH und SL ist der 31.10.2017 **nicht amtlich belegt** und nicht abgebildet;
+  `holidayHistoryNote` sagt es am **Ende** des Feiertagsabschnitts (nicht zwischen „Feiertage <Jahr>." und
+  der Liste — die Probe von AUF-030 liest die Liste als nächstes Element). Belege (Gesetzblätter, für SH
+  und TH Landtagsbeschlüsse): `docs/STATE.md`, Session 2026-11-18. Sonntage zählen nicht. Quellen und
   Prüfung: `docs/STATE.md`, Session 2026-11-17. Je Beschäftigung `Employment.publicHolidays?`
   (`land`, `regional`, `extra`, `skip`; fehlt = keine Feiertage, wie bis 1.12), geprüft in
   `cleanPublicHolidays`, Feldgruppe Vertrag in `fillEmptyEmployment`. Konto: ein Feiertag an einem

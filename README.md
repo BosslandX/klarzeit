@@ -204,11 +204,12 @@ Gesetzestext: [Bundesurlaubsgesetz](https://www.gesetze-im-internet.de/burlg/).
 
 | Thema | Fundstelle | Was Klarzeit tut |
 |---|---|---|
-| Feiertage | Feiertagsgesetze der Länder, [§ 2 Abs. 1 EntgFG](https://www.gesetze-im-internet.de/entgfg/__2.html) | je Beschäftigung das Bundesland des Arbeitsorts; regionale Tage zuschaltbar, eigene Tage dazu oder weg; ein Feiertag an einem Arbeitstag füllt bis zum Tagessoll auf |
+| Feiertage | Feiertagsgesetze der Länder, [§ 2 Abs. 1 EntgFG](https://www.gesetze-im-internet.de/entgfg/__2.html) | je Beschäftigung das Bundesland des Arbeitsorts; regionale Tage zuschaltbar, eigene Tage dazu oder weg; ein Feiertag an einem Arbeitstag füllt bis zum Tagessoll auf; frühere Jahre nach dem damaligen Recht, ab 2017 amtlich belegt |
 | Feiertag im Urlaub | [§ 3 Abs. 2 BUrlG](https://www.gesetze-im-internet.de/burlg/__3.html) | zählt nicht als Urlaubstag |
 | Krankheit | [§ 4 Abs. 1 EntgFG](https://www.gesetze-im-internet.de/entgfg/__4.html) | Krankheitstage an Arbeitstagen füllen bis zum Tagessoll auf |
 | Krank im Urlaub | [§ 9 BUrlG](https://www.gesetze-im-internet.de/burlg/__9.html) | mit ärztlicher Bescheinigung zählt der Tag nicht als Urlaub |
 | Sechs Wochen | [§ 3 Abs. 1 EntgFG](https://www.gesetze-im-internet.de/entgfg/__3.html) | Hinweis, wenn eine Krankheit länger dauert |
+| Wartezeit | [§ 3 Abs. 3 EntgFG](https://www.gesetze-im-internet.de/entgfg/__3.html) | Hinweis, wenn eine Krankheit in die ersten vier Wochen der Beschäftigung fällt |
 | Vertragswechsel | – | „gilt ab" einem Stichtag; frühere Monate rechnen mit dem alten Vertrag |
 | Geänderte Stoppuhr-Zeit | – | „°" im PDF; die ursprünglichen Zeiten stehen in der App und in der CSV |
 | Veranlassung von Überstunden | [BAG, 04.05.2022 – 5 AZR 359/21](https://www.bundesarbeitsgericht.de/entscheidung/5-azr-359-21/) | je Eintrag: wer sie wann und wie angeordnet, gebilligt oder geduldet hat – im PDF und in der CSV |
@@ -220,9 +221,12 @@ Gesetzestext: [Bundesurlaubsgesetz](https://www.gesetze-im-internet.de/burlg/).
 
 - **Sonstige bezahlte Freistellung** (etwa Sonderurlaub) kennt die App nicht – sie erscheint
   als Minusstunden.
-- **Feiertage nach heutigem Recht.** Auch für frühere Jahre gilt die heutige Liste der Länder.
-- **Keine Wartezeit der Entgeltfortzahlung** ([§ 3 Abs. 3 EntgFG](https://www.gesetze-im-internet.de/entgfg/__3.html)).
-  Das Konto rechnet Stunden, nicht Lohn; Krankheit erzeugt auch nach sechs Wochen keine Minusstunden.
+- **Feiertage vor 2017** rechnen mit dem Stand von 2017. Den einmaligen Feiertag am 31.10.2017
+  kennt die App für Baden-Württemberg, Hamburg, Rheinland-Pfalz, das Saarland und
+  Schleswig-Holstein nicht – dafür fehlt ein amtlicher Beleg; bei Bedarf als eigenen Tag eintragen.
+- **Kein Lohn.** Das Konto rechnet Stunden: Krankheit erzeugt weder in der Wartezeit
+  ([§ 3 Abs. 3 EntgFG](https://www.gesetze-im-internet.de/entgfg/__3.html)) noch nach sechs Wochen
+  Minusstunden – die App weist nur darauf hin.
 - **Der Urlaubsanspruch** rechnet mit dem aktuellen Vertrag, auch wenn sich die Arbeitstage im
   Lauf des Jahres geändert haben.
 - **Keine halben Urlaubstage.** Jeder eingetragene Urlaubstag zählt als ganzer Tag.
@@ -263,6 +267,10 @@ gantt
   gebucht wird.
 - **Sperrfrist im Blick.** Klarzeit liest die Sperrfrist deines Clockodo-Kontos und warnt am
   Vortag und am letzten Tag, an dem Clockodo einen Eintrag noch annimmt.
+- **Von Hand erledigt.** Hat dein Vorgesetzter einen gesperrten Eintrag in Clockodo selbst
+  nachgetragen, markierst du ihn in Klarzeit als erledigt – dann sendet Klarzeit ihn nie mehr.
+- **Was nicht übertragen wird, siehst du.** Einträge vor „Übertragen ab“ zählt der
+  Clockodo-Kasten mit; rückt ein übertragener Eintrag davor, löscht der nächste Lauf ihn dort.
 - **Urlaubsanträge.** Offene Urlaubstage beantragst du per Knopf, zusammenhängende Tage als
   einen Antrag. Danach steht an jedem Tag der Stand: beantragt, genehmigt, abgelehnt. Einen
   falsch gestellten Antrag ziehst du per Knopf zurück.
@@ -361,7 +369,7 @@ Zwei Regeln halten das zusammen:
    Den Clockodo-Schlüssel verwahrt `clockodo/key-store.ts` im Android KeyStore. Zeiten
    immer als Epoch-Millisekunden; formatiert wird nur in `domain/time.ts`.
 
-Dazu **375 Tests in 31 Dateien** (Stand 1.13.0, `npm test`).
+Dazu **403 Tests in 31 Dateien** (Stand 1.14.0, `npm test`).
 
 <details>
 <summary><b>Verzeichnisse</b></summary>
