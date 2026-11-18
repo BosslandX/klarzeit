@@ -15,14 +15,13 @@ import {
   useAutoTransferResults,
 } from '../../clockodo/auto-transfer';
 import { refreshClockodoLock } from '../../clockodo/lock';
-import { transferStatus } from '../../domain/clockodo-transfer';
+import { countTransferBuckets } from '../../domain/clockodo-transfer';
 import {
   clockodoEntryLabel,
   countLockStates,
   lockHint,
 } from '../../domain/clockodo-lock';
 import { useClockodoLocks } from '../../db/clockodo-lock';
-import type { ClockodoConfig } from '../../domain/clockodo';
 import { groupByDay } from '../../domain/aggregate';
 import { arbzgHints } from '../../domain/arbzg';
 import type { Period } from '../../domain/aggregate';
@@ -65,24 +64,6 @@ function defaultManualDraft(): EntryDraft {
   };
 }
 
-
-function countTransferBuckets(
-  list: TimeEntry[],
-  employmentId: string,
-  config: ClockodoConfig,
-) {
-  let open = 0;
-  let untimed = 0;
-  let incomplete = 0;
-  for (const e of list) {
-    if (e.employmentId !== employmentId) continue;
-    const s = transferStatus(e, config);
-    if (s === 'pending' || s === 'changed') open++;
-    else if (s === 'untimed-break') untimed++;
-    else if (s === 'incomplete') incomplete++;
-  }
-  return { open, untimed, incomplete };
-}
 
 function entryToDraft(entry: TimeEntry): EntryDraft {
   return {
@@ -265,7 +246,8 @@ export function EntriesScreen() {
                 <p>
                   Clockodo – {emp.name}: {buckets.open} offen ·{' '}
                   {deleteCounts[emp.id] ?? 0} zu loeschen · {buckets.untimed}{' '}
-                  Pause ohne Uhrzeit · {buckets.incomplete} ohne Auswahl
+                  Pause ohne Uhrzeit · {buckets.incomplete} ohne Auswahl ·{' '}
+                  {buckets.beforeStart} vor „Uebertragen ab“
                 </p>
                 {emp.id in locks &&
                   (() => {
@@ -307,7 +289,7 @@ export function EntriesScreen() {
                       Clockodo geloescht.
                     </p>
                     {outcome.errors.map((err, i) => (
-                      <p key={i} className="danger">
+                      <p key={i} className="error-text">
                         {err.entryId != null
                           ? formatDateTime(
                               entries.find((x) => x.id === err.entryId)
@@ -318,7 +300,7 @@ export function EntriesScreen() {
                       </p>
                     ))}
                     {outcome.stopped && (
-                      <p className="danger">Abgebrochen: {outcome.stopped}</p>
+                      <p className="error-text">Abgebrochen: {outcome.stopped}</p>
                     )}
                   </div>
                 )}

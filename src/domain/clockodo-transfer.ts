@@ -140,3 +140,33 @@ export function transferStatus(
   if (entry.clockodoSync.hash !== hash) return 'changed';
   return 'synced';
 }
+
+/** Zaehlung im Clockodo-Kasten von „Eintraege“ (AUF-039). */
+export interface TransferBuckets {
+  open: number;
+  untimed: number;
+  incomplete: number;
+  beforeStart: number;
+}
+
+/** Eintraege einer Beschaeftigung nach Stand; vor „Uebertragen ab“ zaehlt mit (AUF-039). */
+export function countTransferBuckets(
+  list: readonly TimeEntry[],
+  employmentId: string,
+  config: ClockodoConfig,
+): TransferBuckets {
+  let open = 0;
+  let untimed = 0;
+  let incomplete = 0;
+  let beforeStart = 0;
+  for (const e of list) {
+    if (e.employmentId !== employmentId) continue;
+    const s = transferStatus(e, config);
+    if (s === 'pending' || s === 'changed') open++;
+    else if (s === 'untimed-break') untimed++;
+    else if (s === 'incomplete') incomplete++;
+    else if (s === 'before-start') beforeStart++;
+  }
+  return { open, untimed, incomplete, beforeStart };
+}
+

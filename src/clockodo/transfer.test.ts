@@ -593,3 +593,82 @@ describe('Lauf-Schloss und automatischer Lauf (AUF-025)', () => {
   });
 });
 
+describe('Eintrag rueckt vor Uebertragen ab (AUF-039)', () => {
+  // „Uebertragen ab“ ist der 01.07.2026 (CFG_T), E_DAY der 06.07.2026.
+  const am = (monat: number, tag: number, stunde: number) =>
+    new Date(2026, monat - 1, tag, stunde, 0).getTime();
+  const anfragen = () =>
+    httpCalls.map(
+      (c) => `${c.method} ${c.url.replace(/.*\/api/, '')} ${c.headers['X-ClockodoApiUser']}`,
+    );
+
+  beforeEach(async () => {
+    prefStore.clear();
+    secureStore.clear();
+    httpCalls = [];
+    postSeq = 0;
+    postHandler = null;
+    delHandler = null;
+    db.close();
+    await Dexie.delete('zeiterfassung');
+    await db.open();
+    await seedClockodo();
+  });
+
+  async function uebertragen(): Promise<TimeEntry> {
+    const id = await addEntry(baseEntry(E_DAY));
+    await transferEmployment(EMP, { http, now: () => NOW });
+    httpCalls = [];
+    return (await getEntry(id))!;
+  }
+
+  it('rueckt ein uebertragener Eintrag vor Uebertragen ab, wird er in Clockodo geloescht', async () => {
+    const entry = await uebertragen();
+    await updateEntryWithClockodo(entry, {
+      start: am(6, 30, 8),
+      end: am(6, 30, 16),
+      breaks: [],
+      breakMinutes: 0,
+    });
+    expect(await getClockodoDeletes(EMP)).toEqual([501, 502]);
+    const stored = await getEntry(entry.id!);
+    expect(stored?.start).toBe(am(6, 30, 8));
+    expect(Object.prototype.hasOwnProperty.call(stored, 'clockodoSync')).toBe(false);
+    const r = await transferEmployment(EMP, { http, now: () => NOW });
+    expect(anfragen()).toEqual([
+      'DELETE /v2/entries/501 testnutzer',
+      'DELETE /v2/entries/502 testnutzer',
+    ]);
+    expect(r).toMatchObject({ deleted: 2, sent: 0, errors: [], stopped: null });
+    expect(r.skipped.beforeStart).toBe(1);
+  });
+
+  it('verschoben, aber nach Uebertragen ab: kein Vermerk, der Lauf ersetzt ihn wie bisher', async () => {
+    const entry = await uebertragen();
+    await updateEntryWithClockodo(entry, {
+      start: am(7, 7, 8),
+      end: am(7, 7, 16),
+      breaks: [],
+      breakMinutes: 0,
+    });
+    expect(await getClockodoDeletes(EMP)).toEqual([]);
+    expect((await getEntry(entry.id!))?.clockodoSync?.ids).toEqual([501, 502]);
+    const r = await transferEmployment(EMP, { http, now: () => NOW });
+    expect(httpCalls.map((c) => c.method)).toEqual(['DELETE', 'DELETE', 'POST']);
+    expect(r).toMatchObject({ deleted: 2, sent: 1 });
+  });
+
+  it('lag er schon vor Uebertragen ab, vermerkt Bearbeiten nichts', async () => {
+    const entry = await uebertragen();
+    await updateEmployment(EMP, { clockodo: { ...CFG_T, syncFrom: am(7, 10, 0) } });
+    await updateEntryWithClockodo(entry, {
+      start: am(7, 3, 8),
+      end: am(7, 3, 16),
+      breaks: [],
+      breakMinutes: 0,
+    });
+    expect(await getClockodoDeletes(EMP)).toEqual([]);
+    expect((await getEntry(entry.id!))?.clockodoSync?.ids).toEqual([501, 502]);
+  });
+});
+

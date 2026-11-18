@@ -149,7 +149,7 @@ describe('Clockodo-Sperrfrist (AUF-024)', () => {
     expect(lab(eintrag(10, 7, { breakMinutes: 30 }))).toBe('in Clockodo gesperrt');
     expect(lab(eintrag(10, 7))).toBe('in Clockodo gesperrt');
     expect(lab(uebertragen(eintrag(10, 7)))).toBe('in Clockodo');
-    expect(lab(eintrag(9, 30))).toBeNull();
+    expect(lab(eintrag(9, 30))).toBe('vor „Uebertragen ab“ – wird nicht uebertragen');
     expect(lab(eintrag(10, 7), null)).toBe('noch nicht uebertragen');
     expect(lab(eintrag(10, 7), { days: null, at: 1 })).toBe('noch nicht uebertragen');
   });

@@ -112,17 +112,29 @@ function leavesClockodoSync(
   ) {
     return true;
   }
+  const emp = employments.find((e) => e.id === entry.employmentId);
   if (patch.clockodo === null) {
-    const emp = employments.find((e) => e.id === entry.employmentId);
     if (emp?.clockodo != null) return true;
+  }
+  // Rueckt ein uebertragener Eintrag vor „Uebertragen ab“, fasst ihn kein Lauf mehr an (AUF-039).
+  const syncFrom = emp?.clockodo?.syncFrom;
+  if (
+    syncFrom !== undefined &&
+    patch.start !== undefined &&
+    entry.start >= syncFrom &&
+    patch.start < syncFrom
+  ) {
+    return true;
   }
   return false;
 }
 
+
 /**
  * Speichert einen bearbeiteten Eintrag. Wechselt ein uebertragener Eintrag die
- * Beschaeftigung oder verliert er bei eingeschaltetem Clockodo die Auswahl, werden
- * seine Clockodo-Eintraege bei der bisherigen Beschaeftigung zum Loeschen vorgemerkt --
+ * Beschaeftigung, verliert er bei eingeschaltetem Clockodo die Auswahl oder rueckt er vor
+ * „Uebertragen ab“ (AUF-039), werden seine Clockodo-Eintraege bei der bisherigen
+ * Beschaeftigung zum Loeschen vorgemerkt --
  * sonst blieben sie in Clockodo stehen, und kein Lauf fasste sie mehr an.
  */
 export async function updateEntryWithClockodo(

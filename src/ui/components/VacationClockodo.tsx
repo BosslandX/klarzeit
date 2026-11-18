@@ -71,7 +71,7 @@ export function VacationClockodo({
             <p key={line}>{line}</p>
           ))}
           {summary.problems.map((line) => (
-            <p key={line} className="danger">
+            <p key={line} className="error-text">
               {line}
             </p>
           ))}

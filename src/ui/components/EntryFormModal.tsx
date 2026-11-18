@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BreakInterval, EntrySource } from '../../domain/types';
 import type { ClockodoEntryRef, ClockodoLists } from '../../domain/clockodo';
-import { defaultEntryRef } from '../../domain/clockodo';
+import { entrySelectionStart, withStaleOption } from '../../domain/clockodo';
 import { resolveBreakMinutes, validateBreaks } from '../../domain/breaks';
 import { VERANLASSUNG_MAX } from '../../domain/overtime-authorization';
 import {
@@ -57,16 +57,6 @@ interface BreakRow {
 
 function isCompleteBreak(b: BreakInterval): boolean {
   return Number.isFinite(b.start) && Number.isFinite(b.end);
-}
-
-function withStaleOption(
-  items: { id: number; name: string }[],
-  selectedId: number | null,
-): { id: number; name: string }[] {
-  if (selectedId == null || items.some((i) => i.id === selectedId)) {
-    return items;
-  }
-  return [...items, { id: selectedId, name: `ID ${selectedId}` }];
 }
 
 export function EntryFormModal({
@@ -129,12 +119,7 @@ export function EntryFormModal({
     const eigene =
       initial.employmentId === undefined || initial.employmentId === employmentId;
     setClockodoSel(
-      (eigene ? initial.clockodo : null) ??
-        defaultEntryRef(employmentConfig) ?? {
-          customersId: 0,
-          projectsId: null,
-          servicesId: 0,
-        },
+      (eigene ? initial.clockodo : null) ?? entrySelectionStart(employmentConfig),
     );
   }, [
     initial.start,
@@ -200,7 +185,7 @@ export function EntryFormModal({
   const handleEmploymentChange = async (id: string) => {
     setEmploymentId(id);
     const emp = employments.find((e) => e.id === id);
-    setClockodoSel(defaultEntryRef(emp?.clockodo ?? null));
+    setClockodoSel(entrySelectionStart(emp?.clockodo ?? null));
     try {
       await setActiveEmployment(id);
     } catch {

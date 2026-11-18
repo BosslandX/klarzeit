@@ -144,3 +144,33 @@ export function cleanClockodoLock(raw: unknown): ClockodoLock | null {
   if (days === null) return null;
   return { days, at };
 }
+
+/**
+ * Auswahlliste samt der gespeicherten ID, wenn die Liste sie nicht mehr fuehrt. Keine Scheinoption
+ * fuer „nicht gewaehlt“ (0 oder null; AUF-039).
+ */
+export function withStaleOption(
+  items: { id: number; name: string }[],
+  selectedId: number | null,
+): { id: number; name: string }[] {
+  if (selectedId == null || selectedId <= 0 || items.some((i) => i.id === selectedId)) {
+    return items;
+  }
+  return [...items, { id: selectedId, name: `ID ${selectedId}` }];
+}
+
+/**
+ * Startwert der Clockodo-Auswahl im Formular: die Vorgaben der Beschaeftigung, auch wenn nur ein
+ * Teil gesetzt ist; 0 heisst „nicht gewaehlt“. Ein Projekt nur mit seinem Kunden (AUF-039).
+ */
+export function entrySelectionStart(config: ClockodoConfig | null): ClockodoEntryRef {
+  const voll = defaultEntryRef(config);
+  if (voll !== null) return voll;
+  const kunde = config?.defaultCustomersId ?? null;
+  return {
+    customersId: kunde ?? 0,
+    projectsId: kunde !== null ? (config?.defaultProjectsId ?? null) : null,
+    servicesId: config?.defaultServicesId ?? 0,
+  };
+}
+

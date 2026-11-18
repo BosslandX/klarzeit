@@ -196,12 +196,6 @@ export async function getEmployments(): Promise<Employment[]> {
   return migrated;
 }
 
-/** Aktive (erste) Beschaeftigung — API-Kompatibilitaet. */
-export async function getEmployment(): Promise<Employment> {
-  const list = await getEmployments();
-  return list[0] ?? cleanEmployment(defaultEmployment);
-}
-
 export async function getActiveEmploymentId(): Promise<string> {
   const list = await getEmployments();
   const fallback = list[0]?.id ?? INITIAL_EMPLOYMENT_ID;
@@ -219,18 +213,6 @@ export async function setActiveEmployment(id: string): Promise<void> {
     throw new Error('Unbekannte Beschaeftigung: ' + id);
   }
   await Preferences.set({ key: KEY_ACTIVE, value: id });
-}
-
-export async function saveEmployment(emp: Employment): Promise<void> {
-  const list = await getEmployments();
-  const cleaned = cleanEmployment(emp);
-  if (list.length === 0) {
-    await saveEmploymentsList([cleaned]);
-    return;
-  }
-  const next = [...list];
-  next[0] = { ...cleaned, id: list[0].id };
-  await saveEmploymentsList(next);
 }
 
 
@@ -414,35 +396,6 @@ export async function removeVacationDaysOfAbsence(
 }
 
 // --- React-Hooks ---
-
-export function useEmployment(): {
-  employment: Employment;
-  loading: boolean;
-  save: (e: Employment) => Promise<void>;
-} {
-  const [employment, setEmployment] = useState<Employment>(defaultEmployment);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    getEmployment().then((e) => {
-      if (active) {
-        setEmployment(e);
-        setLoading(false);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const save = useCallback(async (e: Employment) => {
-    await saveEmployment(e);
-    setEmployment(e);
-  }, []);
-
-  return { employment, loading, save };
-}
 
 export function useEmployments(): {
   employments: Employment[];

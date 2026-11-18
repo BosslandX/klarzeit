@@ -355,7 +355,6 @@ describe('clockodo client', () => {
     await expect(fetchAbsences(AUTH, req, mit({ data: {} }))).rejects.toMatchObject({ kind: 'format' });
   });
 
-});
   it('createEntry sendet POST und liefert die id', async () => {
     const calls: ClockodoRequest[] = [];
     const payload = {
@@ -417,6 +416,7 @@ describe('clockodo client', () => {
       kind: 'forbidden',
     });
   });
+});
 
 describe('Abwesenheit loeschen und stornieren (AUF-023)', () => {
   const mit =

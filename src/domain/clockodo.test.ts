@@ -5,6 +5,8 @@ import {
   cleanClockodoEntryRef,
   cleanClockodoAbsenceRef,
   defaultEntryRef,
+  entrySelectionStart,
+  withStaleOption,
 } from './clockodo';
 
 const CFG = {
@@ -132,6 +134,43 @@ describe('Automatisch uebertragen: Schalter (AUF-025)', () => {
       );
     }
     expect(cleanClockodoConfig(CFG)).not.toHaveProperty('autoTransfer');
+  });
+});
+
+describe('Auswahl im Formular (AUF-039)', () => {
+  const LISTE = [
+    { id: 11, name: 'Kunde A' },
+    { id: 12, name: 'Kunde B' },
+  ];
+
+  it('withStaleOption: gespeicherte ID dazu, keine Scheinoption fuer nicht gewaehlt', () => {
+    expect(withStaleOption(LISTE, 0)).toEqual(LISTE);
+    expect(withStaleOption(LISTE, null)).toEqual(LISTE);
+    expect(withStaleOption(LISTE, -3)).toEqual(LISTE);
+    expect(withStaleOption(LISTE, 12)).toEqual(LISTE);
+    expect(withStaleOption(LISTE, 99)).toEqual([...LISTE, { id: 99, name: 'ID 99' }]);
+  });
+
+  it('entrySelectionStart: Vorgaben der Beschaeftigung, auch nur teilweise', () => {
+    expect(entrySelectionStart(CFG)).toEqual({ customersId: 11, projectsId: null, servicesId: 31 });
+    expect(entrySelectionStart({ ...CFG, defaultProjectsId: 21 })).toEqual(REF);
+    expect(entrySelectionStart({ ...CFG, defaultServicesId: null })).toEqual({
+      customersId: 11,
+      projectsId: null,
+      servicesId: 0,
+    });
+    expect(
+      entrySelectionStart({ ...CFG, defaultProjectsId: 21, defaultServicesId: null }),
+    ).toEqual({ customersId: 11, projectsId: 21, servicesId: 0 });
+    expect(entrySelectionStart({ ...CFG, defaultCustomersId: null })).toEqual({
+      customersId: 0,
+      projectsId: null,
+      servicesId: 31,
+    });
+    expect(
+      entrySelectionStart({ ...CFG, defaultCustomersId: null, defaultProjectsId: 21 }),
+    ).toEqual({ customersId: 0, projectsId: null, servicesId: 31 });
+    expect(entrySelectionStart(null)).toEqual({ customersId: 0, projectsId: null, servicesId: 0 });
   });
 });
 

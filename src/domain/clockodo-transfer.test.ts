@@ -3,6 +3,7 @@ import type { ClockodoConfig } from './clockodo';
 import type { TimeEntry } from './types';
 import {
   buildEntryPayloads,
+  countTransferBuckets,
   entrySyncHash,
   entryText,
   toClockodoTime,
@@ -235,5 +236,39 @@ describe('clockodo-transfer', () => {
         CFG,
       ),
     ).toBe('changed');
+  });
+});
+
+describe('Zaehlung im Clockodo-Kasten (AUF-039)', () => {
+  it('countTransferBuckets zaehlt Eintraege vor Uebertragen ab mit', () => {
+    // „Uebertragen ab“ ist der 01.09.2026 (CFG), der 31.08.2026 liegt davor.
+    const vorher = {
+      start: new Date(2026, 7, 31, 8, 0).getTime(),
+      end: new Date(2026, 7, 31, 16, 0).getTime(),
+    };
+    const fertig = baseEntry({ note: 'fertig' });
+    const liste: TimeEntry[] = [
+      baseEntry(),
+      baseEntry({ clockodoSync: { ids: [5], hash: 'alt', at: 1 } }),
+      baseEntry({ breakMinutes: 30 }),
+      baseEntry({ clockodo: undefined }),
+      { ...fertig, clockodoSync: { ids: [6], hash: entrySyncHash(fertig, REF, CFG.billable), at: 1 } },
+      baseEntry(vorher),
+      baseEntry({ ...vorher, clockodo: undefined }),
+      baseEntry({ employmentId: 'emp-2' }),
+      baseEntry({ ...vorher, employmentId: 'emp-2' }),
+    ];
+    expect(countTransferBuckets(liste, 'emp-1', CFG)).toEqual({
+      open: 2,
+      untimed: 1,
+      incomplete: 1,
+      beforeStart: 2,
+    });
+    expect(countTransferBuckets(liste, 'emp-2', CFG)).toEqual({
+      open: 1,
+      untimed: 0,
+      incomplete: 0,
+      beforeStart: 1,
+    });
   });
 });
