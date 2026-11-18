@@ -467,17 +467,19 @@ Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehen
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
 
 ## Veröffentlichung
-- Repo `BosslandX/klarzeit` (MIT). **Derzeit noch PRIVAT** — public nur auf das Wort des Users. Die
-  Icons tragen seit dem Pixelart-Logo (2026-11-18) keinen Schriftzug der Vorgänger-App mehr; da
-  `privacy-scan.mjs` **keine Bilddateien prüft**, vor dem Public-Schalten zusätzlich zum Scan die Icons
-  unter `assets/` und `android/app/src/main/res/mipmap-*`/`drawable-*` visuell kontrollieren.
+- Repo `BosslandX/klarzeit` (MIT). **Öffentlich seit 2026-11-18** (Entscheidung des Users: unter
+  Klarnamen, Historie nicht umgeschrieben — der Name steht als Copyright-Halter in LICENSE und README und
+  in den Autorzeilen; Adressen sind durchweg GitHub-noreply, echte Passwörter kommen in der Historie nicht
+  vor). Die Icons tragen seit dem Pixelart-Logo keinen Schriftzug der Vorgänger-App mehr; die Historie
+  behält die alten Bilder. `privacy-scan.mjs` **prüft keine Bilddateien** — neue Bilder vor dem Push
+  ansehen (Screenshots nur mit den Demodaten aus `tools/screenshots.mjs`).
 - **Releases (APK + `version.json`) liegen seit 1.5.1 im ÖFFENTLICHEN `BosslandX/klarzeit-releases`**
   — einem reinen Release-Repo ohne Quellcode (Muster `zeiterfassung-releases`).
   `src/update/updater.ts` zieht `releases/latest/download/version.json` von dort. Grund: Das private
   Code-Repo liefert unauthentifiziert **HTTP 404** (`CapacitorHttp` schickt kein Token), der Updater
   war damit tot. Die öffentliche APK trägt bis 1.14.0 noch die Icons der Vorgänger-App — vom User bewusst in
-  Kauf genommen (2026-09-23); die nächste APK bringt das Pixelart-Logo. Releases bis v1.4 liegen weiter im privaten Code-Repo und sind für den Updater
-  unerreichbar: Wer eine ältere Version installiert hat, installiert 1.5.1 einmal von Hand.
+  Kauf genommen (2026-09-23); die nächste APK bringt das Pixelart-Logo. Releases bis v1.4 liegen im Code-Repo; der Updater liest nur
+  `klarzeit-releases`: Wer eine ältere Version installiert hat, installiert 1.5.1 einmal von Hand.
 - Commits im Releases-Repo nur als `BosslandX <20750642+BosslandX@users.noreply.github.com>` —
   kein Klarname in öffentlicher Historie.
 - Im `version.json` muss die `url` exakt den Asset-Dateinamen tragen. Der enthält die Version
