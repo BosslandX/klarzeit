@@ -28,7 +28,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Prüfwerkzeuge des Orchestrators** (seit 2026-11-17 versioniert, vorher nur im Scratchpad):
   `tools/zitat-pruefen.mjs` und `tools/kontext.mjs` prüfen Zitate gegen den Seitentext (Chrome
   kopflos über `puppeteer-core`, eigenes Profil); `tools/oberflaeche/aufNNN_ui.mjs` sind die
-  Oberflächenproben der Aufträge 027–040 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
+  Oberflächenproben der Aufträge 027–041 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
   `npm run dev`, Stand ihres Auftrags). Einspiel-Vorlage, Auftragstext-Erzeuger und Stückprüfung
   liegen im Baukasten unter `C:\gamedev\composer-kit\orchestrator\` und werden von dort gerufen.
 - Android SDK-Pfad in `android/local.properties` (`sdk.dir=...`, gitignored, rechnerspezifisch).
@@ -181,8 +181,11 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   zusammen höchstens das Monats-Soll; `MonthBalance.sickDays/sickCreditMs`. Die Gutschrift „bis zum
   Tagessoll, abzüglich erfasster Zeit" steht für alle drei in `fillUpCreditMs`. Die Gutschrift endet
   nicht nach sechs Wochen; `longSickRuns` meldet zusammenhängende Krankheit über 42 Kalendertage (§ 3
-  Abs. 1 EntgFG, aneinandergrenzende Zeiträume zählen zusammen). Die Wartezeit (§ 3 Abs. 3 EntgFG) ist
-  nicht abgebildet. `removeEmployment` sperrt bei Krankheitszeiten. Oberfläche: `SickPeriodsSection`
+  Abs. 1 EntgFG, aneinandergrenzende Zeiträume zählen zusammen). Wartezeit (§ 3 Abs. 3 EntgFG, AUF-041):
+  fällt eine Krankheitszeit in die ersten vier Wochen ab „Beschäftigt seit" (28 Kalendertage, letzter Tag
+  Beginn + 27), zeigt `SickPeriodsSection` einen Hinweis (`waitingPeriodSick`, `waitingPeriodHint`) — nur
+  ein Hinweis, das Konto rechnet weiter wie bei jeder Krankheit (wie beim Sechs-Wochen-Hinweis).
+  `removeEmployment` sperrt bei Krankheitszeiten. Oberfläche: `SickPeriodsSection`
   unter den Urlaubstagen (Beschäftigung = Urlaubsauswahl, Bescheinigung nicht vorbelegt, entfernen mit
   Rückfrage, Sechs-Wochen-Hinweis), § 9-Hinweis an `VacationDayRow`, Zeile „Krankheit (n Tage)" in
   Auswertung und PDF-Kontoblock samt Fußnotensatz; ReportsScreen trennt vor Konto und Urlaubsstand. Ein
