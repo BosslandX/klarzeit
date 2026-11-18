@@ -1,6 +1,6 @@
 // Erzeugt die Icon-/Splash-Quellbilder fuer @capacitor/assets aus dem Marken-Logo.
-// Quelle: assets/source-logo.png (Klarzeit-Logo). Rendering via sharp.
-// Aufruf: node tools/gen-icons.mjs  (bzw. npm run icons inkl. capacitor-assets)
+// Quelle: assets/source-logo.png (Klarzeit-Logo: Pixelart-Stoppuhr, 32x32, transparenter Grund).
+// Rendering via sharp. Aufruf: node tools/gen-icons.mjs  (bzw. npm run icons inkl. capacitor-assets)
 import sharp from 'sharp';
 import { mkdirSync } from 'node:fs';
 
@@ -15,13 +15,28 @@ async function motif() {
   return sharp(SRC).trim({ threshold: 60 }).toBuffer();
 }
 
-/** Motiv zentriert auf quadratischem Canvas der Kantenlaenge `size`, skaliert auf `frac`. */
+/** Pixelart-Grenze: ein Motiv mit hoechstens so vielen Pixeln Kantenlaenge gilt als Pixelart. */
+const PIXELART_MAX = 128;
+
+/**
+ * Motiv zentriert auf quadratischem Canvas der Kantenlaenge `size`, skaliert auf `frac`.
+ * Pixelart wird nur ganzzahlig und ohne Glaetten vergroessert (jede Zelle ein scharfes, gleich grosses
+ * Quadrat); ein grosses Logo wird wie bisher eingepasst.
+ */
 async function place(size, frac, background) {
   const logo = await motif();
   const target = Math.round(size * frac);
-  const resized = await sharp(logo)
-    .resize(target, target, { fit: 'contain', background: TRANSPARENT })
-    .toBuffer();
+  const { width, height } = await sharp(logo).metadata();
+  const kante = Math.max(width, height);
+  const faktor = Math.floor(target / kante);
+  const resized =
+    kante <= PIXELART_MAX
+      ? await sharp(logo)
+          .resize(width * faktor, height * faktor, { kernel: sharp.kernel.nearest })
+          .toBuffer()
+      : await sharp(logo)
+          .resize(target, target, { fit: 'contain', background: TRANSPARENT })
+          .toBuffer();
   return sharp({ create: { width: size, height: size, channels: 4, background } })
     .composite([{ input: resized, gravity: 'centre' }])
     .png()
