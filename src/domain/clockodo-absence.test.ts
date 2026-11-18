@@ -228,7 +228,6 @@ describe('Urlaubsantraege ueber einen Feiertag (AUF-029)', () => {
   });
 });
 
-
 describe('Urlaubsantraege und Krankheit (AUF-038)', () => {
   // 05.10.2026 ist ein Montag, 09.10.2026 ein Freitag.
   const woche = () => [5, 6, 7, 8, 9].map((d) => tag(2026, 10, d));

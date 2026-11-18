@@ -177,7 +177,6 @@ export function daysOfAbsence(
   );
 }
 
-
 /** Hinweis am Urlaubstag, wenn isSickInClockodoVacation zutrifft (AUF-038). */
 export const CLOCKODO_SICK_HINT = 'dort weiter als Urlaub, Klarzeit aendert den Antrag nicht';
 

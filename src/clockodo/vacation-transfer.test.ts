@@ -516,7 +516,6 @@ describe('Urlaubsantrag zurueckziehen: Nacharbeit (AUF-023)', () => {
   });
 });
 
-
 describe('Urlaubsantraege und Krankheit (AUF-038)', () => {
   beforeEach(() => {
     prefStore.clear();
