@@ -48,3 +48,6 @@ auftraege/_probe/*
 tools/tracking.db
 # Arbeitsorte der Auftraege
 .wt/
+# Python-Zwischenspeicher der Werkzeuge unter tools/: jeder Lauf schreibt ihn neu, versioniert
+# landete er nach jedem Auftrag im Arbeitspatch (composer-kit, Befund c).
+__pycache__/
