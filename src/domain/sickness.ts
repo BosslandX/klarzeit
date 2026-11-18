@@ -151,3 +151,36 @@ export function longSickHint(run: { from: number; to: number; days: number }): s
     '(§ 3 Abs. 1 EntgFG). Das Konto rechnet die Tage weiter ohne Minusstunden.'
   );
 }
+
+/**
+ * Wartezeit: Der Anspruch auf Entgeltfortzahlung „entsteht nach vierwöchiger ununterbrochener Dauer
+ * des Arbeitsverhältnisses“ (§ 3 Abs. 3 EntgFG). Vier Wochen sind 28 Kalendertage ab „Beschaeftigt
+ * seit“; der letzte Tag der Wartezeit ist der Beginn plus 27 Tage.
+ */
+export const WARTEZEIT_TAGE = 28;
+
+/**
+ * Krankheitszeiten einer Beschaeftigung, die in ihre Wartezeit fallen (AUF-041), samt deren letztem
+ * Tag; null, wenn keine hineinfaellt. Das Konto rechnet sie weiter wie jede Krankheit.
+ */
+export function waitingPeriodSick(
+  periods: readonly SickPeriod[],
+  employmentId: string,
+  employmentStart: number,
+): { until: number; periods: SickPeriod[] } | null {
+  const beginn = startOfDay(employmentStart);
+  const until = addDays(beginn, WARTEZEIT_TAGE - 1).getTime();
+  const betroffen = periods.filter(
+    (p) => p.employmentId === employmentId && p.from <= until && p.to >= beginn.getTime(),
+  );
+  return betroffen.length > 0 ? { until, periods: betroffen } : null;
+}
+
+/** Hinweis zur Wartezeit (aus waitingPeriodSick, AUF-041). */
+export function waitingPeriodHint(w: { until: number }): string {
+  return (
+    `Krank in den ersten vier Wochen der Beschaeftigung (bis ${formatDate(w.until)}): ` +
+    'Der Anspruch auf Entgeltfortzahlung entsteht erst nach vierwoechiger ununterbrochener Dauer ' +
+    'des Arbeitsverhaeltnisses (§ 3 Abs. 3 EntgFG). Das Konto rechnet die Tage weiter ohne Minusstunden.'
+  );
+}

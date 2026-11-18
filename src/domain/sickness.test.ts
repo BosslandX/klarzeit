@@ -8,6 +8,8 @@ import {
   longSickHint,
   sickPeriodLabel,
   sickPeriodOn,
+  waitingPeriodHint,
+  waitingPeriodSick,
   type SickPeriod,
 } from './sickness';
 import {
@@ -185,6 +187,41 @@ describe('Krankheit in der Oberflaeche (AUF-034)', () => {
       'Krank vom 05.01.2026 bis 16.02.2026 (43 Kalendertage): Die Entgeltfortzahlung durch den ' +
         'Arbeitgeber dauert hoechstens sechs Wochen (§ 3 Abs. 1 EntgFG). Das Konto rechnet die ' +
         'Tage weiter ohne Minusstunden.',
+    );
+  });
+});
+
+describe('Wartezeit nach § 3 Abs. 3 EntgFG (AUF-041)', () => {
+  // Beschaeftigt seit Donnerstag, 01.10.2026: die Wartezeit endet mit dem 28.10.2026.
+  const beginn = d(2026, 10, 1);
+
+  it('waitingPeriodSick: Krankheit in den ersten vier Wochen ab Beschaeftigt seit', () => {
+    const drin = p(d(2026, 10, 20), d(2026, 10, 22));
+    const spaeter = p(d(2026, 11, 2), d(2026, 11, 3));
+    expect(waitingPeriodSick([drin, spaeter], 'emp-1', beginn)).toEqual({
+      until: d(2026, 10, 28),
+      periods: [drin],
+    });
+    expect(waitingPeriodSick([p(d(2026, 10, 28), d(2026, 10, 30))], 'emp-1', beginn)?.until).toBe(
+      d(2026, 10, 28),
+    );
+    expect(waitingPeriodSick([p(d(2026, 10, 29), d(2026, 10, 30))], 'emp-1', beginn)).toBeNull();
+    expect(waitingPeriodSick([p(d(2026, 9, 20), d(2026, 9, 30))], 'emp-1', beginn)).toBeNull();
+    expect(waitingPeriodSick([p(d(2026, 9, 28), d(2026, 10, 2))], 'emp-1', beginn)).not.toBeNull();
+    expect(
+      waitingPeriodSick([p(d(2026, 10, 5), d(2026, 10, 6), true, 'emp-2')], 'emp-1', beginn),
+    ).toBeNull();
+    expect(
+      waitingPeriodSick([drin], 'emp-1', new Date(2026, 9, 1, 9, 30).getTime())?.until,
+    ).toBe(d(2026, 10, 28));
+    expect(waitingPeriodSick([], 'emp-1', beginn)).toBeNull();
+  });
+
+  it('waitingPeriodHint nennt den letzten Tag und § 3 Abs. 3 EntgFG', () => {
+    expect(waitingPeriodHint({ until: d(2026, 10, 28) })).toBe(
+      'Krank in den ersten vier Wochen der Beschaeftigung (bis 28.10.2026): Der Anspruch auf ' +
+        'Entgeltfortzahlung entsteht erst nach vierwoechiger ununterbrochener Dauer des ' +
+        'Arbeitsverhaeltnisses (§ 3 Abs. 3 EntgFG). Das Konto rechnet die Tage weiter ohne Minusstunden.',
     );
   });
 });

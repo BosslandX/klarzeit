@@ -4,6 +4,8 @@ import {
   longSickHint,
   longSickRuns,
   sickPeriodLabel,
+  waitingPeriodHint,
+  waitingPeriodSick,
   type SickPeriod,
 } from '../../domain/sickness';
 import { fromDateInput } from '../../domain/time';
@@ -11,7 +13,8 @@ import { addSickPeriod, removeSickPeriod } from '../../db/sickness';
 
 /**
  * Krankheitszeiten der unter "Urlaub fuer Beschaeftigung" gewaehlten Beschaeftigung (AUF-034):
- * eintragen (von, bis, Bescheinigung), auflisten, entfernen; Hinweis bei mehr als sechs Wochen.
+ * eintragen (von, bis, Bescheinigung), auflisten, entfernen; Hinweise bei mehr als sechs Wochen und
+ * in der Wartezeit (AUF-041).
  */
 export function SickPeriodsSection({
   employment,
@@ -31,6 +34,7 @@ export function SickPeriodsSection({
   if (!employment) return null;
   const eigene = periods.filter((p) => p.employmentId === employment.id);
   const lange = longSickRuns(periods, employment.id);
+  const wartezeit = waitingPeriodSick(periods, employment.id, employment.startDate);
 
   const eintragen = async () => {
     const from = fromDateInput(von);
@@ -110,6 +114,7 @@ export function SickPeriodsSection({
           {longSickHint(l)}
         </p>
       ))}
+      {wartezeit && <p className="muted small">{waitingPeriodHint(wartezeit)}</p>}
       {eigene.length === 0 ? (
         <p className="muted small">Noch keine Krankheitszeiten erfasst.</p>
       ) : (
