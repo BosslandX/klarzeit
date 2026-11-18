@@ -186,7 +186,11 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   unter den Urlaubstagen (Beschäftigung = Urlaubsauswahl, Bescheinigung nicht vorbelegt, entfernen mit
   Rückfrage, Sechs-Wochen-Hinweis), § 9-Hinweis an `VacationDayRow`, Zeile „Krankheit (n Tage)" in
   Auswertung und PDF-Kontoblock samt Fußnotensatz; ReportsScreen trennt vor Konto und Urlaubsstand. Ein
-  in Clockodo beantragter Urlaubstag bleibt dort bestehen, auch wenn er hier als Krankheit zählt.
+  in Clockodo beantragter Urlaubstag bleibt dort bestehen, auch wenn er hier als Krankheit zählt;
+  Klarzeit ändert den Antrag nicht, die Zeile sagt es („dort weiter als Urlaub, Klarzeit aendert den
+  Antrag nicht", `isSickInClockodoVacation`, nur Status 0/1; AUF-038). Der Abgleich beantragt keinen
+  Urlaubstag, der hier als Krankheit mit Bescheinigung zählt, und zählt ihn nicht als offen
+  (`vacationRequestRanges`/`openVacationDayCount` mit `sickPeriods`, AUF-038); bis 1.13.0 tat er es.
 - **Geänderte Stoppuhr-Einträge (AUF-035):** `TimeEntry.trackedTimes?: {start, end}` — die
   Stoppuhr-Zeiten, gemerkt beim **ersten** Ändern von Beginn oder Ende (`withTrackedTimes` in
   `updateEntryWithClockodo`, `src/domain/tracked-times.ts`); spätere Änderungen lassen sie stehen,
@@ -283,7 +287,8 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   `{ id, status, at }` des Clockodo-Antrags (Status 0 beantragt … 4 storniert, openapi
   `AbsenceStatus`); fehlt = nie beantragt, `cleanVacationDays` trägt einen gültigen Verweis,
   sonst fehlt der Schlüssel ganz. `vacationRequestRanges` (`src/domain/clockodo-absence.ts`,
-  rein): offene Tage (ohne Verweis, ab `syncFrom`) werden zu Zeiträumen gebündelt, solange kein
+  rein): offene Tage (ohne Verweis, ab `syncFrom`, seit AUF-038 ohne Krankheitstage mit
+  Bescheinigung — ein solcher Tag trennt den Antrag) werden zu Zeiträumen gebündelt, solange kein
   Arbeitstag dazwischen liegt (Regel von `workdaysInRange`); der Jahreswechsel trennt (Clockodo
   verlangt `date_until` im Jahr von `date_since`). Client `createAbsence` (`POST /v4/absences`,
   ausdrücklich `users_id`, Typ 1, **Status 0**) und `fetchAbsences` (Filter Person, Jahr, Typ 1;
