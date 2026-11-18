@@ -173,4 +173,3 @@ export function entrySelectionStart(config: ClockodoConfig | null): ClockodoEntr
     servicesId: config?.defaultServicesId ?? 0,
   };
 }
-

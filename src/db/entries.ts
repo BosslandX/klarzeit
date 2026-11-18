@@ -129,7 +129,6 @@ function leavesClockodoSync(
   return false;
 }
 
-
 /**
  * Speichert einen bearbeiteten Eintrag. Wechselt ein uebertragener Eintrag die
  * Beschaeftigung, verliert er bei eingeschaltetem Clockodo die Auswahl oder rueckt er vor

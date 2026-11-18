@@ -169,4 +169,3 @@ export function countTransferBuckets(
   }
   return { open, untimed, incomplete, beforeStart };
 }
-
