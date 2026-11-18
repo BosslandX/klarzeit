@@ -28,7 +28,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Prüfwerkzeuge des Orchestrators** (seit 2026-11-17 versioniert, vorher nur im Scratchpad):
   `tools/zitat-pruefen.mjs` und `tools/kontext.mjs` prüfen Zitate gegen den Seitentext (Chrome
   kopflos über `puppeteer-core`, eigenes Profil); `tools/oberflaeche/aufNNN_ui.mjs` sind die
-  Oberflächenproben der Aufträge 027–042 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
+  Oberflächenproben der Aufträge 027–043 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
   `npm run dev`, Stand ihres Auftrags). Einspiel-Vorlage, Auftragstext-Erzeuger und Stückprüfung
   liegen im Baukasten unter `C:\gamedev\composer-kit\orchestrator\` und werden von dort gerufen.
 - Android SDK-Pfad in `android/local.properties` (`sdk.dir=...`, gitignored, rechnerspezifisch).
@@ -330,13 +330,13 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   Antwort, zurückgespieltes Backup), sonst beantragen; jeder Erfolg wird **sofort** vermerkt
   (`setVacationAbsenceRef`). `auth`/`network`/`rate` brechen ab, alles andere trifft nur den
   eigenen Zeitraum. Weicht Clockodos `countDays` von Klarzeits Tageszahl ab → `mismatches`.
-- **Urlaubsanträge — Oberfläche (AUF-021):** im Urlaubsbereich von `MoreScreen` der Knopf
+- **Urlaubsanträge — Oberfläche (AUF-021):** im Urlaubsbereich von „Mehr" (`VacationSection`) der Knopf
   „Urlaub mit Clockodo abgleichen" (`src/ui/components/VacationClockodo.tsx`, nur für die im Feld
   „Urlaub fuer Beschaeftigung" gewählte Beschäftigung mit Zugang, im Browser gesperrt) und je Tag
   der Stand (`VacationDayRow`, `absenceStatusLabel`). **Beantragte und genehmigte Tage lassen
   sich nicht entfernen** (`isVacationDayRemovable`: erst ab Status 2) — die Sperre sitzt in der
-  Oberfläche, `removeVacationDay` selbst prüft nicht. Der Zustand des Urlaubsbereichs bleibt in
-  `MoreScreen`: `vacEmp` ist zugleich der Ausgangswert des Beschäftigungs-Formulars.
+  Oberfläche, `removeVacationDay` selbst prüft nicht. Die Auswahl „Urlaub fuer Beschaeftigung"
+  (`vacEmpId`) bleibt in `MoreScreen`; an ihr hängen `VacationSection` und `SickPeriodsSection`.
 - **Urlaubsantrag zurückziehen (AUF-023), nur auf Knopfdruck:** Ein beantragter oder genehmigter
   Tag einer Beschäftigung mit Clockodo zeigt statt des Hinweises „zurueckziehen" (`VacationDayRow`,
   im Browser gesperrt). Der Knopf gilt für den **ganzen** Antrag; die Rückfrage nennt Zeitraum und
@@ -385,6 +385,18 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   (`appStateChange`), Speichern oder Löschen eines Eintrags in „Erfassung" und „Eintraege". Ein
   Hinweis erscheint nur bei Abbruch oder Fehlern (`autoTransferHint`), in „Erfassung" und im
   Clockodo-Kasten. Urlaubsanträge bleiben auf Knopfdruck.
+- **„Mehr" aufgeteilt (AUF-043):** `MoreScreen.tsx` (229 Zeilen, vorher 770) setzt die Abschnitte
+  zusammen — `ProfileSection`, `EmploymentEditForm`, `VacationSection`, `BackupSection` (alle
+  `src/ui/components/`), dazu wie bisher `SickPeriodsSection` und `UpdateSection`; bewegter Code
+  wörtlich. **In `MoreScreen` bleibt, was das Formular „Beschaeftigung bearbeiten" überdauert:** der
+  Entwurf (`editingId`, `editDraft`), „Gilt ab" (`aenderungAb`, jedes Öffnen setzt es zurück),
+  „Gespeichert" (`empFlash`, steht noch da, wenn das Formular kurz nach dem Speichern wieder geöffnet
+  wird), die Urlaubsauswahl `vacEmpId` und alle Hooks (die Ladesperre „Lade…" wartet auf sie). Eigenen
+  Zustand dürfen die Abschnitte nur halten, weil `loading` der Hooks einmal von `true` auf `false`
+  springt und nie zurück — sonst hängte die Ladesperre sie bei jedem Neuladen aus, und Eingaben gingen
+  verloren. Probe `tools/oberflaeche/auf043_ui.mjs`: U1–U3 prüfen genau diese Lebensdauern; mit
+  `AUF043_DATEI=<datei>` nimmt sie in 15 Zuständen das DOM von „Mehr" ab (Vergleich alter gegen neuer
+  Stand).
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).
