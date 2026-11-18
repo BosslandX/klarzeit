@@ -188,10 +188,8 @@ export function canMarkClockodoDone(entry: TimeEntry, config: ClockodoConfig | n
 export function clockodoDoneQuestion(entry: Pick<TimeEntry, 'start'>, done: boolean): string {
   const tag = formatDateTime(entry.start);
   return done
-    ? `Eintrag vom ${tag} als in Clockodo erledigt markieren?
-` +
+    ? `Eintrag vom ${tag} als in Clockodo erledigt markieren?\n` +
         'Klarzeit sendet ihn danach nie mehr, auch nicht nach einer Aenderung.'
-    : `Eintrag vom ${tag} wieder als offen fuehren?
-` +
+    : `Eintrag vom ${tag} wieder als offen fuehren?\n` +
         'Ist er vollstaendig, sendet Klarzeit ihn beim naechsten Uebertragen.';
 }
