@@ -176,3 +176,17 @@ describe('Clockodo-Sperrfrist (AUF-024)', () => {
     expect(lockDaysText(null)).toBe('Clockodo meldet keine Sperrfrist.');
   });
 });
+
+describe('Von Hand erledigt (AUF-040)', () => {
+  it('clockodoEntryLabel und countLockStates: erledigt ist nicht offen', () => {
+    const erledigt = eintrag(10, 7, { clockodoDone: 5 });
+    expect(clockodoEntryLabel(erledigt, CFG, LOCK3, NOW)).toBe('von Hand erledigt – wird nicht uebertragen');
+    expect(clockodoEntryLabel(erledigt, CFG, null, NOW)).toBe('von Hand erledigt – wird nicht uebertragen');
+    expect(countLockStates([erledigt, eintrag(10, 10)], 'emp-1', CFG, 3, NOW)).toEqual({
+      open: 1,
+      dueTomorrow: 0,
+      dueToday: 0,
+      locked: 0,
+    });
+  });
+});

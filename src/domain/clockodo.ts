@@ -173,3 +173,8 @@ export function entrySelectionStart(config: ClockodoConfig | null): ClockodoEntr
     servicesId: config?.defaultServicesId ?? 0,
   };
 }
+
+/** „Von Hand erledigt“ aus Speicher oder Backup: endliche Zahl ueber 0, sonst nichts (AUF-040). */
+export function cleanClockodoDone(raw: unknown): number | undefined {
+  return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : undefined;
+}

@@ -28,6 +28,7 @@ const STATUS_LABEL: Record<TransferStatus, string | null> = {
   'untimed-break': 'Pause ohne Uhrzeit',
   incomplete: 'Clockodo-Auswahl fehlt',
   none: null,
+  done: 'von Hand erledigt – wird nicht uebertragen',
   'before-start': 'vor „Uebertragen ab“ – wird nicht uebertragen',
 };
 

@@ -4,6 +4,7 @@ import {
   cleanClockodoSync,
   cleanClockodoEntryRef,
   cleanClockodoAbsenceRef,
+  cleanClockodoDone,
   defaultEntryRef,
   entrySelectionStart,
   withStaleOption,
@@ -171,6 +172,16 @@ describe('Auswahl im Formular (AUF-039)', () => {
       entrySelectionStart({ ...CFG, defaultCustomersId: null, defaultProjectsId: 21 }),
     ).toEqual({ customersId: 0, projectsId: null, servicesId: 31 });
     expect(entrySelectionStart(null)).toEqual({ customersId: 0, projectsId: null, servicesId: 0 });
+  });
+});
+
+describe('Von Hand erledigt (AUF-040)', () => {
+  it('cleanClockodoDone: Zeitpunkt oder nichts', () => {
+    expect(cleanClockodoDone(5)).toBe(5);
+    expect(cleanClockodoDone(1_800_000_000_000)).toBe(1_800_000_000_000);
+    for (const v of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, '5', null, undefined, {}]) {
+      expect(cleanClockodoDone(v)).toBeUndefined();
+    }
   });
 });
 

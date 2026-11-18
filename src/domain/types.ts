@@ -37,6 +37,11 @@ export interface TimeEntry {
   clockodo?: ClockodoEntryRef | null;
   /** Clockodo-Uebertragungsstand; fehlt = nie uebertragen. */
   clockodoSync?: ClockodoSync;
+  /**
+   * Von Hand in Clockodo erledigt (AUF-040): Zeitpunkt der Markierung. Klarzeit sendet den Eintrag
+   * danach nie mehr, auch nicht nach einer Aenderung; fehlt = nicht markiert.
+   */
+  clockodoDone?: number;
   activity: string; // Taetigkeit / Beschreibung
   note: string; // optionale Notiz
   source: EntrySource;

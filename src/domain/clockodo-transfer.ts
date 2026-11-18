@@ -1,5 +1,6 @@
 import type { ClockodoConfig, ClockodoEntryRef } from './clockodo';
 import type { BreakInterval, TimeEntry } from './types';
+import { formatDateTime } from './time';
 
 export interface ClockodoEntryPayload {
   customers_id: number;
@@ -13,6 +14,7 @@ export interface ClockodoEntryPayload {
 
 export type TransferStatus =
   | 'none'
+  | 'done'
   | 'before-start'
   | 'untimed-break'
   | 'incomplete'
@@ -126,6 +128,8 @@ export function transferStatus(
   config: ClockodoConfig | null,
 ): TransferStatus {
   if (config === null) return 'none';
+  // Von Hand in Clockodo erledigt: gilt endgueltig, auch nach einer Aenderung (AUF-040).
+  if (entry.clockodoDone !== undefined) return 'done';
   if (entry.start < config.syncFrom) return 'before-start';
   const breaks = entry.breaks;
   if (
@@ -168,4 +172,26 @@ export function countTransferBuckets(
     else if (s === 'before-start') beforeStart++;
   }
   return { open, untimed, incomplete, beforeStart };
+}
+
+/**
+ * „als erledigt markieren“ nur an offenen, nie uebertragenen Eintraegen (AUF-040): ohne
+ * Uebertragungsstand und noch nicht uebertragen, ohne Auswahl oder mit Pause ohne Uhrzeit.
+ */
+export function canMarkClockodoDone(entry: TimeEntry, config: ClockodoConfig | null): boolean {
+  if (entry.clockodoSync) return false;
+  const s = transferStatus(entry, config);
+  return s === 'pending' || s === 'incomplete' || s === 'untimed-break';
+}
+
+/** Rueckfrage vor dem Markieren (done) oder Aufheben (AUF-040). */
+export function clockodoDoneQuestion(entry: Pick<TimeEntry, 'start'>, done: boolean): string {
+  const tag = formatDateTime(entry.start);
+  return done
+    ? `Eintrag vom ${tag} als in Clockodo erledigt markieren?
+` +
+        'Klarzeit sendet ihn danach nie mehr, auch nicht nach einer Aenderung.'
+    : `Eintrag vom ${tag} wieder als offen fuehren?
+` +
+        'Ist er vollstaendig, sendet Klarzeit ihn beim naechsten Uebertragen.';
 }

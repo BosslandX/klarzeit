@@ -1105,3 +1105,60 @@ describe('Fruehere Vertragsstaende im Backup (AUF-031)', () => {
     expect(fillEmptyEmployment(localMitStd, incoming).contractHistory).toBeUndefined();
   });
 });
+
+describe('Von Hand erledigt im Backup (AUF-040)', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+  });
+
+  it('von Hand erledigt uebersteht die Backup-Rundreise', async () => {
+    const { addEntry } = await import('./entries');
+    await addEntry({
+      start: new Date(2026, 6, 6, 8, 0).getTime(),
+      end: new Date(2026, 6, 6, 16, 30).getTime(),
+      breakMinutes: 0,
+      activity: 'a',
+      note: '',
+      source: 'manual',
+      clockodo: { customersId: 11, projectsId: null, servicesId: 31 },
+      clockodoDone: 1_800_000_000_000,
+    });
+    const json = JSON.stringify(await buildBackup());
+    prefStore.clear();
+    await Dexie.delete('zeiterfassung');
+    db.close();
+    await db.open();
+    await restoreBackup(json, 'replace');
+    const imported = await getAllEntries();
+    expect(imported).toHaveLength(1);
+    expect(imported[0].clockodoDone).toBe(1_800_000_000_000);
+  });
+
+  it('ungueltiges erledigt faellt beim Import weg', async () => {
+    const backup: BackupData = {
+      app: 'zeiterfassung',
+      version: 3,
+      exportedAt: 1,
+      profile: {
+        vorname: '',
+        nachname: '',
+        personalnummer: '',
+        arbeitgeber: '',
+        abteilung: '',
+      },
+      entries: [
+        {
+          ...baseEntry(),
+          clockodoDone: 'gestern',
+        } as unknown as import('../domain/types').TimeEntry,
+      ],
+    };
+    await restoreBackup(JSON.stringify(backup), 'replace');
+    const imported = await getAllEntries();
+    expect(imported).toHaveLength(1);
+    expect(Object.prototype.hasOwnProperty.call(imported[0], 'clockodoDone')).toBe(false);
+  });
+});

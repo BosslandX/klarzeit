@@ -3,6 +3,8 @@ import type { ClockodoConfig } from './clockodo';
 import type { TimeEntry } from './types';
 import {
   buildEntryPayloads,
+  canMarkClockodoDone,
+  clockodoDoneQuestion,
   countTransferBuckets,
   entrySyncHash,
   entryText,
@@ -270,5 +272,51 @@ describe('Zaehlung im Clockodo-Kasten (AUF-039)', () => {
       incomplete: 0,
       beforeStart: 1,
     });
+  });
+});
+
+describe('Von Hand erledigt (AUF-040)', () => {
+  const ALT = { ids: [5], hash: 'alt', at: 1 };
+
+  it('transferStatus: von Hand erledigt bleibt erledigt, auch nach einer Aenderung', () => {
+    expect(transferStatus(baseEntry({ clockodoDone: 5 }), CFG)).toBe('done');
+    expect(transferStatus(baseEntry({ clockodoDone: 5, clockodo: undefined }), CFG)).toBe('done');
+    expect(transferStatus(baseEntry({ clockodoDone: 5, breakMinutes: 30 }), CFG)).toBe('done');
+    expect(transferStatus(baseEntry({ clockodoDone: 5 }), null)).toBe('none');
+  });
+
+  it('canMarkClockodoDone: nur offene, nie uebertragene Eintraege', () => {
+    const fertig = baseEntry({ note: 'fertig' });
+    const vorher = baseEntry({
+      start: new Date(2026, 7, 31, 8, 0).getTime(),
+      end: new Date(2026, 7, 31, 16, 0).getTime(),
+    });
+    expect(canMarkClockodoDone(baseEntry(), CFG)).toBe(true);
+    expect(canMarkClockodoDone(baseEntry({ clockodo: undefined }), CFG)).toBe(true);
+    expect(canMarkClockodoDone(baseEntry({ breakMinutes: 30 }), CFG)).toBe(true);
+    expect(canMarkClockodoDone(baseEntry({ clockodoSync: ALT }), CFG)).toBe(false);
+    expect(canMarkClockodoDone(baseEntry({ breakMinutes: 30, clockodoSync: ALT }), CFG)).toBe(false);
+    expect(canMarkClockodoDone(baseEntry({ clockodo: undefined, clockodoSync: ALT }), CFG)).toBe(false);
+    expect(
+      canMarkClockodoDone(
+        { ...fertig, clockodoSync: { ids: [6], hash: entrySyncHash(fertig, REF, CFG.billable), at: 1 } },
+        CFG,
+      ),
+    ).toBe(false);
+    expect(canMarkClockodoDone(vorher, CFG)).toBe(false);
+    expect(canMarkClockodoDone(baseEntry({ clockodoDone: 5 }), CFG)).toBe(false);
+    expect(canMarkClockodoDone(baseEntry(), null)).toBe(false);
+  });
+
+  it('clockodoDoneQuestion nennt den Eintrag und die Folge', () => {
+    const e = { start: new Date(2026, 9, 15, 8, 0).getTime() };
+    expect(clockodoDoneQuestion(e, true)).toBe(
+      'Eintrag vom 15.10.2026 08:00 als in Clockodo erledigt markieren?\n' +
+        'Klarzeit sendet ihn danach nie mehr, auch nicht nach einer Aenderung.',
+    );
+    expect(clockodoDoneQuestion(e, false)).toBe(
+      'Eintrag vom 15.10.2026 08:00 wieder als offen fuehren?\n' +
+        'Ist er vollstaendig, sendet Klarzeit ihn beim naechsten Uebertragen.',
+    );
   });
 });

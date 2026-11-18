@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import {
   addEntry,
   deleteEntryWithClockodo,
+  setEntryClockodoDone,
   updateEntryWithClockodo,
   useAllEntriesDesc,
 } from '../../db/entries';
@@ -15,7 +16,12 @@ import {
   useAutoTransferResults,
 } from '../../clockodo/auto-transfer';
 import { refreshClockodoLock } from '../../clockodo/lock';
-import { countTransferBuckets } from '../../domain/clockodo-transfer';
+import {
+  canMarkClockodoDone,
+  clockodoDoneQuestion,
+  countTransferBuckets,
+  transferStatus,
+} from '../../domain/clockodo-transfer';
 import {
   clockodoEntryLabel,
   countLockStates,
@@ -156,6 +162,12 @@ export function EntriesScreen() {
     await deleteEntryWithClockodo(entry);
     await refreshDeleteCounts();
     startAutoTransfer();
+  };
+
+  const handleClockodoDone = async (entry: TimeEntry, done: boolean) => {
+    if (entry.id == null) return;
+    if (!window.confirm(clockodoDoneQuestion(entry, done))) return;
+    await setEntryClockodoDone(entry.id, done ? Date.now() : null);
   };
 
   const handleSharePdf = async (entry: TimeEntry) => {
@@ -359,14 +371,31 @@ export function EntriesScreen() {
                     const emp = employments.find(
                       (x) => x.id === e.employmentId,
                     );
+                    const cfg = emp?.clockodo ?? null;
                     const label = clockodoEntryLabel(
                       e,
-                      emp?.clockodo ?? null,
+                      cfg,
                       locks[e.employmentId] ?? null,
                       now,
                     );
+                    const erledigt = transferStatus(e, cfg) === 'done';
+                    const markierbar = canMarkClockodoDone(e, cfg);
                     return label ? (
-                      <div className="muted entry-clockodo">{label}</div>
+                      <div className="muted entry-clockodo">
+                        {label}
+                        {(erledigt || markierbar) && (
+                          <>
+                            {' '}
+                            <button
+                              type="button"
+                              className="link-btn"
+                              onClick={() => void handleClockodoDone(e, !erledigt)}
+                            >
+                              {erledigt ? 'wieder offen' : 'als erledigt markieren'}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     ) : null;
                   })()}
                   {e.note && <div className="entry-note">{e.note}</div>}

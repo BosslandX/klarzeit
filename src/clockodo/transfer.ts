@@ -167,6 +167,8 @@ async function uebertrage(
       continue;
     }
     if (status === 'synced') continue;
+    // Von Hand in Clockodo erledigt: nie senden, auch nicht nach einer Aenderung (AUF-040).
+    if (status === 'done') continue;
 
     // Der automatische Lauf laesst gesperrte Eintraege aus; sie kaemen nur mit 403 zurueck.
     if (

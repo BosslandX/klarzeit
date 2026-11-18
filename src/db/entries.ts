@@ -91,6 +91,11 @@ export async function setEntryClockodoSync(
   }
 }
 
+/** Markiert einen Eintrag als von Hand in Clockodo erledigt (Zeitpunkt) oder hebt das auf (null; AUF-040). */
+export async function setEntryClockodoDone(id: number, at: number | null): Promise<void> {
+  await db.entries.update(id, { clockodoDone: at === null ? undefined : at });
+}
+
 export async function deleteEntryWithClockodo(entry: TimeEntry): Promise<void> {
   if (entry.id == null) return;
   const sync = entry.clockodoSync;

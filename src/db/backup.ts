@@ -15,7 +15,7 @@ import {
   setActiveEmployment,
 } from './employment';
 import type { BreakInterval, Profile, TimeEntry } from '../domain/types';
-import { cleanClockodoEntryRef, cleanClockodoSync } from '../domain/clockodo';
+import { cleanClockodoDone, cleanClockodoEntryRef, cleanClockodoSync } from '../domain/clockodo';
 import { changedTrackedTimes, cleanTrackedTimes } from '../domain/tracked-times';
 import { cleanOvertimeAuthorization } from '../domain/overtime-authorization';
 import { defaultEmployment, mergeVacationDays } from '../domain/employment';
@@ -130,6 +130,7 @@ function cleanEntry(e: TimeEntry): TimeEntry {
   const clockodoSync = cleanClockodoSync(
     (e as { clockodoSync?: unknown }).clockodoSync,
   );
+  const clockodoDone = cleanClockodoDone((e as { clockodoDone?: unknown }).clockodoDone);
   const trackedTimes = cleanTrackedTimes((e as { trackedTimes?: unknown }).trackedTimes);
   const overtimeAuthorization = cleanOvertimeAuthorization(
     (e as { overtimeAuthorization?: unknown }).overtimeAuthorization,
@@ -143,6 +144,7 @@ function cleanEntry(e: TimeEntry): TimeEntry {
     ...(breaks !== undefined ? { breaks } : {}),
     ...(clockodo !== null ? { clockodo } : {}),
     ...(clockodoSync !== null ? { clockodoSync } : {}),
+    ...(clockodoDone !== undefined ? { clockodoDone } : {}),
     ...(trackedTimes !== undefined ? { trackedTimes } : {}),
     ...(overtimeAuthorization !== undefined ? { overtimeAuthorization } : {}),
     activity: e.activity,

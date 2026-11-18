@@ -42,7 +42,7 @@ vi.mock('capacitor-secure-storage-plugin', () => ({
 }));
 
 import { db } from '../db/db';
-import { addEntry, getEntry, updateEntry, setEntryClockodoSync, deleteEntryWithClockodo, updateEntryWithClockodo } from '../db/entries';
+import { addEntry, getEntry, updateEntry, setEntryClockodoSync, setEntryClockodoDone, deleteEntryWithClockodo, updateEntryWithClockodo } from '../db/entries';
 import { updateEmployment } from '../db/employment';
 import { setClockodoKey } from './key-store';
 import { addClockodoDeletes, getClockodoDeletes } from '../db/clockodo-deletes';
@@ -669,6 +669,52 @@ describe('Eintrag rueckt vor Uebertragen ab (AUF-039)', () => {
     });
     expect(await getClockodoDeletes(EMP)).toEqual([]);
     expect((await getEntry(entry.id!))?.clockodoSync?.ids).toEqual([501, 502]);
+  });
+});
+
+describe('Von Hand erledigt (AUF-040)', () => {
+  beforeEach(async () => {
+    prefStore.clear();
+    secureStore.clear();
+    httpCalls = [];
+    postSeq = 0;
+    postHandler = null;
+    delHandler = null;
+    db.close();
+    await Dexie.delete('zeiterfassung');
+    await db.open();
+    await seedClockodo();
+  });
+
+  it('als erledigt markiert: der Lauf sendet ihn nie, auch nicht nach einer Aenderung', async () => {
+    const erledigt = await addEntry(baseEntry(E_DAY));
+    await addEntry(baseEntry(E2_DAY));
+    await setEntryClockodoDone(erledigt, 7);
+    expect((await getEntry(erledigt))?.clockodoDone).toBe(7);
+    const r1 = await transferEmployment(EMP, { http, now: () => NOW });
+    expect(httpCalls.map((c) => c.method)).toEqual(['POST', 'POST']);
+    expect(r1).toMatchObject({ sent: 1, errors: [], stopped: null });
+    expect((await getEntry(erledigt))?.clockodoSync).toBeUndefined();
+
+    httpCalls = [];
+    await updateEntryWithClockodo((await getEntry(erledigt))!, { note: 'nachgetragen' });
+    const r2 = await transferEmployment(EMP, { http, now: () => NOW });
+    expect(httpCalls).toEqual([]);
+    expect(r2).toMatchObject({ sent: 0, deleted: 0 });
+    expect((await getEntry(erledigt))?.clockodoDone).toBe(7);
+  });
+
+  it('wieder offen: der naechste Lauf sendet ihn', async () => {
+    const id = await addEntry(baseEntry(E_DAY));
+    await setEntryClockodoDone(id, 7);
+    await transferEmployment(EMP, { http, now: () => NOW });
+    expect(httpCalls).toEqual([]);
+    await setEntryClockodoDone(id, null);
+    const stored = await getEntry(id);
+    expect(Object.prototype.hasOwnProperty.call(stored, 'clockodoDone')).toBe(false);
+    const r = await transferEmployment(EMP, { http, now: () => NOW });
+    expect(httpCalls.map((c) => c.method)).toEqual(['POST', 'POST']);
+    expect(r).toMatchObject({ sent: 1 });
   });
 });
 
