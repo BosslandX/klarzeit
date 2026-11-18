@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import type { Employment, VacationDay } from '../../domain/employment';
 import { openVacationDayCount } from '../../domain/clockodo-absence';
+import type { SickPeriod } from '../../domain/sickness';
 import {
   transferVacations,
   vacationTransferSummary,
@@ -12,10 +13,12 @@ import {
 export function VacationClockodo({
   employment,
   days,
+  sickPeriods,
   onDone,
 }: {
   employment: Employment | undefined;
   days: readonly VacationDay[];
+  sickPeriods: readonly SickPeriod[];
   onDone: () => Promise<void>;
 }) {
   const native = Capacitor.isNativePlatform();
@@ -28,7 +31,7 @@ export function VacationClockodo({
   }
 
   const name = employment.name;
-  const n = openVacationDayCount(days, employment);
+  const n = openVacationDayCount(days, employment, sickPeriods);
   const summary = result !== null ? vacationTransferSummary(result) : null;
   const showResult = result !== null && resultEmpId === employment.id && summary !== null;
 

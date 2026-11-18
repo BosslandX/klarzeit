@@ -25,6 +25,7 @@ import {
   removeVacationDaysOfAbsence,
   setVacationAbsenceRef,
 } from '../db/employment';
+import { getSickPeriods } from '../db/sickness';
 
 export interface VacationTransferResult {
   requested: number;
@@ -116,7 +117,8 @@ function findMatchingAbsence(
 /**
  * Urlaubstage einer Beschaeftigung mit Clockodo abgleichen:
  * 1. Zugang pruefen (wie transferEmployment)
- * 2. Offene Zeitraeume und betroffene Jahre ermitteln
+ * 2. Offene Zeitraeume (ohne Krankheitstage mit Bescheinigung, AUF-038) und betroffene Jahre
+ *    ermitteln
  * 3. fetchMe, fetchAbsences je Jahr — ohne Liste nichts senden
  * 4. Bekannten Status nachziehen und speichern
  * 5. Je offenem Zeitraum uebernehmen oder beantragen, sofort vermerken
@@ -138,7 +140,7 @@ export async function transferVacations(
   const { employment, auth } = zugang;
 
   let days = await getVacationDays();
-  const ranges = vacationRequestRanges(days, employment);
+  const ranges = vacationRequestRanges(days, employment, await getSickPeriods());
   const years = yearsForTransfer(days, employmentId, ranges);
   if (years.length === 0) {
     return result;

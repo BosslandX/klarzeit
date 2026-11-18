@@ -2,6 +2,7 @@ import { addDays, getYear, startOfDay } from 'date-fns';
 import type { Employment, VacationDay } from './employment';
 import { workdaysInRange } from './employment';
 import type { ClockodoAbsenceRef, ClockodoAbsenceStatus } from './clockodo';
+import { sickPeriodOn, type SickPeriod } from './sickness';
 import { toDateInput } from './time';
 
 export interface VacationRequestRange {
@@ -11,15 +12,25 @@ export interface VacationRequestRange {
 }
 
 /**
+ * Zaehlt der Urlaubstag als Krankheit mit Bescheinigung? Dann ist er kein Urlaub (§ 9 BUrlG,
+ * wie in splitVacationAndSickness; AUF-038).
+ */
+function zaehltAlsKrankheit(day: VacationDay, sickPeriods: readonly SickPeriod[]): boolean {
+  return sickPeriodOn(sickPeriods, day.employmentId, day.date)?.certificate === true;
+}
+
+/**
  * Buendelt offene Urlaubstage zu Clockodo-Antragszeitraeumen.
  * - Ohne Clockodo-Zugang: leere Liste.
- * - Offen: Tag der Beschaeftigung, ohne clockodoAbsence, Datum >= syncFrom.
+ * - Offen: Tag der Beschaeftigung, ohne clockodoAbsence, Datum >= syncFrom, kein Krankheitstag
+ *   mit Bescheinigung (zaehltAlsKrankheit; er ist kein Urlaub, AUF-038).
  * - Zwei Tage im selben Kalenderjahr ohne Arbeitstag dazwischen (workdaysInRange) → ein Zeitraum.
  * - Jahreswechsel trennt (Clockodo: date_until im Jahr von date_since).
  */
 export function vacationRequestRanges(
   days: readonly VacationDay[],
   emp: Employment,
+  sickPeriods: readonly SickPeriod[] = [],
 ): VacationRequestRange[] {
   if (emp.clockodo === null) return [];
   const syncFrom = emp.clockodo.syncFrom;
@@ -28,7 +39,8 @@ export function vacationRequestRanges(
       (d) =>
         d.employmentId === emp.id &&
         d.date >= syncFrom &&
-        d.clockodoAbsence === undefined,
+        d.clockodoAbsence === undefined &&
+        !zaehltAlsKrankheit(d, sickPeriods),
     )
     .sort((a, b) => a.date - b.date);
   if (open.length === 0) return [];
@@ -143,8 +155,15 @@ export function isVacationDayRemovable(day: VacationDay): boolean {
 }
 
 /** Zahl der offenen Urlaubstage einer Beschaeftigung (Summe ueber vacationRequestRanges). */
-export function openVacationDayCount(days: readonly VacationDay[], emp: Employment): number {
-  return vacationRequestRanges(days, emp).reduce((sum, range) => sum + range.dates.length, 0);
+export function openVacationDayCount(
+  days: readonly VacationDay[],
+  emp: Employment,
+  sickPeriods: readonly SickPeriod[] = [],
+): number {
+  return vacationRequestRanges(days, emp, sickPeriods).reduce(
+    (sum, range) => sum + range.dates.length,
+    0,
+  );
 }
 
 /** Die Urlaubstage einer Beschaeftigung, die diesen Clockodo-Antrag tragen. */
@@ -156,4 +175,21 @@ export function daysOfAbsence(
   return days.filter(
     (d) => d.employmentId === employmentId && d.clockodoAbsence?.id === absenceId,
   );
+}
+
+
+/** Hinweis am Urlaubstag, wenn isSickInClockodoVacation zutrifft (AUF-038). */
+export const CLOCKODO_SICK_HINT = 'dort weiter als Urlaub, Klarzeit aendert den Antrag nicht';
+
+/**
+ * Ein in Clockodo beantragter oder genehmigter Urlaubstag, der hier als Krankheit mit Bescheinigung
+ * zaehlt (§ 9 BUrlG): Clockodo fuehrt ihn weiter als Urlaub, Klarzeit aendert den Antrag nicht
+ * (AUF-038).
+ */
+export function isSickInClockodoVacation(
+  day: VacationDay,
+  sickPeriods: readonly SickPeriod[],
+): boolean {
+  const status = day.clockodoAbsence?.status;
+  return (status === 0 || status === 1) && zaehltAlsKrankheit(day, sickPeriods);
 }

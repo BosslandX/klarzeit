@@ -3,6 +3,7 @@ import {
   absenceStatusLabel,
   applyAbsenceRef,
   daysOfAbsence,
+  isSickInClockodoVacation,
   isVacationDayRemovable,
   openVacationDayCount,
   syncAbsenceStatus,
@@ -13,6 +14,7 @@ import {
   type Employment,
   type VacationDay,
 } from './employment';
+import type { SickPeriod } from './sickness';
 
 const ab = (y: number, m: number, d: number) => new Date(y, m - 1, d).getTime();
 
@@ -223,5 +225,61 @@ describe('Urlaubsantraege ueber einen Feiertag (AUF-029)', () => {
       ['2026-05-13', '2026-05-13'],
       ['2026-05-15', '2026-05-15'],
     ]);
+  });
+});
+
+
+describe('Urlaubsantraege und Krankheit (AUF-038)', () => {
+  // 05.10.2026 ist ein Montag, 09.10.2026 ein Freitag.
+  const woche = () => [5, 6, 7, 8, 9].map((d) => tag(2026, 10, d));
+  const krank = (
+    von: number,
+    bis: number,
+    certificate: boolean,
+    employmentId = 'emp-1',
+  ): SickPeriod => ({
+    employmentId,
+    from: ab(2026, 10, von),
+    to: ab(2026, 10, bis),
+    certificate,
+  });
+  const spannenK = (periods: SickPeriod[]) =>
+    vacationRequestRanges(woche(), empMit(), periods).map((r) => [r.dateSince, r.dateUntil]);
+  const antrag = (status: 0 | 1 | 2 | 3 | 4) =>
+    tag(2026, 10, 7, { clockodoAbsence: { id: 9, status, at: 1 } });
+
+  it('vacationRequestRanges: Krankheit mit Bescheinigung wird nicht beantragt, ohne schon', () => {
+    expect(spannenK([krank(7, 7, true)])).toEqual([
+      ['2026-10-05', '2026-10-06'],
+      ['2026-10-08', '2026-10-09'],
+    ]);
+    expect(spannenK([krank(7, 7, false)])).toEqual([['2026-10-05', '2026-10-09']]);
+    expect(spannenK([krank(5, 9, true)])).toEqual([]);
+  });
+
+  it('vacationRequestRanges: Krankheit einer anderen Beschaeftigung zaehlt nicht', () => {
+    expect(spannenK([krank(7, 7, true, 'emp-2'), krank(8, 8, true)])).toEqual([
+      ['2026-10-05', '2026-10-07'],
+      ['2026-10-09', '2026-10-09'],
+    ]);
+  });
+
+  it('openVacationDayCount zaehlt Krankheitstage mit Bescheinigung nicht mit', () => {
+    expect(openVacationDayCount(woche(), empMit(), [krank(7, 8, true)])).toBe(3);
+    expect(openVacationDayCount(woche(), empMit(), [krank(7, 8, false)])).toBe(5);
+  });
+
+  it('isSickInClockodoVacation: nur beantragte und genehmigte Tage', () => {
+    const k = [krank(7, 7, true)];
+    expect([0, 1, 2, 3, 4].map((status) =>
+      isSickInClockodoVacation(antrag(status as 0 | 1 | 2 | 3 | 4), k),
+    )).toEqual([true, true, false, false, false]);
+  });
+
+  it('isSickInClockodoVacation: nur mit Bescheinigung, am Tag, in der Beschaeftigung', () => {
+    expect(isSickInClockodoVacation(tag(2026, 10, 7), [krank(7, 7, true)])).toBe(false);
+    expect(isSickInClockodoVacation(antrag(1), [krank(7, 7, false)])).toBe(false);
+    expect(isSickInClockodoVacation(antrag(1), [krank(8, 9, true)])).toBe(false);
+    expect(isSickInClockodoVacation(antrag(1), [krank(7, 7, true, 'emp-2')])).toBe(false);
   });
 });

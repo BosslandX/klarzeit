@@ -515,3 +515,29 @@ describe('Urlaubsantrag zurueckziehen: Nacharbeit (AUF-023)', () => {
     );
   });
 });
+
+
+describe('Urlaubsantraege und Krankheit (AUF-038)', () => {
+  beforeEach(() => {
+    prefStore.clear();
+    secureStore.clear();
+    calls = [];
+    absencesByYear = {};
+    absencesStatus = 200;
+    postSeq = 0;
+    postHandler = null;
+  });
+
+  it('Urlaubstag, der als Krankheit mit Bescheinigung zaehlt, wird nicht beantragt', async () => {
+    await seed([5, 6, 7, 8, 9].map((d) => tag(2026, 10, d)));
+    const krank = { employmentId: EMP, from: ab(2026, 10, 7), to: ab(2026, 10, 7) };
+    prefStore.set('sickPeriods', JSON.stringify([{ ...krank, certificate: true }]));
+    const r = await transferVacations(EMP, { http, now: () => NOW });
+    expect(r).toMatchObject({ requested: 2, adopted: 0, errors: [], stopped: null });
+    expect(posts().map((c) => c.data)).toEqual([
+      { users_id: 7, date_since: '2026-10-05', date_until: '2026-10-06', type: 1, status: 0 },
+      { users_id: 7, date_since: '2026-10-08', date_until: '2026-10-09', type: 1, status: 0 },
+    ]);
+    expect(await ids()).toEqual([901, 901, undefined, 902, 902]);
+  });
+});

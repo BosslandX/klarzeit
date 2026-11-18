@@ -666,7 +666,12 @@ export function MoreScreen() {
               'Es zaehlen die Wochentage der Beschaeftigung; ohne gewaehlte Wochentage Montag bis Freitag, ab 6 Arbeitstagen auch der Samstag. Feiertage der Beschaeftigung werden uebersprungen.'}
         </p>
 
-        <VacationClockodo employment={vacEmp} days={vacDays} onDone={refreshVac} />
+        <VacationClockodo
+          employment={vacEmp}
+          days={vacDays}
+          sickPeriods={sickPeriods}
+          onDone={refreshVac}
+        />
         {vacDays.length === 0 ? (
           <p className="muted small">Noch keine Urlaubstage erfasst.</p>
         ) : (

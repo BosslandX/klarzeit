@@ -3,7 +3,12 @@ import { Capacitor } from '@capacitor/core';
 import type { Employment, VacationDay } from '../../domain/employment';
 import { holidayNameOn } from '../../domain/holidays';
 import { sickPeriodOn, type SickPeriod } from '../../domain/sickness';
-import { absenceStatusLabel, isVacationDayRemovable } from '../../domain/clockodo-absence';
+import {
+  absenceStatusLabel,
+  CLOCKODO_SICK_HINT,
+  isSickInClockodoVacation,
+  isVacationDayRemovable,
+} from '../../domain/clockodo-absence';
 import { formatDateWithWeekday } from '../../domain/time';
 import {
   vacationWithdrawQuestion,
@@ -80,6 +85,7 @@ export function VacationDayRow({
           <span className="muted small">
             {' '}
             · Clockodo: {absenceStatusLabel(day.clockodoAbsence)}
+            {isSickInClockodoVacation(day, sickPeriods) && ` – ${CLOCKODO_SICK_HINT}`}
           </span>
         )}
       </span>
