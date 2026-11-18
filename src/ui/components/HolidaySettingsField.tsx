@@ -3,6 +3,7 @@ import {
   BUNDESLAENDER,
   REGIONALE_FEIERTAGE,
   addExtraHoliday,
+  holidayHistoryNote,
   holidayPreview,
   removeExtraHoliday,
   toggleRegionalHoliday,
@@ -92,6 +93,7 @@ export function HolidaySettingsField({
               Eigenen Feiertag hinzufuegen
             </button>
           </div>
+          <p className="muted small">{holidayHistoryNote(value.land)}</p>
         </>
       )}
     </>

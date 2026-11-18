@@ -9,6 +9,7 @@ import {
   holidaysOf,
   publicHolidayMap,
   addExtraHoliday,
+  holidayHistoryNote,
   holidayNameOn,
   holidayPreview,
   removeExtraHoliday,
@@ -282,5 +283,78 @@ describe('Feiertage im Formular (AUF-030)', () => {
     expect(holidayNameOn({ ...by, extra: [tag(2026, 12, 24)] }, tag(2026, 12, 24))).toBe(
       'Eigener Feiertag',
     );
+  });
+});
+
+describe('Feiertage nach damaligem Recht ab 2017 (AUF-042)', () => {
+  // Belege: GVBl. Berlin 2015 S. 378, 2019 S. 22, 2024 S. 460; GVOBl. M-V 2022 S. 427; HmbGVBl. 2018
+  // S. 63; Bremen und Niedersachsen (Fassungen ab 29.06.2018); Schleswig-Holstein Drs. 19/509 (Beschluss
+  // 22.02.2018); Thueringen Drs. 6/6163 (Beschluss 28.02.2019); GVBl. Bayern 2016 Nr. 4, GVBl. Hessen
+  // 2013 S. 566, GV. NRW. 2015 S. 496, Nds. Drs. 18/827.
+  const hat = (j: number, land: Bundesland, m: number, d: number) =>
+    holidaysOf(j, land).some((h) => h.date === tag(j, m, d));
+  const name = (j: number, land: Bundesland, m: number, d: number) =>
+    holidaysOf(j, land).find((h) => h.date === tag(j, m, d))?.name;
+
+  it('Berlin: Frauentag ab 2019, einmalig 2017, 2020 und 2025', () => {
+    expect(hat(2018, 'BE', 3, 8)).toBe(false);
+    expect(name(2019, 'BE', 3, 8)).toBe('Frauentag');
+    expect(hat(2016, 'BE', 10, 31)).toBe(false);
+    expect(name(2017, 'BE', 10, 31)).toBe('500. Jahrestag der Reformation');
+    expect(hat(2018, 'BE', 10, 31)).toBe(false);
+    expect(name(2020, 'BE', 5, 8)).toBe(
+      '75. Jahrestag der Befreiung vom Nationalsozialismus und der Beendigung des Zweiten Weltkrieges in Europa',
+    );
+    expect(hat(2021, 'BE', 5, 8)).toBe(false);
+    expect(name(2025, 'BE', 5, 8)).toBe(
+      '80. Jahrestag der Befreiung vom Nationalsozialismus und der Beendigung des Zweiten Weltkriegs in Europa',
+    );
+    expect(hat(2026, 'BE', 5, 8)).toBe(false);
+  });
+
+  it('Reformationstag in HB, HH, NI und SH erst ab 2018; 2017 einmalig nur in HB und NI belegt', () => {
+    for (const l of ['HB', 'HH', 'NI', 'SH'] as const) {
+      expect([l, hat(2016, l, 10, 31), hat(2018, l, 10, 31)]).toEqual([l, false, true]);
+    }
+    expect(['HB', 'NI', 'HH', 'SH'].map((l) => hat(2017, l as Bundesland, 10, 31))).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
+    expect(name(2018, 'HH', 10, 31)).toBe('Reformationstag');
+  });
+
+  it('Frauentag in MV ab 2023, Weltkindertag in TH ab 2019', () => {
+    expect([hat(2022, 'MV', 3, 8), hat(2023, 'MV', 3, 8)]).toEqual([false, true]);
+    expect([hat(2018, 'TH', 9, 20), hat(2019, 'TH', 9, 20)]).toEqual([false, true]);
+  });
+
+  it('31.10.2017 einmalig in BY, HE und NW; in BW, RP und SL nicht abgebildet', () => {
+    for (const l of ['BY', 'HE', 'NW'] as const) {
+      expect([l, hat(2016, l, 10, 31), hat(2017, l, 10, 31), hat(2018, l, 10, 31)]).toEqual([
+        l,
+        false,
+        true,
+        false,
+      ]);
+    }
+    expect(['BW', 'RP', 'SL'].map((l) => hat(2017, l as Bundesland, 10, 31))).toEqual([
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it('holidayHistoryNote: Rechtsstand, dazu der fehlende Beleg fuer den 31.10.2017', () => {
+    const satz =
+      'Fruehere Jahre rechnen nach dem damaligen Recht, ab 2017 amtlich belegt; davor gilt der Stand von 2017.';
+    expect(holidayHistoryNote('BY')).toBe(satz);
+    expect(holidayHistoryNote('BE')).toBe(satz);
+    for (const l of ['BW', 'HH', 'RP', 'SH', 'SL'] as const) {
+      expect(holidayHistoryNote(l)).toBe(
+        `${satz} Den einmaligen Feiertag am 31.10.2017 kennt die App fuer dieses Land nicht (nicht amtlich belegt) – bei Bedarf als eigenen Tag eintragen.`,
+      );
+    }
   });
 });

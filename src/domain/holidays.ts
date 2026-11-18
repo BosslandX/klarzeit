@@ -10,8 +10,9 @@ import { addDays, getDay, startOfDay } from 'date-fns';
  * Mittwoch vor dem letzten Sonntag des Kirchenjahres (§ 2 FTG BW), das ist der Sonntag vor dem
  * 1. Advent (§ 2 Abs. 2 FTG M-V); der 1. Advent ist der vierte Sonntag vor dem 25. Dezember.
  *
- * Jedes Jahr gilt die heutige Liste; aeltere Rechtsstaende bildet die App nicht ab. Sonntage
- * zaehlen nicht als Feiertage, auch wo ein Gesetz sie nennt (Hessen).
+ * Fruehere Jahre rechnen nach dem damaligen Recht, ab 2017 amtlich belegt (AUF-042: SEIT und
+ * EINMALIG); davor gilt der Stand von 2017. Sonntage zaehlen nicht als Feiertage, auch wo ein Gesetz
+ * sie nennt (Hessen).
  */
 
 export type Bundesland =
@@ -167,6 +168,40 @@ const LAND: Readonly<Record<Bundesland, readonly Tag[]>> = {
   TH: ['weltkindertag', 'reformationstag'],
 };
 
+/**
+ * Feiertage, die ein Land nach 2016 eingefuehrt hat (AUF-042): sie zaehlen erst ab `ab` (lokale
+ * Mitternacht). Belegt aus Gesetzblatt oder Landtagsbeschluss (Quellen: docs/STATE.md, Session
+ * 2026-11-18); `ab` liegt jeweils vor dem ersten Feiertag nach neuem Recht und nach dem letzten davor.
+ */
+const SEIT: readonly { land: Bundesland; tag: Tag; ab: number }[] = [
+  // GVBl. Berlin 2019 S. 22: in Kraft am Tag nach der Verkuendung (ausgegeben 6.2.2019).
+  { land: 'BE', tag: 'frauentag', ab: new Date(2019, 1, 7).getTime() },
+  // Bremen: Inkrafttreten 29.6.2018.
+  { land: 'HB', tag: 'reformationstag', ab: new Date(2018, 5, 29).getTime() },
+  // HmbGVBl. 2018 S. 63, ausgegeben 20.3.2018 (ohne eigene Inkrafttretensregel).
+  { land: 'HH', tag: 'reformationstag', ab: new Date(2018, 2, 20).getTime() },
+  // GVOBl. M-V 2022 S. 427: in Kraft am Tag nach der Verkuendung (ausgegeben 12.7.2022).
+  { land: 'MV', tag: 'frauentag', ab: new Date(2022, 6, 13).getTime() },
+  // Niedersachsen: Fassung ab 29.6.2018.
+  { land: 'NI', tag: 'reformationstag', ab: new Date(2018, 5, 29).getTime() },
+  // Schleswig-Holstein: Landtagsbeschluss vom 22.2.2018 (Drs. 19/509), in Kraft nach Verkuendung.
+  { land: 'SH', tag: 'reformationstag', ab: new Date(2018, 1, 22).getTime() },
+  // Thueringen: Landtagsbeschluss vom 28.2.2019 (Drs. 6/6163), in Kraft nach Verkuendung.
+  { land: 'TH', tag: 'weltkindertag', ab: new Date(2019, 1, 28).getTime() },
+];
+
+/** Laender, fuer die ein einmaliger Feiertag am 31.10.2017 nicht amtlich belegt ist (AUF-042). */
+const OHNE_BELEG_2017: readonly Bundesland[] = ['BW', 'HH', 'RP', 'SH', 'SL'];
+
+/** Hinweis zum Rechtsstand der Feiertage frueherer Jahre, je Land (AUF-042). */
+export function holidayHistoryNote(land: Bundesland): string {
+  const satz =
+    'Fruehere Jahre rechnen nach dem damaligen Recht, ab 2017 amtlich belegt; davor gilt der Stand von 2017.';
+  return OHNE_BELEG_2017.includes(land)
+    ? `${satz} Den einmaligen Feiertag am 31.10.2017 kennt die App fuer dieses Land nicht (nicht amtlich belegt) – bei Bedarf als eigenen Tag eintragen.`
+    : satz;
+}
+
 /** Einmalige Feiertage (Monat 1 bis 12). */
 const EINMALIG: readonly {
   land: Bundesland;
@@ -175,6 +210,28 @@ const EINMALIG: readonly {
   tag: number;
   name: string;
 }[] = [
+  // Der 500. Jahrestag der Reformation (31.10.2017), wo amtlich belegt (AUF-042).
+  ...(['BE', 'BY', 'HB', 'HE', 'NI', 'NW'] as const).map((land) => ({
+    land,
+    jahr: 2017,
+    monat: 10,
+    tag: 31,
+    name: '500. Jahrestag der Reformation',
+  })),
+  {
+    land: 'BE',
+    jahr: 2020,
+    monat: 5,
+    tag: 8,
+    name: '75. Jahrestag der Befreiung vom Nationalsozialismus und der Beendigung des Zweiten Weltkrieges in Europa',
+  },
+  {
+    land: 'BE',
+    jahr: 2025,
+    monat: 5,
+    tag: 8,
+    name: '80. Jahrestag der Befreiung vom Nationalsozialismus und der Beendigung des Zweiten Weltkriegs in Europa',
+  },
   {
     land: 'BE',
     jahr: 2028,
@@ -273,6 +330,8 @@ export function holidaysOf(
   for (const [t, name] of NAMEN) {
     if (!gilt.has(t)) continue;
     const d = datum(t, year, ostern);
+    const seit = SEIT.find((s) => s.land === land && s.tag === t);
+    if (seit !== undefined && d < seit.ab) continue;
     jeDatum.set(d, [...(jeDatum.get(d) ?? []), name]);
   }
   for (const e of EINMALIG) {
