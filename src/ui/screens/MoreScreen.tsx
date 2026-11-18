@@ -24,7 +24,6 @@ import { BackupSection } from '../components/BackupSection';
 
 export function MoreScreen() {
   const { profile, loading, save } = useProfile();
-
   const [aenderungAb, setAenderungAb] = useState<number | null>(() =>
     startOfMonth(Date.now()).getTime(),
   );
@@ -46,13 +45,10 @@ export function MoreScreen() {
   const [empFlash, setEmpFlash] = useState(false);
   const [vacEmpId, setVacEmpId] = useState('');
 
-
-
   const vacTargetId =
     vacEmpId || employments[0]?.id || '';
   const vacEmp =
     employments.find((e) => e.id === vacTargetId) ?? employments[0];
-
 
   const openEdit = (e: Employment) => {
     setEditingId(e.id);
@@ -109,8 +105,6 @@ export function MoreScreen() {
       window.alert(msg(e));
     }
   };
-
-
 
   if (loading || empListLoading) return <div className="screen center muted">Lade…</div>;
 
