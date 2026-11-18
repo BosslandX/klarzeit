@@ -28,7 +28,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Prüfwerkzeuge des Orchestrators** (seit 2026-11-17 versioniert, vorher nur im Scratchpad):
   `tools/zitat-pruefen.mjs` und `tools/kontext.mjs` prüfen Zitate gegen den Seitentext (Chrome
   kopflos über `puppeteer-core`, eigenes Profil); `tools/oberflaeche/aufNNN_ui.mjs` sind die
-  Oberflächenproben der Aufträge 027–037 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
+  Oberflächenproben der Aufträge 027–039 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
   `npm run dev`, Stand ihres Auftrags). Einspiel-Vorlage, Auftragstext-Erzeuger und Stückprüfung
   liegen im Baukasten unter `C:\gamedev\composer-kit\orchestrator\` und werden von dort gerufen.
 - Android SDK-Pfad in `android/local.properties` (`sdk.dir=...`, gitignored, rechnerspezifisch).
@@ -255,14 +255,20 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Clockodo-Auswahl je Eintrag (AUF-013):** `TimeEntry.clockodo?: ClockodoEntryRef | null`
   (Kunde + Leistung Pflicht, Projekt optional; `cleanClockodoEntryRef` verwirft den ganzen Ref
   bei einer kaputten Projekt-ID). Das Formular zeigt die Auswahl nur bei Beschäftigungen mit
-  Zugang, Startwert `defaultEntryRef` der Beschäftigung; `EntryDraft.clockodo` ist Pflicht
-  (Dexie-`update`, wie `breaks`). Gespeichert wird nur eine vollständige Auswahl, sonst `null`.
+  Zugang, Startwert `entrySelectionStart` (die Vorgaben der Beschäftigung, seit AUF-039 auch nur
+  Kunde oder nur Leistung; 0 heißt „nicht gewählt", ohne Scheinoption „ID 0", `withStaleOption`);
+  `EntryDraft.clockodo` ist Pflicht (Dexie-`update`, wie `breaks`). Gespeichert wird nur eine
+  vollständige Auswahl, sonst `null`. Einträge ohne Auswahl bekommen die Vorgabe **nicht** still beim
+  Übertragen (Entscheidung AUF-039: sonst landete ein Eintrag ungefragt beim falschen Kunden).
 - **Übertragung an Clockodo (AUF-014/015), nur Klarzeit → Clockodo, auf Knopfdruck oder — wenn
   eingeschaltet — automatisch (AUF-025):**
   `src/domain/clockodo-transfer.ts` (rein): je Arbeitsabschnitt zwischen den Pausen ein
   Clockodo-Eintrag (`workSegments`, `buildEntryPayloads`), UTC ohne Millisekunden, Prüfsumme
   `entrySyncHash` (FNV-1a über das Gesendete), `transferStatus` in fester Reihenfolge
-  (none, before-start, untimed-break, incomplete, pending, changed, synced).
+  (none, before-start, untimed-break, incomplete, pending, changed, synced). Der Clockodo-Kasten in
+  „Eintraege" zählt auch die Einträge vor „Uebertragen ab", jeder trägt den Stand „vor „Uebertragen
+  ab" – wird nicht uebertragen" (`countTransferBuckets` in der Domäne; AUF-039, vorher fielen sie
+  still heraus).
   `TimeEntry.clockodoSync` = IDs der angelegten Einträge + Prüfsumme; nicht im `EntryDraft`
   (so bleibt ein bearbeiteter Eintrag als `changed` erkennbar), im Backup. Ablauf
   `src/clockodo/transfer.ts`: Löschvermerke (`clockodoDeletes:<id>`) zuerst, geänderte
@@ -281,8 +287,9 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   Bei ausgeschaltetem Clockodo liefert das Formular immer `clockodo: null` — keine Entscheidung
   des Nutzers, es wird nichts vermerkt. Der Clockodo-Kasten in „Eintraege" zählt offene
   Löschvermerke („n zu loeschen"); die Rückfrage „Alle Daten loeschen" sagt, dass Übertragenes in
-  Clockodo stehen bleibt. Nicht abgedeckt: ein übertragener Eintrag, der vor „Uebertragen ab"
-  rückt (`before-start`), bleibt in Clockodo, wie er war.
+  Clockodo stehen bleibt. Rückt ein übertragener Eintrag vor „Uebertragen ab" (bisheriger Beginn am
+  oder nach dem Tag, neuer davor), werden seine IDs ebenso vorgemerkt (AUF-039); lag er schon davor
+  (etwa weil „Uebertragen ab" später gesetzt wurde), ändert ein Bearbeiten nichts an Clockodo.
 - **Urlaubsanträge an Clockodo — Bausteine (AUF-019):** `VacationDay.clockodoAbsence?` =
   `{ id, status, at }` des Clockodo-Antrags (Status 0 beantragt … 4 storniert, openapi
   `AbsenceStatus`); fehlt = nie beantragt, `cleanVacationDays` trägt einen gültigen Verweis,
