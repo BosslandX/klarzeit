@@ -11,10 +11,8 @@ import {
   type Period,
   type PeriodKind,
 } from '../../domain/aggregate';
-import {
-  buildBalanceLedger,
-  buildVacationStatus,
-} from '../../domain/employment';
+import { buildBalanceLedger } from '../../domain/balance';
+import { buildVacationStatus } from '../../domain/employment';
 import {
   getEntriesInRange,
   getEntriesInRangeForEmployment,

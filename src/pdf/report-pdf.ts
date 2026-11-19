@@ -17,11 +17,9 @@ import {
   employedFractionOfMonth,
   fullMonthlyTargetMs,
   includedOvertimeCapMs,
-  waitingPeriodEnd,
   type BalanceLedger,
-  type Employment,
-  type VacationStatus,
-} from '../domain/employment';
+} from '../domain/balance';
+import { waitingPeriodEnd, type Employment, type VacationStatus } from '../domain/employment';
 import { BUNDESLAENDER } from '../domain/holidays';
 import { changedTrackedTimes } from '../domain/tracked-times';
 import { overtimeAuthorizationLine } from '../domain/overtime-authorization';

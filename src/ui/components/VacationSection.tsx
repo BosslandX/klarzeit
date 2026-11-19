@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { differenceInCalendarDays } from 'date-fns';
+import { dailyTargetMs } from '../../domain/balance';
 import {
-  dailyTargetMs,
   workdaysInRange,
   type Employment,
   type VacationDay,

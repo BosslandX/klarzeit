@@ -9,8 +9,8 @@ import {
 } from './report-pdf';
 import { monthPeriod } from '../domain/aggregate';
 import type { Profile, TimeEntry } from '../domain/types';
+import { buildBalanceLedger } from '../domain/balance';
 import {
-  buildBalanceLedger,
   buildVacationStatus,
   defaultEmployment,
   type Employment,

@@ -12,8 +12,8 @@ import {
   waitingPeriodSick,
   type SickPeriod,
 } from './sickness';
+import { buildBalanceLedger } from './balance';
 import {
-  buildBalanceLedger,
   buildVacationStatus,
   defaultEmployment,
   workdaysInRange,

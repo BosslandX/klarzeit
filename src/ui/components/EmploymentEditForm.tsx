@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
+import { fullMonthlyTargetMs } from '../../domain/balance';
 import {
   annualEntitlement,
-  fullMonthlyTargetMs,
   type Employment,
   type VacationYearMode,
 } from '../../domain/employment';
