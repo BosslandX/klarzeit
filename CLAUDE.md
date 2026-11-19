@@ -137,7 +137,14 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
     wie bisher.
   - **Oberfläche:** nur beim Einzeltag, über das Kästchen „halber Tag (zaehlt 0,5)“ in „Mehr“; Zeiträume sind immer
     ganze Tage. Die Liste zeigt „· halber Tag“.
-  - ⚠️ **Clockodo beantragt einen halben Tag noch als ganzen**, bis AUF-047. Dazwischen kein Release.
+  - **An Clockodo (AUF-047):**
+    - **Antrag:** Ein halber Tag ist ein eigener Antragszeitraum (`VacationRequestRange.halfDay`). `createAbsence`
+      sendet `half_day: true` nur für ihn; mehrtägig lehnt Clockodo ab (`HalfDayAbsenceTooLong`).
+    - **Antwort:** Clockodos Antwort trägt kein `half_day`, nur `count_days`.
+    - **Abgleich:** Übernommen wird wie bei ganzen Tagen nach Beginn und Ende. Der Abgleich vergleicht `count_days`
+      mit 0,5 und meldet eine Abweichung als Widerspruch, mit Komma („Klarzeit 0,5“).
+    - **Zählung:** `openVacationDayCount` zählt weiter Einträge.
+    - **Gerätetest:** Ob der Clockodo des Arbeitgebers halbe Tage annimmt, zeigt erst er.
 - **Mit dem Gehalt abgegoltene Überstunden (AUF-016):** `Employment.includedOvertimeHoursPerMonth`,
   `null` = keine Klausel. `buildBalanceLedger` weist je Monat
   `includedOvertimeMs = min(includedOvertimeCapMs, max(0, saldoMs))` aus; `saldoMs` bleibt roh,

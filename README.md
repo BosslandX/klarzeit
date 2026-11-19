@@ -368,7 +368,7 @@ Zwei Regeln halten das zusammen:
    Den Clockodo-Schlüssel verwahrt `clockodo/key-store.ts` im Android KeyStore. Zeiten
    immer als Epoch-Millisekunden; formatiert wird nur in `domain/time.ts`.
 
-Dazu **413 Tests in 32 Dateien** (`npm test`).
+Dazu **421 Tests in 32 Dateien** (`npm test`).
 
 <details>
 <summary><b>Verzeichnisse</b></summary>
