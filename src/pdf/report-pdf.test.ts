@@ -69,6 +69,22 @@ describe('Urlaubsblock PDF-Text', () => {
     expect(foot).toContain('30');
     expect(foot).toContain('16');
   });
+
+  it('Uebertrag und verfallene Tage stehen vor "genommen" (AUF-048)', () => {
+    const mitUebertrag: Employment = {
+      ...empFixture,
+      vacationCarry: { fromYear: 2027, startDays: 5, lapsed: [{ year: 2027, days: 2 }] },
+    };
+    const v = buildVacationStatus(mitUebertrag, [], 2027);
+    const { rows } = buildVacationPanelText(v, mitUebertrag);
+    expect(rows.map((r) => `${r.label}: ${r.value}`)).toEqual([
+      'Jahresanspruch 2027 (§ 3 BUrlG): 16 Tage',
+      'Uebertrag aus 2026: 5 Tage',
+      'verfallen: -2 Tage',
+      'genommen 2027: 0 Tage',
+      'Resturlaub: 19 Tage',
+    ]);
+  });
 });
 
 describe('Kontoblock PDF-Text (AUF-016)', () => {

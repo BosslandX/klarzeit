@@ -347,6 +347,22 @@ describe('Backup Version 3 und Beschaeftigungen', () => {
     expect(fillEmptyEmployment(localMitStd, incoming).includedOvertimeHoursPerMonth).toBeNull();
   });
 
+  it('fillEmptyEmployment uebernimmt den Resturlaub-Uebertrag nur mit dem Vertrag (AUF-048)', () => {
+    const local = cleanEmployment({ id: 'emp-1' });
+    const incoming = cleanEmployment({
+      id: 'emp-1',
+      weeklyHours: 30,
+      vacationCarry: { fromYear: 2026, startDays: 3, lapsed: [] },
+    });
+    expect(fillEmptyEmployment(local, incoming).vacationCarry).toEqual({
+      fromYear: 2026,
+      startDays: 3,
+      lapsed: [],
+    });
+    const localMitStd = cleanEmployment({ id: 'emp-1', weeklyHours: 20 });
+    expect(fillEmptyEmployment(localMitStd, incoming).vacationCarry).toBeUndefined();
+  });
+
   it('Rundreise balanceNote ueber Backup', async () => {
     prefStore.set(
       'employments',

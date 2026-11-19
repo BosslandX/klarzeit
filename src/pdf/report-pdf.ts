@@ -281,6 +281,12 @@ export function buildVacationPanelText(
       value: formatDays(v.prorataRounded),
     });
   }
+  if (v.carryIn !== null) {
+    rows.push({ label: `Uebertrag aus ${v.year - 1}`, value: formatDays(v.carryIn) });
+  }
+  if (v.lapsed > 0) {
+    rows.push({ label: 'verfallen', value: `-${formatDays(v.lapsed)}` });
+  }
   rows.push({ label: `genommen ${v.year}`, value: formatDays(v.taken) });
   rows.push({ label: 'Resturlaub', value: formatDays(v.remaining) });
 

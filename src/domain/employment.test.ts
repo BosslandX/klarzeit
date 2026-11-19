@@ -673,3 +673,47 @@ describe('Vertrag gueltig ab (AUF-031)', () => {
     ]);
   });
 });
+
+describe('Resturlaub-Uebertrag (AUF-048)', () => {
+  const t = (y: number, m: number, d: number) => new Date(y, m - 1, d).getTime();
+  const mit = (fromYear: number, startDays: number, lapsed: { year: number; days: number }[] = []) => ({
+    ...emp,
+    vacationCarry: { fromYear, startDays, lapsed },
+  });
+
+  it('ohne vacationCarry kein Uebertrag, der Rest wie bisher', () => {
+    const s = buildVacationStatus(emp, [t(2027, 3, 2)], 2027);
+    expect([s.carryIn, s.lapsed, s.remaining]).toEqual([null, 0, 15]);
+  });
+
+  it('im Startjahr gilt der eingetragene Rest', () => {
+    const s = buildVacationStatus(mit(2027, 5), [], 2027);
+    expect([s.carryIn, s.remaining]).toEqual([5, 21]); // 16 + 5
+  });
+
+  it('vor dem Startjahr kein Uebertrag', () => {
+    expect(buildVacationStatus(mit(2027, 5), [], 2026).carryIn).toBeNull();
+  });
+
+  it('im Folgejahr geht der Rest des Vorjahres ueber', () => {
+    const taken = [t(2027, 3, 2), t(2027, 3, 3), t(2027, 3, 4)];
+    const s = buildVacationStatus(mit(2027, 5), taken, 2028);
+    expect([s.carryIn, s.remaining]).toEqual([18, 34]); // 16 + 5 - 3; dann 16 + 18
+  });
+
+  it('ein Minus geht nicht ueber (E24, §§ 1, 3 Abs. 1 BUrlG)', () => {
+    const taken = Array.from({ length: 18 }, (_, i) => t(2027, 6, 1) + i * 86_400_000);
+    expect(buildVacationStatus(mit(2027, 0), taken, 2027).remaining).toBe(-2);
+    expect(buildVacationStatus(mit(2027, 0), taken, 2028).carryIn).toBe(0);
+  });
+
+  it('verfallene Tage mindern den Rest ihres Jahres', () => {
+    const s = buildVacationStatus(mit(2027, 5, [{ year: 2028, days: 4 }]), [], 2028);
+    expect([s.carryIn, s.lapsed, s.remaining]).toEqual([21, 4, 33]); // 16 + 21 - 4
+  });
+
+  it('halbe Tage zaehlen im Uebertrag 0,5', () => {
+    const s = buildVacationStatus(mit(2027, 0), [t(2027, 3, 2)], 2028, [t(2027, 3, 2)]);
+    expect(s.carryIn).toBe(15.5);
+  });
+});

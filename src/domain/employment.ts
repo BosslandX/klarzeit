@@ -52,6 +52,8 @@ export interface Employment {
   openingBalanceMs: number;
   /** Vertraglicher Jahresurlaub in Arbeitstagen; null = gesetzliches Minimum. */
   contractVacationDays: number | null;
+  /** Resturlaub-Uebertrag (AUF-048); fehlt = kein Uebertrag, wie bis 1.14. */
+  vacationCarry?: VacationCarry;
   /** Mit dem Gehalt abgegoltene Ueberstunden je Monat (Stunden); null = keine solche Klausel. */
   includedOvertimeHoursPerMonth: number | null;
   /** Hinweis in der Fussnote des PDF-Kontoblocks (z. B. Ausgleichsregel im Vertrag); leer = keiner. */
@@ -148,6 +150,43 @@ export interface VacationDay {
 
 /** Anteil eines halben Urlaubstags am ganzen (AUF-046). */
 export const HALF_VACATION_DAY = 0.5;
+
+/**
+ * Resturlaub-Uebertrag einer Beschaeftigung (AUF-048, Entscheidungen E21 und E24): Ab `fromYear` geht der Rest jedes
+ * Jahres ins naechste, ein Minus nicht -- jedes Kalenderjahr ist ein eigener Anspruch (§§ 1, 3 Abs. 1 BUrlG),
+ * uebertragen wird nur nicht genommener Urlaub (§ 7 Abs. 3). `startDays` ist der Rest, mit dem `fromYear` beginnt
+ * (etwa laut Arbeitgeber); Jahre davor rechnet die App nicht hoch. `lapsed` sind die verfallenen Tage je Jahr, vom
+ * Nutzer eingetragen: Verfallen kann Urlaub nur nach Hinweis des Arbeitgebers (BAG, Urteil vom 19.02.2019 --
+ * 9 AZR 423/16), das weiss die App nicht. Dort steht auch eine mit dem Arbeitgeber vereinbarte Verrechnung.
+ */
+export interface VacationCarry {
+  fromYear: number;
+  startDays: number;
+  lapsed: { year: number; days: number }[];
+}
+
+/** Prueft einen Uebertrag aus Speicher oder Backup; ungueltig = undefined (kein Uebertrag). */
+export function cleanVacationCarry(raw: unknown): VacationCarry | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const x = raw as Record<string, unknown>;
+  const jahrOk = (v: unknown, ab: number): v is number =>
+    typeof v === 'number' && Number.isInteger(v) && v >= ab && v <= 2100;
+  const fromYear = x.fromYear;
+  const startDays = x.startDays;
+  if (!jahrOk(fromYear, 2000)) return undefined;
+  if (typeof startDays !== 'number' || !Number.isFinite(startDays) || startDays < 0) return undefined;
+  const jahre = new Set<number>();
+  const lapsed: { year: number; days: number }[] = [];
+  for (const item of Array.isArray(x.lapsed) ? x.lapsed : []) {
+    const l = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
+    if (!jahrOk(l.year, fromYear)) continue;
+    if (typeof l.days !== 'number' || !Number.isFinite(l.days) || l.days <= 0) continue;
+    if (jahre.has(l.year)) continue; // je Jahr ein Eintrag, der erste bleibt
+    jahre.add(l.year);
+    lapsed.push({ year: l.year, days: l.days });
+  }
+  return { fromYear, startDays, lapsed: [...lapsed].sort((a, b) => a.year - b.year) };
+}
 
 // --- Konstanten (gesetzliche Grundlagen) ---
 
@@ -375,7 +414,9 @@ export interface VacationStatus {
   mode: VacationYearMode;
   entitlement: number; // massgebliche Anspruchszahl fuers Jahr
   taken: number; // genommene Urlaubstage im Jahr, ein halber zaehlt 0,5 (AUF-046)
-  remaining: number; // Resturlaub (entitlement - taken)
+  carryIn: number | null; // Uebertrag aus dem Vorjahr (AUF-048); null = kein Uebertrag
+  lapsed: number; // in diesem Jahr verfallene Tage (AUF-048)
+  remaining: number; // Resturlaub (entitlement + carryIn - lapsed - taken)
 }
 
 /**
@@ -388,6 +429,9 @@ export interface VacationStatus {
  *
  * `halfDates` nennt die halben unter den genommenen Tagen; sie zaehlen 0,5 (AUF-046). Ein
  * Datum nur dort ist kein Urlaubstag.
+ *
+ * Mit `vacationCarry` (AUF-048) kommen der Uebertrag aus dem Vorjahr und die verfallenen Tage dazu:
+ * Rest = Anspruch + Uebertrag - verfallen - genommen.
  */
 export function buildVacationStatus(
   emp: Employment,
@@ -434,6 +478,15 @@ export function buildVacationStatus(
   const taken = takenDates
     .filter((d) => getYear(d) === year && !feiertage.has(startOfDay(d).getTime()))
     .reduce((n, d) => n + (halbe.has(startOfDay(d).getTime()) ? HALF_VACATION_DAY : 1), 0);
+  // Uebertrag (AUF-048): im Startjahr der eingetragene Rest, danach der Rest des Vorjahres, ein Minus nicht (E24).
+  const c = emp.vacationCarry;
+  let carryIn: number | null = null;
+  if (c !== undefined && year === c.fromYear) {
+    carryIn = c.startDays;
+  } else if (c !== undefined && year > c.fromYear) {
+    carryIn = Math.max(0, buildVacationStatus(emp, takenDates, year - 1, halfDates).remaining);
+  }
+  const lapsed = c?.lapsed.find((l) => l.year === year)?.days ?? 0;
   return {
     year,
     workdaysPerWeek: emp.workdaysPerWeek,
@@ -448,6 +501,8 @@ export function buildVacationStatus(
     mode: emp.vacationYearMode,
     entitlement,
     taken,
-    remaining: entitlement - taken,
+    carryIn,
+    lapsed,
+    remaining: entitlement + (carryIn ?? 0) - lapsed - taken,
   };
 }

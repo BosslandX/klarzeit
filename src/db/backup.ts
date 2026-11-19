@@ -237,6 +237,7 @@ export function fillEmptyEmployment(
       vacationYearMode: incomingClean.vacationYearMode,
       openingBalanceMs: incomingClean.openingBalanceMs,
       contractVacationDays: incomingClean.contractVacationDays,
+      vacationCarry: incomingClean.vacationCarry,
       includedOvertimeHoursPerMonth: incomingClean.includedOvertimeHoursPerMonth,
       balanceNote: incomingClean.balanceNote,
     };

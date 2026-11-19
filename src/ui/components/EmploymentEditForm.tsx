@@ -10,6 +10,7 @@ import { ClockodoSettings } from './ClockodoSettings';
 import { WorkWeekdaysField } from './WorkWeekdaysField';
 import { HolidaySettingsField } from './HolidaySettingsField';
 import { ContractChangeField } from './ContractChangeField';
+import { VacationCarryField } from './VacationCarryField';
 
 const VACATION_MODE_LABELS: { value: VacationYearMode; label: string }[] = [
   { value: 'both', label: 'Beide (voll + anteilig)' },
@@ -169,6 +170,10 @@ export function EmploymentEditForm({
           gilt der gesetzliche Urlaubsanspruch.
         </p>
       )}
+      <VacationCarryField
+        value={emp.vacationCarry}
+        onChange={(next) => setEmpField('vacationCarry', next)}
+      />
       <label className="field">
         <span>Urlaub im Eintrittsjahr ausweisen</span>
         <select

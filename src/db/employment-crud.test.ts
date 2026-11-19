@@ -343,3 +343,42 @@ describe('Beschaeftigung loeschen: Sperrfrist (AUF-024)', () => {
     expect(prefStore.get(`clockodoLock:${INITIAL_EMPLOYMENT_ID}`)).toBe('{"days":5,"at":1}');
   });
 });
+
+describe('Resturlaub-Uebertrag speichern (AUF-048)', () => {
+  it('cleanEmployment traegt vacationCarry, ungueltige Teile fallen weg', () => {
+    const out = cleanEmployment({
+      id: 'emp-1',
+      vacationCarry: {
+        fromYear: 2026,
+        startDays: 4.5,
+        lapsed: [
+          { year: 2027, days: 2 },
+          { year: 2025, days: 1 },
+          { year: 2027, days: 9 },
+          { year: 2026, days: 0 },
+          { year: 2026, days: 1.5 },
+        ],
+      },
+    });
+    expect(out.vacationCarry).toEqual({
+      fromYear: 2026,
+      startDays: 4.5,
+      lapsed: [
+        { year: 2026, days: 1.5 },
+        { year: 2027, days: 2 },
+      ],
+    });
+  });
+
+  it('cleanEmployment verwirft einen kaputten Uebertrag ganz', () => {
+    const kaputt = [
+      { fromYear: 1999, startDays: 1, lapsed: [] },
+      { fromYear: 2026.5, startDays: 1, lapsed: [] },
+      { fromYear: 2026, startDays: -1, lapsed: [] },
+      'x',
+    ];
+    for (const vacationCarry of kaputt) {
+      expect('vacationCarry' in cleanEmployment({ id: 'emp-1', vacationCarry })).toBe(false);
+    }
+  });
+});

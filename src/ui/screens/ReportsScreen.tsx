@@ -396,6 +396,18 @@ export function ReportsScreen() {
                 <strong>{formatDays(vacation.prorataRounded)}</strong>
               </div>
             )}
+            {vacation.carryIn !== null && (
+              <div className="konto-row">
+                <span>Uebertrag aus {vacation.year - 1}</span>
+                <strong>{formatDays(vacation.carryIn)}</strong>
+              </div>
+            )}
+            {vacation.lapsed > 0 && (
+              <div className="konto-row">
+                <span>verfallen</span>
+                <strong>-{formatDays(vacation.lapsed)}</strong>
+              </div>
+            )}
             <div className="konto-row">
               <span>genommen</span>
               <strong>{formatDays(vacation.taken)}</strong>
