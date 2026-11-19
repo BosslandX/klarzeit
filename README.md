@@ -78,8 +78,8 @@ neuer Vertrag gilt ab einem Stichtag.
 **🏖️ Urlaub nach BUrlG**
 
 Mindesturlaub, Wartezeit, Zwölftelung und Rundung nach Gesetz – oder dein
-Vertragsurlaub, aber nie weniger als das Minimum. Halbe Tage und Resturlaub-Übertrag
-ab einem Startwert.
+Vertragsurlaub, aber nie weniger als das Minimum. Halbe Tage, Resturlaub-Übertrag
+ab einem Startwert und eine Notiz je Urlaubstag.
 
 </td>
 </tr>
@@ -369,7 +369,7 @@ Zwei Regeln halten das zusammen:
    Den Clockodo-Schlüssel verwahrt `clockodo/key-store.ts` im Android KeyStore. Zeiten
    immer als Epoch-Millisekunden; formatiert wird nur in `domain/time.ts`.
 
-Dazu **432 Tests in 32 Dateien** (`npm test`).
+Dazu **437 Tests in 33 Dateien** (`npm test`).
 
 <details>
 <summary><b>Verzeichnisse</b></summary>

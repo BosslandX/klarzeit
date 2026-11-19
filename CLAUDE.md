@@ -28,7 +28,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Prüfwerkzeuge des Orchestrators** (seit 2026-11-17 versioniert, vorher nur im Scratchpad):
   `tools/zitat-pruefen.mjs` und `tools/kontext.mjs` prüfen Zitate gegen den Seitentext (Chrome
   kopflos über `puppeteer-core`, eigenes Profil); `tools/oberflaeche/aufNNN_ui.mjs` sind die
-  Oberflächenproben der Aufträge 027–048 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
+  Oberflächenproben der Aufträge 027–049 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
   `npm run dev`, Stand ihres Auftrags). Einspiel-Vorlage, Auftragstext-Erzeuger und Stückprüfung
   liegen im Baukasten unter `C:\gamedev\composer-kit\orchestrator\` und werden von dort gerufen.
 - Android SDK-Pfad in `android/local.properties` (`sdk.dir=...`, gitignored, rechnerspezifisch).
@@ -157,6 +157,15 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
     Urteil vom 19.02.2019 – 9 AZR 423/16). Dort steht auch eine vereinbarte Verrechnung.
   - **Oberfläche:** `VacationCarryField` in „Beschäftigung bearbeiten“, das Jahr als Auswahl. Auswertung und PDF
     zeigen die Zeilen „Uebertrag aus <Vorjahr>“ und „verfallen“ vor „genommen“.
+- **Notiz am Urlaubstag (AUF-049):** `VacationDay.note`, je Zeile der Urlaubsliste in „Mehr“ über den Knopf „Notiz“
+  (Feld unter dem Datum, „speichern“/„abbrechen“), auch an beantragten Tagen, die sich nicht entfernen lassen.
+  - **Regel** in `withVacationNote` (`src/domain/vacation-note.ts`, rein): nur am Tag dieser Beschäftigung, getrimmt,
+    höchstens `VACATION_NOTE_MAX` (200) Zeichen, leer löscht. Gespeichert über `setVacationDayNote`, im Hook `setNote`.
+    `cleanVacationDays` liest gespeicherte Notizen unverändert.
+  - **Bleibt in Klarzeit:** nicht im PDF, nicht in der CSV, nicht an Clockodo. `createAbsence` sendet sie nicht; den
+    Body hält der Antragstest in `client.test.ts` mit `toEqual` fest.
+  - **Backup:** Beim Zusammenführen gewinnt der lokale Tag samt Notiz, auch eine leere (`mergeVacationDays`). Die
+    Notiz des Backups kommt nur mit einem Tag, den es lokal nicht gibt.
 - **Mit dem Gehalt abgegoltene Überstunden (AUF-016):** `Employment.includedOvertimeHoursPerMonth`,
   `null` = keine Klausel. `buildBalanceLedger` weist je Monat
   `includedOvertimeMs = min(includedOvertimeCapMs, max(0, saldoMs))` aus; `saldoMs` bleibt roh,
@@ -266,8 +275,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   abgebildet.
 - **Nicht abgebildet:** sonstige bezahlte Freistellung (außer Feiertagen und Krankheit) erzeugt
   weiterhin Minusstunden; an einem halben Urlaubstag in einer Krankheitszeit ohne Bescheinigung schreibt die
-  zweite Hälfte nichts gut (der Urlaub geht für den ganzen Tag vor, AUF-046);
-  `VacationDay.note` existiert, ist in der UI aber tot.
+  zweite Hälfte nichts gut (der Urlaub geht für den ganzen Tag vor, AUF-046).
   Ausgezahlte Überstunden lassen sich nicht buchen (das Konto behält sie als Guthaben), eine
   Genehmigung von Überstunden kennt die App nicht — ihre Veranlassung lässt sich je Eintrag vermerken
   (AUF-036).
@@ -511,6 +519,8 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
 - `src/domain/employment.ts` → Feld `vacationCarry` am `Employment` samt `fromYear`, `startDays`, `lapsed` (`year`,
   `days`) (Preferences `employments` und Backup; umbenannt verwirft `cleanEmployment` den Übertrag, und jeder
   Resturlaub beginnt wieder bei 0)
+- `src/domain/employment.ts` → Feld `note` am `VacationDay` (Preferences `vacations` und Backup; umbenannt setzt
+  `cleanVacationDays` jede Notiz auf leer)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
