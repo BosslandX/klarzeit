@@ -190,16 +190,12 @@ const SEIT: readonly { land: Bundesland; tag: Tag; ab: number }[] = [
   { land: 'TH', tag: 'weltkindertag', ab: new Date(2019, 1, 28).getTime() },
 ];
 
-/** Laender, fuer die ein einmaliger Feiertag am 31.10.2017 nicht amtlich belegt ist (AUF-042). */
-const OHNE_BELEG_2017: readonly Bundesland[] = ['BW', 'HH', 'RP', 'SH', 'SL'];
-
-/** Hinweis zum Rechtsstand der Feiertage frueherer Jahre, je Land (AUF-042). */
+/**
+ * Hinweis zum Rechtsstand der Feiertage frueherer Jahre (AUF-042). Seit AUF-044 in allen Laendern derselbe
+ * Satz: der 31.10.2017 ist ueberall belegt. `land` bleibt, damit die Aufrufer unveraendert bleiben.
+ */
 export function holidayHistoryNote(land: Bundesland): string {
-  const satz =
-    'Fruehere Jahre rechnen nach dem damaligen Recht, ab 2017 amtlich belegt; davor gilt der Stand von 2017.';
-  return OHNE_BELEG_2017.includes(land)
-    ? `${satz} Den einmaligen Feiertag am 31.10.2017 kennt die App fuer dieses Land nicht (nicht amtlich belegt) – bei Bedarf als eigenen Tag eintragen.`
-    : satz;
+  return 'Fruehere Jahre rechnen nach dem damaligen Recht, ab 2017 amtlich belegt; davor gilt der Stand von 2017.';
 }
 
 /** Einmalige Feiertage (Monat 1 bis 12). */
@@ -210,8 +206,9 @@ const EINMALIG: readonly {
   tag: number;
   name: string;
 }[] = [
-  // Der 500. Jahrestag der Reformation (31.10.2017), wo amtlich belegt (AUF-042).
-  ...(['BE', 'BY', 'HB', 'HE', 'NI', 'NW'] as const).map((land) => ({
+  // Der 500. Jahrestag der Reformation (31.10.2017) in den elf Laendern, in denen der 31. Oktober 2017 sonst
+  // kein Feiertag war (AUF-042; BW, HH, RP, SH und SL belegt mit AUF-044, Quellen: docs/STATE.md).
+  ...(['BE', 'BW', 'BY', 'HB', 'HE', 'HH', 'NI', 'NW', 'RP', 'SH', 'SL'] as const).map((land) => ({
     land,
     jahr: 2017,
     monat: 10,

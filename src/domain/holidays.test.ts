@@ -312,16 +312,11 @@ describe('Feiertage nach damaligem Recht ab 2017 (AUF-042)', () => {
     expect(hat(2026, 'BE', 5, 8)).toBe(false);
   });
 
-  it('Reformationstag in HB, HH, NI und SH erst ab 2018; 2017 einmalig nur in HB und NI belegt', () => {
+  it('Reformationstag in HB, HH, NI und SH erst ab 2018; 2017 einmalig in allen vier', () => {
     for (const l of ['HB', 'HH', 'NI', 'SH'] as const) {
       expect([l, hat(2016, l, 10, 31), hat(2018, l, 10, 31)]).toEqual([l, false, true]);
+      expect([l, name(2017, l, 10, 31)]).toEqual([l, '500. Jahrestag der Reformation']);
     }
-    expect(['HB', 'NI', 'HH', 'SH'].map((l) => hat(2017, l as Bundesland, 10, 31))).toEqual([
-      true,
-      true,
-      false,
-      false,
-    ]);
     expect(name(2018, 'HH', 10, 31)).toBe('Reformationstag');
   });
 
@@ -330,8 +325,10 @@ describe('Feiertage nach damaligem Recht ab 2017 (AUF-042)', () => {
     expect([hat(2018, 'TH', 9, 20), hat(2019, 'TH', 9, 20)]).toEqual([false, true]);
   });
 
-  it('31.10.2017 einmalig in BY, HE und NW; in BW, RP und SL nicht abgebildet', () => {
-    for (const l of ['BY', 'HE', 'NW'] as const) {
+  it('31.10.2017 einmalig in BW, BY, HE, NW, RP und SL', () => {
+    // Belege BW, RP und SL (AUF-044): Landtag BW Drs. 15/5718 mit dem Gesetz vom 25.11.2014 (GBl. S. 548),
+    // GVBl. RP 2015 S. 433, Verordnung des Saarlandes vom 18.06.2014 (Amtsbl. S. 283).
+    for (const l of ['BW', 'BY', 'HE', 'NW', 'RP', 'SL'] as const) {
       expect([l, hat(2016, l, 10, 31), hat(2017, l, 10, 31), hat(2018, l, 10, 31)]).toEqual([
         l,
         false,
@@ -339,22 +336,26 @@ describe('Feiertage nach damaligem Recht ab 2017 (AUF-042)', () => {
         false,
       ]);
     }
-    expect(['BW', 'RP', 'SL'].map((l) => hat(2017, l as Bundesland, 10, 31))).toEqual([
-      false,
-      false,
-      false,
-    ]);
   });
 
-  it('holidayHistoryNote: Rechtsstand, dazu der fehlende Beleg fuer den 31.10.2017', () => {
+  it('holidayHistoryNote: Rechtsstand, in allen Laendern derselbe Satz', () => {
     const satz =
       'Fruehere Jahre rechnen nach dem damaligen Recht, ab 2017 amtlich belegt; davor gilt der Stand von 2017.';
-    expect(holidayHistoryNote('BY')).toBe(satz);
-    expect(holidayHistoryNote('BE')).toBe(satz);
-    for (const l of ['BW', 'HH', 'RP', 'SH', 'SL'] as const) {
-      expect(holidayHistoryNote(l)).toBe(
-        `${satz} Den einmaligen Feiertag am 31.10.2017 kennt die App fuer dieses Land nicht (nicht amtlich belegt) – bei Bedarf als eigenen Tag eintragen.`,
-      );
+    for (const { code } of BUNDESLAENDER) {
+      expect([code, holidayHistoryNote(code)]).toEqual([code, satz]);
+    }
+  });
+
+  it('31.10.2017 in allen 16 Laendern ein Feiertag (AUF-044)', () => {
+    // Belege HH und SH (AUF-044): HmbGVBl. 2013 S. 192 (Verordnung vom 30.04.2013), GVOBl. Schl.-H. 2014
+    // S. 380 (Landesverordnung vom 24.11.2014). In BB, MV, SN, ST und TH ist der 31. Oktober dauerhaft
+    // Feiertag.
+    const dauerhaft: readonly Bundesland[] = ['BB', 'MV', 'SN', 'ST', 'TH'];
+    for (const { code } of BUNDESLAENDER) {
+      expect([code, name(2017, code, 10, 31)]).toEqual([
+        code,
+        dauerhaft.includes(code) ? 'Reformationstag' : '500. Jahrestag der Reformation',
+      ]);
     }
   });
 });
