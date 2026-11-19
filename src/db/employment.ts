@@ -18,6 +18,7 @@ import {
 } from '../domain/clockodo';
 import { applyAbsenceRef, daysOfAbsence } from '../domain/clockodo-absence';
 import { cleanPublicHolidays } from '../domain/holidays';
+import { withVacationNote } from '../domain/vacation-note';
 import { getProfile } from './profile';
 import { removeClockodoKey } from '../clockodo/key-store';
 import { removeClockodoLists } from './clockodo-lists';
@@ -366,6 +367,17 @@ export async function addVacationDay(
   return merged;
 }
 
+/** Setzt oder loescht die Notiz eines Urlaubstags dieser Beschaeftigung (AUF-049); sie bleibt in Klarzeit. */
+export async function setVacationDayNote(
+  date: number,
+  employmentId: string,
+  note: string,
+): Promise<VacationDay[]> {
+  const next = withVacationNote(await getVacationDays(), employmentId, date, note);
+  await saveVacationDays(next);
+  return next;
+}
+
 
 /** Vermerkt einen Clockodo-Antrag an den genannten Urlaubstagen einer Beschaeftigung. */
 export async function setVacationAbsenceRef(
@@ -435,6 +447,7 @@ export function useVacationDays(): {
   add: (date: number, note?: string, employmentId?: string, halfDay?: boolean) => Promise<void>;
   addMany: (dates: readonly number[], employmentId?: string) => Promise<number>;
   remove: (date: number, employmentId: string) => Promise<void>;
+  setNote: (date: number, employmentId: string, note: string) => Promise<void>;
 } {
   const [days, setDays] = useState<VacationDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -479,5 +492,9 @@ export function useVacationDays(): {
     setDays(await removeVacationDay(date, employmentId));
   }, []);
 
-  return { days, loading, refresh, add, addMany, remove };
+  const setNote = useCallback(async (date: number, employmentId: string, note: string) => {
+    setDays(await setVacationDayNote(date, employmentId, note));
+  }, []);
+
+  return { days, loading, refresh, add, addMany, remove, setNote };
 }

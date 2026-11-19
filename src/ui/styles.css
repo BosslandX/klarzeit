@@ -532,6 +532,25 @@ textarea:focus {
 .vac-list li:last-child {
   border-bottom: none;
 }
+/* Knoepfe einer Zeile der Urlaubsliste (AUF-049): untereinander, rechtsbuendig */
+.vac-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  margin-left: 8px;
+}
+/* Notiz am Urlaubstag in Bearbeitung (AUF-049): das Datum, darunter die Eingabe */
+.vac-note-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.vac-note-edit input {
+  padding: 8px;
+}
 .link-btn {
   background: none;
   border: none;

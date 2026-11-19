@@ -38,6 +38,7 @@ export function MoreScreen() {
     addMany: addVacMany,
     remove: removeVac,
     refresh: refreshVac,
+    setNote: setVacNote,
   } = useVacationDays();
   const { periods: sickPeriods, refresh: refreshSick } = useSickPeriods();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -177,6 +178,7 @@ export function MoreScreen() {
           addVacMany={addVacMany}
           removeVac={removeVac}
           refreshVac={refreshVac}
+          setVacNote={setVacNote}
           sickPeriods={sickPeriods}
         />
 

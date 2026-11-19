@@ -51,6 +51,7 @@ import {
   addVacationDay,
   removeVacationDay,
   cleanVacationDays,
+  setVacationDayNote,
 } from './employment';
 import { db } from './db';
 import { addEntry } from './entries';
@@ -380,5 +381,22 @@ describe('Resturlaub-Uebertrag speichern (AUF-048)', () => {
     for (const vacationCarry of kaputt) {
       expect('vacationCarry' in cleanEmployment({ id: 'emp-1', vacationCarry })).toBe(false);
     }
+  });
+});
+
+describe('Notiz am Urlaubstag speichern (AUF-049)', () => {
+  beforeEach(() => {
+    prefStore.clear();
+  });
+
+  it('setVacationDayNote speichert die Notiz nur am Tag dieser Beschaeftigung', async () => {
+    const tag = new Date(2026, 10, 4).getTime();
+    await addVacationDay(tag, '', INITIAL_EMPLOYMENT_ID);
+    await addVacationDay(tag, '', 'emp-2');
+    await setVacationDayNote(tag, INITIAL_EMPLOYMENT_ID, ' Brueckentag ');
+    expect((await getVacationDays()).map((d) => [d.employmentId, d.note])).toEqual([
+      [INITIAL_EMPLOYMENT_ID, 'Brueckentag'],
+      ['emp-2', ''],
+    ]);
   });
 });

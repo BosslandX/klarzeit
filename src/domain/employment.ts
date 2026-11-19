@@ -141,6 +141,7 @@ export function wochentageAm(
 export interface VacationDay {
   employmentId: string;
   date: number; // lokale Mitternacht des Urlaubstags
+  /** Notiz des Nutzers (AUF-049): bleibt in Klarzeit, steht nicht im PDF und geht nicht an Clockodo. */
   note: string;
   /** Halber Urlaubstag (AUF-046): zaehlt 0,5, die Gutschrift hoechstens das halbe Tagessoll; fehlt = ganzer Tag. */
   halfDay?: true;

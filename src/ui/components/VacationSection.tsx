@@ -33,6 +33,7 @@ export function VacationSection({
   addVacMany,
   removeVac,
   refreshVac,
+  setVacNote,
   sickPeriods,
 }: {
   employments: readonly Employment[];
@@ -44,6 +45,7 @@ export function VacationSection({
   addVacMany: (dates: readonly number[], employmentId?: string) => Promise<number>;
   removeVac: (date: number, employmentId: string) => Promise<void>;
   refreshVac: () => Promise<void>;
+  setVacNote: (date: number, employmentId: string, note: string) => Promise<void>;
   sickPeriods: readonly SickPeriod[];
 }) {
   const [newVacDate, setNewVacDate] = useState('');
@@ -207,6 +209,7 @@ export function VacationSection({
               employment={employments.find((e) => e.id === d.employmentId)}
               onRemove={() => void removeVac(d.date, d.employmentId)}
               onWithdrawn={refreshVac}
+              onNoteChange={(note) => setVacNote(d.date, d.employmentId, note)}
               sickPeriods={sickPeriods}
             />
           ))}
