@@ -261,6 +261,41 @@ describe('clockodo client', () => {
     expect(calls[0].headers['Content-Type']).toBe('application/json');
   });
 
+  it('createAbsence sendet half_day nur fuer einen halben Tag (AUF-047)', async () => {
+    const calls: ClockodoRequest[] = [];
+    const http: ClockodoHttp = async (req) => {
+      calls.push(req);
+      return {
+        status: 200,
+        data: {
+          data: {
+            id: 99,
+            users_id: 7,
+            date_since: '2026-10-06',
+            date_until: '2026-10-06',
+            status: 0,
+            count_days: 0.5,
+          },
+        },
+      };
+    };
+    await createAbsence(
+      AUTH,
+      { usersId: 7, dateSince: '2026-10-06', dateUntil: '2026-10-06', halfDay: true },
+      http,
+    );
+    await createAbsence(AUTH, { usersId: 7, dateSince: '2026-10-06', dateUntil: '2026-10-06' }, http);
+    expect(calls[0].data).toEqual({
+      users_id: 7,
+      date_since: '2026-10-06',
+      date_until: '2026-10-06',
+      half_day: true,
+      type: 1,
+      status: 0,
+    });
+    expect('half_day' in (calls[1].data as object)).toBe(false);
+  });
+
   it('createAbsence: Ueberschneidung wird collision, aus 409 und aus dem Fehlertyp', async () => {
     const mit = (status: number, data: unknown): ClockodoHttp => async () => ({ status, data });
     const req = { usersId: 7, dateSince: '2026-10-05', dateUntil: '2026-10-09' };

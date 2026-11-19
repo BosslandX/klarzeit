@@ -291,6 +291,42 @@ describe('Urlaubsantraege an Clockodo (AUF-020)', () => {
     ]);
   });
 
+  it('halber Tag wird als eigener Antrag mit half_day beantragt (AUF-047)', async () => {
+    await seed([tag(2026, 10, 5), tag(2026, 10, 6, { halfDay: true }), tag(2026, 10, 7)]);
+    const r = await transferVacations(EMP, { http, now: () => NOW });
+    expect(r.requested).toBe(3);
+    expect(posts().map((c) => c.data)).toEqual([
+      { users_id: 7, date_since: '2026-10-05', date_until: '2026-10-05', type: 1, status: 0 },
+      {
+        users_id: 7,
+        date_since: '2026-10-06',
+        date_until: '2026-10-06',
+        half_day: true,
+        type: 1,
+        status: 0,
+      },
+      { users_id: 7, date_since: '2026-10-07', date_until: '2026-10-07', type: 1, status: 0 },
+    ]);
+  });
+
+  it('halber Tag, Clockodo zaehlt 0,5: kein Widerspruch (AUF-047)', async () => {
+    await seed([tag(2026, 10, 6, { halfDay: true })]);
+    absencesByYear['2026'] = [absence(55, '2026-10-06', '2026-10-06', 1, 0.5)];
+    const r = await transferVacations(EMP, { http, now: () => NOW });
+    expect(r.adopted).toBe(1);
+    expect(r.mismatches).toEqual([]);
+  });
+
+  it('halber Tag, Clockodo zaehlt einen ganzen: Widerspruch 0,5 gegen 1 (AUF-047)', async () => {
+    await seed([tag(2026, 10, 6, { halfDay: true })]);
+    absencesByYear['2026'] = [absence(55, '2026-10-06', '2026-10-06', 1, 1)];
+    const r = await transferVacations(EMP, { http, now: () => NOW });
+    expect(r.adopted).toBe(1);
+    expect(r.mismatches).toEqual([
+      { dateSince: '2026-10-06', dateUntil: '2026-10-06', klarzeitDays: 0.5, clockodoDays: 1 },
+    ]);
+  });
+
   it('ueber den Jahreswechsel werden beide Jahre gelesen, bevor gesendet wird', async () => {
     await seed([tag(2026, 12, 30), tag(2026, 12, 31), tag(2027, 1, 4)]);
     const r = await transferVacations(EMP, { http, now: () => NOW });
@@ -341,6 +377,17 @@ describe('Abgleich: Anzeige (AUF-021)', () => {
         '14.10.2026: Der Zeitraum ueberschneidet sich mit einer Abwesenheit in Clockodo.',
       ],
     });
+  });
+
+  it('vacationTransferSummary schreibt halbe Tage mit Komma (AUF-047)', () => {
+    expect(
+      vacationTransferSummary({
+        ...leer,
+        mismatches: [
+          { dateSince: '2026-10-06', dateUntil: '2026-10-06', klarzeitDays: 0.5, clockodoDays: 1 },
+        ],
+      }).problems,
+    ).toEqual(['06.10.2026: Clockodo zaehlt 1 Tag(e), Klarzeit 0,5.']);
   });
 
   it('vacationTransferSummary meldet den Abbruch', () => {

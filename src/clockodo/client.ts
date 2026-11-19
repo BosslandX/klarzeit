@@ -487,7 +487,7 @@ function absenceFromBody(raw: unknown): ClockodoAbsence {
 
 export async function createAbsence(
   auth: ClockodoAuth,
-  request: { usersId: number; dateSince: string; dateUntil: string },
+  request: { usersId: number; dateSince: string; dateUntil: string; halfDay?: boolean },
   http?: ClockodoHttp,
 ): Promise<ClockodoAbsence> {
   const h = http ?? defaultHttp;
@@ -499,6 +499,8 @@ export async function createAbsence(
       users_id: request.usersId,
       date_since: request.dateSince,
       date_until: request.dateUntil,
+      // Nur fuer einen einzelnen Tag; mehrtaegig lehnt Clockodo ab (HalfDayAbsenceTooLong, AUF-047).
+      ...(request.halfDay ? { half_day: true } : {}),
       type: ABSENCE_TYPE_HOLIDAY_QUOTA,
       status: ABSENCE_STATUS_ENQUIRED,
     },

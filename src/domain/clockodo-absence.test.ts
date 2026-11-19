@@ -282,3 +282,28 @@ describe('Urlaubsantraege und Krankheit (AUF-038)', () => {
     expect(isSickInClockodoVacation(antrag(1), [krank(7, 7, true, 'emp-2')])).toBe(false);
   });
 });
+
+describe('Halbe Urlaubstage an Clockodo (AUF-047)', () => {
+  it('vacationRequestRanges: ein halber Tag ist ein eigener Zeitraum mit halfDay', () => {
+    const days = [tag(2026, 11, 3), tag(2026, 11, 4, { halfDay: true }), tag(2026, 11, 5)];
+    expect(vacationRequestRanges(days, empMit())).toEqual([
+      { dateSince: '2026-11-03', dateUntil: '2026-11-03', dates: [ab(2026, 11, 3)] },
+      { dateSince: '2026-11-04', dateUntil: '2026-11-04', dates: [ab(2026, 11, 4)], halfDay: true },
+      { dateSince: '2026-11-05', dateUntil: '2026-11-05', dates: [ab(2026, 11, 5)] },
+    ]);
+  });
+
+  it('vacationRequestRanges: zwei halbe Tage hintereinander bleiben zwei Antraege', () => {
+    const days = [tag(2026, 11, 4, { halfDay: true }), tag(2026, 11, 5, { halfDay: true })];
+    expect(vacationRequestRanges(days, empMit()).map((r) => [r.dateSince, r.halfDay])).toEqual([
+      ['2026-11-04', true],
+      ['2026-11-05', true],
+    ]);
+  });
+
+  it('vacationRequestRanges: ganze Tage tragen kein halfDay', () => {
+    const r = vacationRequestRanges([3, 4, 5].map((d) => tag(2026, 11, d)), empMit());
+    expect(r).toHaveLength(1);
+    expect('halfDay' in r[0]).toBe(false);
+  });
+});

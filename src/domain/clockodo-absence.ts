@@ -9,6 +9,8 @@ export interface VacationRequestRange {
   dateSince: string;
   dateUntil: string;
   dates: number[];
+  /** Ein halber Urlaubstag, immer allein im Zeitraum (AUF-047); fehlt = ganze Tage. */
+  halfDay?: true;
 }
 
 /**
@@ -26,6 +28,8 @@ function zaehltAlsKrankheit(day: VacationDay, sickPeriods: readonly SickPeriod[]
  *   mit Bescheinigung (zaehltAlsKrankheit; er ist kein Urlaub, AUF-038).
  * - Zwei Tage im selben Kalenderjahr ohne Arbeitstag dazwischen (workdaysInRange) → ein Zeitraum.
  * - Jahreswechsel trennt (Clockodo: date_until im Jahr von date_since).
+ * - Ein halber Tag ist ein eigener Zeitraum mit `halfDay` (AUF-047): Clockodo laesst einen halben
+ *   Tag nicht ueber mehrere Tage laufen (HalfDayAbsenceTooLong).
  */
 export function vacationRequestRanges(
   days: readonly VacationDay[],
@@ -48,6 +52,7 @@ export function vacationRequestRanges(
   const ranges: VacationRequestRange[] = [];
   let since = open[0].date;
   let until = open[0].date;
+  let halb = open[0].halfDay === true;
   const dates: number[] = [open[0].date];
 
   const canExtend = (prev: number, next: number): boolean => {
@@ -58,28 +63,30 @@ export function vacationRequestRanges(
     return workdaysInRange(gapFrom, gapTo, emp).length === 0;
   };
 
+  const abschliessen = () =>
+    ranges.push({
+      dateSince: toDateInput(since),
+      dateUntil: toDateInput(until),
+      dates: [...dates],
+      ...(halb ? { halfDay: true as const } : {}),
+    });
+
   for (let i = 1; i < open.length; i++) {
     const d = open[i].date;
-    if (canExtend(until, d)) {
+    // Ein halber Tag verlaengert keinen Zeitraum und wird von keinem verlaengert (AUF-047).
+    if (!halb && open[i].halfDay !== true && canExtend(until, d)) {
       until = d;
       dates.push(d);
     } else {
-      ranges.push({
-        dateSince: toDateInput(since),
-        dateUntil: toDateInput(until),
-        dates: [...dates],
-      });
+      abschliessen();
       since = d;
       until = d;
+      halb = open[i].halfDay === true;
       dates.length = 0;
       dates.push(d);
     }
   }
-  ranges.push({
-    dateSince: toDateInput(since),
-    dateUntil: toDateInput(until),
-    dates: [...dates],
-  });
+  abschliessen();
   return ranges;
 }
 

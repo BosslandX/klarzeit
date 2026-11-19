@@ -16,7 +16,7 @@ import {
   syncAbsenceStatus,
   vacationRequestRanges,
 } from '../domain/clockodo-absence';
-import type { Employment, VacationDay } from '../domain/employment';
+import { HALF_VACATION_DAY, type Employment, type VacationDay } from '../domain/employment';
 import { formatDate, fromDateInput, toDateInput } from '../domain/time';
 import {
   getEmployments,
@@ -191,7 +191,12 @@ export async function transferVacations(
       try {
         absence = await createAbsence(
           auth,
-          { usersId, dateSince: range.dateSince, dateUntil: range.dateUntil },
+          {
+            usersId,
+            dateSince: range.dateSince,
+            dateUntil: range.dateUntil,
+            halfDay: range.halfDay === true,
+          },
           http,
         );
         result.requested++;
@@ -213,11 +218,13 @@ export async function transferVacations(
       status: absence.status,
       at: now(),
     });
-    if (absence.countDays !== null && absence.countDays !== range.dates.length) {
+    // Ein halber Tag zaehlt 0,5 (AUF-047); Clockodo meldet ihn in count_days.
+    const tage = range.halfDay ? HALF_VACATION_DAY : range.dates.length;
+    if (absence.countDays !== null && absence.countDays !== tage) {
       result.mismatches.push({
         dateSince: range.dateSince,
         dateUntil: range.dateUntil,
-        klarzeitDays: range.dates.length,
+        klarzeitDays: tage,
         clockodoDays: absence.countDays,
       });
     }
@@ -239,7 +246,7 @@ export function vacationTransferSummary(r: VacationTransferResult): {
   }
   for (const m of r.mismatches) {
     problems.push(
-      `${spanne(m.dateSince, m.dateUntil)}: Clockodo zaehlt ${m.clockodoDays} Tag(e), Klarzeit ${m.klarzeitDays}.`,
+      `${spanne(m.dateSince, m.dateUntil)}: Clockodo zaehlt ${tageZahl(m.clockodoDays)} Tag(e), Klarzeit ${tageZahl(m.klarzeitDays)}.`,
     );
   }
   for (const e of r.errors) {
@@ -249,6 +256,11 @@ export function vacationTransferSummary(r: VacationTransferResult): {
     problems.push(`Abgebrochen: ${r.stopped}`);
   }
   return { info, problems };
+}
+
+/** Eine Tageszahl mit Komma, wie in der Oberflaeche ("0,5"); ganze Zahlen bleiben, wie sie sind. */
+function tageZahl(n: number): string {
+  return String(n).replace('.', ',');
 }
 
 function spanne(dateSince: string, dateUntil: string): string {
