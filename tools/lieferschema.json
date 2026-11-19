@@ -67,7 +67,7 @@
           }
         }
       },
-      "description": "Was der Auftrag verlangte und nicht geliefert wurde. PFLICHT, auch wenn leer. Ein leeres nicht_erreicht ist kein Erfolgszeichen, sondern meist ein Zeichen, dass der Auftrag keine Stelle hatte, an der eine Luecke sichtbar werden konnte."
+      "description": "Was der Auftrag verlangte und nicht geliefert wurde -- und jede Wiederholung, Wiederherstellung oder Reparatur waehrend des Laufs (ein Schritt zweimal, eine Datei zurueckgeholt, ein Skript nachgebessert, eine Messung nachgestellt), mit Uhrzeit. PFLICHT, auch wenn leer. Ein leeres nicht_erreicht ist kein Erfolgszeichen, sondern meist ein Zeichen, dass der Auftrag keine Stelle hatte, an der eine Luecke sichtbar werden konnte."
     },
     "werkzeuge": {
       "type": "array",
