@@ -522,6 +522,30 @@ if ($Aufraeumen) {
             }
             if ($gerettet -eq 0) { Sagen "  Nichts zu sichern (alles liegt schon im Hauptbaum)." }
         }
+        # 1a DIE PROBE SICHERN (lohnradar-azure S3 gemessen, S7 zurueckgefuehrt). Auch unter
+        #    auftraege/_probe/ legt ein Ausfuehrender Belege ab -- Kopien fuer Mutanten,
+        #    Probeausgaben. 'worktree remove --force' nahm sie mit; dort wurden sie bis S7 von
+        #    Hand nach auftraege/_ergebnisse/<auf>_probe/ kopiert. quellbaum_kopieren.py kopiert Links
+        #    als Links und bricht bei einem Link ab, der aus dem Ziel herausfuehrt; dann bleibt
+        #    der Arbeitsort stehen und nichts ist verloren.
+        $wtProbe = Join-Path $wt "auftraege\_probe"
+        $probeZiel = Join-Path $repo ("auftraege\_ergebnisse\" + $auf + "_probe")
+        $probeInhalt = @(Get-ChildItem $wtProbe -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne ".gitkeep" })
+        if ($probeInhalt.Count -eq 0) {
+            Sagen "  Probe leer -- nichts zu sichern."
+        } elseif (Test-Path $probeZiel) {
+            Abbruch "$probeZiel gibt es schon; der Arbeitsort bleibt stehen. Erst ansehen, dann umbenennen oder entfernen."
+        } else {
+            $k = Native "python" @("-u", (Join-Path $repo "tools\quellbaum_kopieren.py"), $wtProbe, $probeZiel, $probeZiel)
+            if ($k.Code -ne 0) {
+                # Die Dateien kopiert quellbaum_kopieren.py vor den Links: unter $probeZiel steht
+                # dann eine Teilkopie. Sie bleibt stehen -- ein rekursives Loeschen muesste
+                # Verzeichnis-Links sicher auslassen, und das prueft hier niemand.
+                Abbruch "Probe nicht vollstaendig gesichert (Exit $($k.Code)); $probeZiel enthaelt eine Teilkopie, der Arbeitsort bleibt stehen:`n$($k.Ausgabe)"
+            }
+            Sagen "  gesichert: auftraege/_probe/ -> auftraege/_ergebnisse/${auf}_probe/ ($($probeInhalt.Count) Eintraege oben)"
+        }
         # 1b DIE ARBEIT SICHERN, bevor der Worktree faellt. Siehe Arbeit-Sichern: der
         #    Ausfuehrende kann nicht committen, sein Code lebt nur hier. Ist sie NICHT
         #    gesichert, bleibt der Arbeitsort stehen -- 'worktree remove --force' naehme sie mit.
