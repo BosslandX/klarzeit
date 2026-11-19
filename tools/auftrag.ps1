@@ -428,6 +428,43 @@ function Arbeit-Sichern {
     return $true
 }
 
+<#
+    DER LEERE RESTORDNER (klarzeit AUF-043, Befund x).
+
+    'git worktree remove --force' leert den Arbeitsort und scheitert an seiner Wurzel, wenn ein
+    Prozess sie als Arbeitsverzeichnis hat ("failed to delete ...: Permission denied") -- in
+    AUF-043 die Shell des Orchestrators nach einem 'cd' dorthin. Zurueck bleibt ein leerer Ordner
+    ohne Datei .git; den Eintrag unter .git/worktrees loescht git trotzdem (gemessen 2026-11-19).
+    Bis dahin brach -Aufraeumen dort ab, vor 'prune' und dem Zweig -- und jeder weitere Lauf
+    ebenso, weil Arbeit-Sichern einen Ordner ohne .git zu Recht nicht anfasst (Befund b). Es half
+    nur Handarbeit.
+
+    Ein Ordner OHNE JEDEN Eintrag, auch ohne versteckten, traegt keine Arbeit mehr: er wird
+    entfernt, nie rekursiv, und es geht weiter mit 'prune' und dem Zweig. Alles andere bleibt beim
+    alten Weg -- sichern oder abbrechen.
+#>
+function Leerer-Rest {
+    # $true nur fuer einen Ordner ohne jeden Eintrag. -Force zaehlt versteckte mit: die Datei .git
+    # eines Worktrees kann versteckt sein. Laesst sich der Ordner nicht lesen: $false.
+    param([string]$Ort)
+    if (-not (Test-Path -LiteralPath $Ort -PathType Container)) { return $false }
+    try { return (@(Get-ChildItem -LiteralPath $Ort -Force -ErrorAction Stop).Count -eq 0) } catch { return $false }
+}
+
+function Rest-Entfernen {
+    # Nie rekursiv: [IO.Directory]::Delete(..., $false) entfernt nur einen leeren Ordner und wirft bei
+    # allem anderen. Wirft es, bleibt der Ordner stehen, und es geht trotzdem weiter -- er ist leer.
+    param([string]$Ort)
+    try {
+        [IO.Directory]::Delete($Ort, $false)
+        Sagen "  Leeren Restordner entfernt: $Ort"
+    } catch {
+        Sagen "  [!] Der leere Ordner $Ort bleibt stehen: $($_.Exception.Message)"
+        Sagen "      Steht ein Prozess darin (eine Shell nach 'cd' dorthin)? Danach -Aufraeumen noch einmal"
+        Sagen "      oder von Hand: Remove-Item -LiteralPath '$Ort'   (ohne -Recurse)."
+    }
+}
+
 function Vergleich {
     param($v, $n)
     $ausbruch = @()
@@ -462,10 +499,14 @@ function Vergleich {
 
 # ---------------------------------------------------------------- AUFRAEUMEN
 if ($Aufraeumen) {
+    # 0  EIN LEERER RESTORDNER (Befund x, siehe Leerer-Rest): nichts darin zu sichern, nur entfernen.
     # 1  DIE LIEFERUNG ZUERST SICHERN. Sie liegt NUR im Arbeitsort -- 'worktree remove
     #    --force' nimmt sie mit, und dann ist der Beleg weg, waehrend das Protokoll im
     #    Hauptbaum stehenbleibt und so aussieht, als sei alles da.
-    if (Test-Path $wt) {
+    if (Leerer-Rest $wt) {
+        Sagen "  Leerer Restordner .wt\$auf (kein Eintrag, keine Datei .git) -- nichts zu sichern."
+        Rest-Entfernen $wt
+    } elseif (Test-Path $wt) {
         $wtErg = Join-Path $wt "auftraege\_ergebnisse"
         $hauptErg = Join-Path $repo "auftraege\_ergebnisse"
         if (Test-Path $wtErg) {
@@ -489,7 +530,14 @@ if ($Aufraeumen) {
         }
         Sagen "  Worktree entfernen: .wt\$auf"
         $r = Native git @("-C", $repo, "worktree", "remove", "--force", ".wt/$auf")
-        if ($r.Code -ne 0) { Abbruch "git worktree remove ging nicht durch:`n$($r.Ausgabe)" }
+        if ($r.Code -ne 0) {
+            # Befund x: Hat git den Arbeitsort geleert und nur die Wurzel nicht geloescht, ist die
+            # Arbeit oben gesichert und nichts mehr darin -- weiter mit 'prune' und dem Zweig.
+            if (-not (Leerer-Rest $wt)) { Abbruch "git worktree remove ging nicht durch:`n$($r.Ausgabe)" }
+            Sagen "  [!] git worktree remove ging nicht ganz durch, der Arbeitsort ist aber leer:"
+            Sagen "      $($r.Ausgabe.Trim())"
+            Rest-Entfernen $wt
+        }
     } else {
         Sagen "  Kein Worktree unter .wt\$auf -- nichts zu entfernen."
     }
