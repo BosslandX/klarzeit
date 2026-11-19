@@ -28,7 +28,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Prüfwerkzeuge des Orchestrators** (seit 2026-11-17 versioniert, vorher nur im Scratchpad):
   `tools/zitat-pruefen.mjs` und `tools/kontext.mjs` prüfen Zitate gegen den Seitentext (Chrome
   kopflos über `puppeteer-core`, eigenes Profil); `tools/oberflaeche/aufNNN_ui.mjs` sind die
-  Oberflächenproben der Aufträge 027–046 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
+  Oberflächenproben der Aufträge 027–048 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
   `npm run dev`, Stand ihres Auftrags). Einspiel-Vorlage, Auftragstext-Erzeuger und Stückprüfung
   liegen im Baukasten unter `C:\gamedev\composer-kit\orchestrator\` und werden von dort gerufen.
 - Android SDK-Pfad in `android/local.properties` (`sdk.dir=...`, gitignored, rechnerspezifisch).
@@ -145,6 +145,18 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
       mit 0,5 und meldet eine Abweichung als Widerspruch, mit Komma („Klarzeit 0,5“).
     - **Zählung:** `openVacationDayCount` zählt weiter Einträge.
     - **Gerätetest:** Ob der Clockodo des Arbeitgebers halbe Tage annimmt, zeigt erst er.
+- **Resturlaub-Übertrag (AUF-048, E21/E24):** `Employment.vacationCarry?: { fromYear, startDays, lapsed: { year,
+  days }[] }`.
+  - **Prüfung** in `cleanVacationCarry`: Jahr 2000–2100, Rest ≥ 0, je Jahr ein Verfall, sortiert. Ungültig = das
+    Feld fehlt. Es gehört zur Feldgruppe Vertrag in `fillEmptyEmployment`.
+  - **Rechnung** in `buildVacationStatus`: `carryIn` ist im Startjahr `startDays`, danach `max(0, Rest des
+    Vorjahres)`. Ein Minus geht nicht über (BUrlG §§ 1, 3 Abs. 1, 7 Abs. 3, 13 Abs. 1; E24). `lapsed` ist der
+    eingetragene Verfall des Jahres, `remaining = entitlement + carryIn − lapsed − taken`. Vor dem Startjahr ist
+    `carryIn` null.
+  - **Verfall** trägt der Nutzer selbst ein, denn verfallen kann Urlaub nur nach Hinweis des Arbeitgebers (BAG,
+    Urteil vom 19.02.2019 – 9 AZR 423/16). Dort steht auch eine vereinbarte Verrechnung.
+  - **Oberfläche:** `VacationCarryField` in „Beschäftigung bearbeiten“, das Jahr als Auswahl. Auswertung und PDF
+    zeigen die Zeilen „Uebertrag aus <Vorjahr>“ und „verfallen“ vor „genommen“.
 - **Mit dem Gehalt abgegoltene Überstunden (AUF-016):** `Employment.includedOvertimeHoursPerMonth`,
   `null` = keine Klausel. `buildBalanceLedger` weist je Monat
   `includedOvertimeMs = min(includedOvertimeCapMs, max(0, saldoMs))` aus; `saldoMs` bleibt roh,
@@ -254,8 +266,8 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   abgebildet.
 - **Nicht abgebildet:** sonstige bezahlte Freistellung (außer Feiertagen und Krankheit) erzeugt
   weiterhin Minusstunden; an einem halben Urlaubstag in einer Krankheitszeit ohne Bescheinigung schreibt die
-  zweite Hälfte nichts gut (der Urlaub geht für den ganzen Tag vor, AUF-046); kein
-  Resturlaub-Übertrag (§ 7 III BUrlG); `VacationDay.note` existiert, ist in der UI aber tot.
+  zweite Hälfte nichts gut (der Urlaub geht für den ganzen Tag vor, AUF-046);
+  `VacationDay.note` existiert, ist in der UI aber tot.
   Ausgezahlte Überstunden lassen sich nicht buchen (das Konto behält sie als Guthaben), eine
   Genehmigung von Überstunden kennt die App nicht — ihre Veranlassung lässt sich je Eintrag vermerken
   (AUF-036).
@@ -496,6 +508,9 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
   Hand erledigte Eintrag wieder als offen — der nächste Lauf bucht ihn in Clockodo **doppelt**)
 - `src/domain/employment.ts` → Feld `halfDay` am `VacationDay` (Preferences `vacations` und Backup; umbenannt
   verwirft `cleanVacationDays` es, und jeder halbe Urlaubstag zählt wieder ganz)
+- `src/domain/employment.ts` → Feld `vacationCarry` am `Employment` samt `fromYear`, `startDays`, `lapsed` (`year`,
+  `days`) (Preferences `employments` und Backup; umbenannt verwirft `cleanEmployment` den Übertrag, und jeder
+  Resturlaub beginnt wieder bei 0)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
