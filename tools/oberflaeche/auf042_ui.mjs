@@ -1,4 +1,5 @@
 // Oberflaechenprobe AUF-042: Hinweis zum Rechtsstand der Feiertage frueherer Jahre (Mehr, Beschaeftigung).
+// U2 seit AUF-044 angepasst: der 31.10.2017 ist auch im Saarland belegt, der Satz zur Luecke entfaellt.
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -8,7 +9,6 @@ const ergebnisse = [];
 const pruefe = (name, ok, detail = '') => ergebnisse.push({ name, ok: Boolean(ok), detail });
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const SATZ = 'Fruehere Jahre rechnen nach dem damaligen Recht, ab 2017 amtlich belegt; davor gilt der Stand von 2017.';
-const LUECKE = 'Den einmaligen Feiertag am 31.10.2017 kennt die App fuer dieses Land nicht (nicht amtlich belegt) \u2013 bei Bedarf als eigenen Tag eintragen.';
 
 const browser = await puppeteer.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--lang=de-DE'] });
 try {
@@ -45,7 +45,7 @@ try {
   pruefe('U1 Bayern: Hinweis zum Rechtsstand, ohne Satz zum 31.10.2017', by === SATZ, by);
   await waehle('SL');
   const sl = await hinweis();
-  pruefe('U2 Saarland: dazu der fehlende Beleg fuer den 31.10.2017', sl === `${SATZ} ${LUECKE}`, sl);
+  pruefe('U2 Saarland: Hinweis zum Rechtsstand (seit AUF-044 ohne Satz zur Luecke)', sl === SATZ, sl);
   await waehle('');
   const keine = await hinweis();
   pruefe('U3 Gegenprobe: ohne Bundesland kein Hinweis', keine === '', keine);
