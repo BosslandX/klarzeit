@@ -221,9 +221,7 @@ Gesetzestext: [Bundesurlaubsgesetz](https://www.gesetze-im-internet.de/burlg/).
 
 - **Sonstige bezahlte Freistellung** (etwa Sonderurlaub) kennt die App nicht – sie erscheint
   als Minusstunden.
-- **Feiertage vor 2017** rechnen mit dem Stand von 2017. Den einmaligen Feiertag am 31.10.2017
-  kennt die App für Baden-Württemberg, Hamburg, Rheinland-Pfalz, das Saarland und
-  Schleswig-Holstein nicht – dafür fehlt ein amtlicher Beleg; bei Bedarf als eigenen Tag eintragen.
+- **Feiertage vor 2017** rechnen mit dem Stand von 2017.
 - **Kein Lohn.** Das Konto rechnet Stunden: Krankheit erzeugt weder in der Wartezeit
   ([§ 3 Abs. 3 EntgFG](https://www.gesetze-im-internet.de/entgfg/__3.html)) noch nach sechs Wochen
   Minusstunden – die App weist nur darauf hin.
@@ -369,7 +367,7 @@ Zwei Regeln halten das zusammen:
    Den Clockodo-Schlüssel verwahrt `clockodo/key-store.ts` im Android KeyStore. Zeiten
    immer als Epoch-Millisekunden; formatiert wird nur in `domain/time.ts`.
 
-Dazu **403 Tests in 31 Dateien** (Stand 1.14.0, `npm test`).
+Dazu **404 Tests in 31 Dateien** (Stand 1.14.2, `npm test`).
 
 <details>
 <summary><b>Verzeichnisse</b></summary>
