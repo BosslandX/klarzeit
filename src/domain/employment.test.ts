@@ -163,6 +163,20 @@ describe('Urlaubsanspruch (BUrlG)', () => {
     expect(s.remaining).toBe(14); // 16 - 2
   });
 
+  it('ein halber Urlaubstag zaehlt 0,5 (AUF-046)', () => {
+    const taken = [new Date(2026, 6, 7).getTime(), new Date(2026, 7, 4).getTime()];
+    const s = buildVacationStatus(emp, taken, 2026, [new Date(2026, 7, 4).getTime()]);
+    expect(s.taken).toBe(1.5);
+    expect(s.remaining).toBe(14.5); // 16 - 1,5
+  });
+
+  it('ein Datum nur in der halben Liste zaehlt nicht (AUF-046)', () => {
+    const s = buildVacationStatus(emp, [new Date(2026, 6, 7).getTime()], 2026, [
+      new Date(2026, 7, 4).getTime(),
+    ]);
+    expect(s.taken).toBe(1);
+  });
+
   it('Folgejahr 2027: voller Jahresanspruch', () => {
     const s = buildVacationStatus(emp, [], 2027);
     expect(s.isEntryYear).toBe(false);

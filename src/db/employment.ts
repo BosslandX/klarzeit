@@ -317,11 +317,13 @@ export function cleanVacationDays(raw: unknown): VacationDay[] {
     if (seen.has(key)) continue;
     seen.add(key);
     const note = typeof x.note === 'string' ? x.note : '';
+    // Nur true traegt (AUF-046); jeder andere Wert heisst ganzer Tag.
+    const half = x.halfDay === true ? { halfDay: true as const } : {};
     const absence = cleanClockodoAbsenceRef(x.clockodoAbsence);
     if (absence) {
-      out.push({ employmentId, date: x.date, note, clockodoAbsence: absence });
+      out.push({ employmentId, date: x.date, note, ...half, clockodoAbsence: absence });
     } else {
-      out.push({ employmentId, date: x.date, note });
+      out.push({ employmentId, date: x.date, note, ...half });
     }
   }
   return out.sort((a, b) => a.date - b.date);
@@ -344,14 +346,18 @@ export async function saveVacationDays(days: VacationDay[]): Promise<void> {
   });
 }
 
-/** Traegt einen Urlaubstag ein; ein schon erfasster bleibt samt Notiz bestehen. */
+/**
+ * Traegt einen Urlaubstag ein, mit `halfDay` einen halben (AUF-046); ein schon erfasster bleibt
+ * samt Notiz bestehen.
+ */
 export async function addVacationDay(
   date: number,
   note: string,
   employmentId: string,
+  halfDay = false,
 ): Promise<VacationDay[]> {
   const merged = mergeVacationDays(await getVacationDays(), [
-    { date, note, employmentId },
+    { date, note, employmentId, ...(halfDay ? { halfDay: true as const } : {}) },
   ]);
   await saveVacationDays(merged);
   return merged;
@@ -423,7 +429,7 @@ export function useVacationDays(): {
   days: VacationDay[];
   loading: boolean;
   refresh: () => Promise<void>;
-  add: (date: number, note?: string, employmentId?: string) => Promise<void>;
+  add: (date: number, note?: string, employmentId?: string, halfDay?: boolean) => Promise<void>;
   addMany: (dates: readonly number[], employmentId?: string) => Promise<number>;
   remove: (date: number, employmentId: string) => Promise<void>;
 } {
@@ -441,12 +447,12 @@ export function useVacationDays(): {
   }, [refresh]);
 
   const add = useCallback(
-    async (date: number, note = '', employmentId?: string) => {
+    async (date: number, note = '', employmentId?: string, halfDay = false) => {
       const eid =
         employmentId != null && employmentId !== ''
           ? employmentId
           : await getActiveEmploymentId();
-      setDays(await addVacationDay(date, note, eid));
+      setDays(await addVacationDay(date, note, eid, halfDay));
     },
     [],
   );

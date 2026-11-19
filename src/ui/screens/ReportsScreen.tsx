@@ -112,6 +112,9 @@ export function ReportsScreen() {
   const vacationDates = vacationDays
     .filter((d) => d.employmentId === employmentId)
     .map((d) => d.date);
+  const halfVacationDates = vacationDays
+    .filter((d) => d.employmentId === employmentId && d.halfDay)
+    .map((d) => d.date);
   const { periods: sickPeriods } = useSickPeriods();
   // Urlaub und Krankheit nach § 9 BUrlG getrennt (AUF-034).
   const geteilt = splitVacationAndSickness(vacationDates, sickPeriods, employmentId);
@@ -123,11 +126,17 @@ export function ReportsScreen() {
           ref,
           geteilt.vacationDates,
           geteilt.sickDates,
+          halfVacationDates,
         )
       : null;
   const vacation =
     isMonth && employment
-      ? buildVacationStatus(employment, geteilt.vacationDates, getYear(period.from))
+      ? buildVacationStatus(
+          employment,
+          geteilt.vacationDates,
+          getYear(period.from),
+          halfVacationDates,
+        )
       : null;
 
   const shift = (dir: -1 | 1) => {
@@ -161,6 +170,7 @@ export function ReportsScreen() {
           ),
         ]);
         const vacForEmp = vac.filter((d) => d.employmentId === employment.id);
+        const halbe = vacForEmp.filter((d) => d.halfDay).map((d) => d.date);
         bodyEntries = wide.filter(
           (e) => e.start >= period.from && e.start <= period.to,
         );
@@ -169,7 +179,14 @@ export function ReportsScreen() {
           krank,
           employment.id,
         );
-        const led = buildBalanceLedger(employment, wide, ref, teil.vacationDates, teil.sickDates);
+        const led = buildBalanceLedger(
+          employment,
+          wide,
+          ref,
+          teil.vacationDates,
+          teil.sickDates,
+          halbe,
+        );
         if (led) {
           extras = {
             ledger: led,
@@ -177,6 +194,7 @@ export function ReportsScreen() {
               employment,
               teil.vacationDates,
               getYear(period.from),
+              halbe,
             ),
           };
         }

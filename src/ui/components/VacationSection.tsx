@@ -40,13 +40,14 @@ export function VacationSection({
   vacEmp: Employment | undefined;
   setVacEmpId: (id: string) => void;
   vacDays: readonly VacationDay[];
-  addVac: (date: number, note?: string, employmentId?: string) => Promise<void>;
+  addVac: (date: number, note?: string, employmentId?: string, halfDay?: boolean) => Promise<void>;
   addVacMany: (dates: readonly number[], employmentId?: string) => Promise<number>;
   removeVac: (date: number, employmentId: string) => Promise<void>;
   refreshVac: () => Promise<void>;
   sickPeriods: readonly SickPeriod[];
 }) {
   const [newVacDate, setNewVacDate] = useState('');
+  const [newVacHalf, setNewVacHalf] = useState(false);
   const [vacFrom, setVacFrom] = useState('');
   const [vacTo, setVacTo] = useState('');
   const [vacRangeMsg, setVacRangeMsg] = useState('');
@@ -57,8 +58,9 @@ export function VacationSection({
   const handleAddVacation = async () => {
     const t = fromDateInput(newVacDate);
     if (Number.isNaN(t) || !vacTargetId) return;
-    await addVac(t, '', vacTargetId);
+    await addVac(t, '', vacTargetId, newVacHalf);
     setNewVacDate('');
+    setNewVacHalf(false);
   };
 
   // Zweiter Erfassungsweg: ganzer Zeitraum statt Einzeltag. Die Vorschau wird
@@ -99,13 +101,15 @@ export function VacationSection({
     <>
       <h3 className="sub-head">Genommene Urlaubstage</h3>
       <p className="muted small">
-        Jeder Eintrag zaehlt als 1 Urlaubstag, mindert den Resturlaub des
-        jeweiligen Jahres und entlastet das Arbeitszeitkonto um bis zu{' '}
+        Jeder Eintrag zaehlt als 1 Urlaubstag (ein halber als 0,5), mindert den
+        Resturlaub des jeweiligen Jahres und entlastet das Arbeitszeitkonto um
+        bis zu{' '}
         {vacEmp
           ? decimalHours(dailyTargetMs(vacEmp)).toFixed(2).replace('.', ',')
           : '0,00'}{' '}
-        Std. Ist an dem Tag schon Zeit erfasst, wird nur die Differenz
-        gutgeschrieben — ein Tag zaehlt nie doppelt.
+        Std., ein halber um hoechstens die Haelfte. Ist an dem Tag schon Zeit
+        erfasst, wird nur die Differenz gutgeschrieben — ein Tag zaehlt nie
+        doppelt.
       </p>
       <label className="field">
         <span>Urlaub fuer Beschaeftigung</span>
@@ -134,6 +138,14 @@ export function VacationSection({
           Urlaubstag hinzufuegen
         </button>
       </div>
+      <label className="field row">
+        <span>halber Tag (zaehlt 0,5)</span>
+        <input
+          type="checkbox"
+          checked={newVacHalf}
+          onChange={(e) => setNewVacHalf(e.target.checked)}
+        />
+      </label>
 
       <p className="muted small vac-or">oder ganzen Zeitraum eintragen:</p>
       <div className="vac-range">

@@ -412,3 +412,46 @@ describe('Mit dem Gehalt abgegoltene Ueberstunden (AUF-016)', () => {
     expect(l.closing).toBe(0);
   });
 });
+
+describe('Halbe Urlaubstage (AUF-046)', () => {
+  const vac = (y: number, mo: number, d: number) => new Date(y, mo - 1, d).getTime();
+  const ref = new Date(2026, 4, 28).getTime();
+
+  it('ein halber Urlaubstag zaehlt 0,5 und schreibt das halbe Tagessoll gut', () => {
+    const l = buildBalanceLedger(emp, [], ref, [vac(2026, 5, 6)], [], [vac(2026, 5, 6)]);
+    expect(l!.target.vacationDays).toBe(0.5);
+    expect(l!.target.vacationCreditMs).toBe(2.5 * HOUR);
+  });
+
+  it('halber Tag mit 2 h erfasst: die Gutschrift bleibt das halbe Tagessoll', () => {
+    const entries = [entry(2026, 5, 6, 8, 10)]; // 2 h
+    const l = buildBalanceLedger(emp, entries, ref, [vac(2026, 5, 6)], [], [vac(2026, 5, 6)]);
+    expect(l!.target.vacationCreditMs).toBe(2.5 * HOUR);
+    expect(l!.target.saldoMs).toBe(2 * HOUR + 2.5 * HOUR - SOLL);
+  });
+
+  it('halber Tag mit 4 h erfasst: Gutschrift nur bis zum Tagessoll', () => {
+    const entries = [entry(2026, 5, 6, 8, 12)]; // 4 h
+    const l = buildBalanceLedger(emp, entries, ref, [vac(2026, 5, 6)], [], [vac(2026, 5, 6)]);
+    expect(l!.target.vacationCreditMs).toBe(1 * HOUR); // 5 h Tagessoll - 4 h
+  });
+
+  it('ganze und halbe Tage zusammen', () => {
+    const l = buildBalanceLedger(
+      emp,
+      [],
+      ref,
+      [vac(2026, 5, 6), vac(2026, 5, 7)],
+      [],
+      [vac(2026, 5, 7)],
+    );
+    expect(l!.target.vacationDays).toBe(1.5);
+    expect(l!.target.vacationCreditMs).toBe(7.5 * HOUR);
+  });
+
+  it('ein Datum nur in der halben Liste ist kein Urlaubstag', () => {
+    const l = buildBalanceLedger(emp, [], ref, [vac(2026, 5, 6)], [], [vac(2026, 5, 7)]);
+    expect(l!.target.vacationDays).toBe(1);
+    expect(l!.target.vacationCreditMs).toBe(5 * HOUR);
+  });
+});

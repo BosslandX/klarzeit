@@ -15,7 +15,13 @@ import { de } from 'date-fns/locale';
 import { HOUR, MINUTE, netMs } from './time';
 import type { TimeEntry } from './types';
 import { publicHolidayMap } from './holidays';
-import { WEEKS_PER_MONTH, contractAt, wochentageAm, type Employment } from './employment';
+import {
+  HALF_VACATION_DAY,
+  WEEKS_PER_MONTH,
+  contractAt,
+  wochentageAm,
+  type Employment,
+} from './employment';
 
 /**
  * Arbeitszeitkonto: Monats-Soll, Ist, Gutschriften fuer Urlaub, Feiertage und Krankheit und die
@@ -153,12 +159,15 @@ function istMsOfMonth(
 /**
  * Gutschrift fuer Tage ohne Arbeitspflicht (Urlaub, Feiertag, Krankheit): je Tag bis zum
  * Tagessoll des an ihm geltenden Vertrags, abzueglich der an diesem Tag erfassten Zeit -- so
- * zaehlt kein Tag doppelt. Auf volle Minuten gerundet.
+ * zaehlt kein Tag doppelt. Auf volle Minuten gerundet. `anteil` deckelt die Gutschrift eines
+ * Tages auf diesen Teil des Tagessolls (halber Urlaubstag, AUF-046); ohne ihn rechnet die
+ * Funktion wie zuvor.
  */
 function fillUpCreditMs(
   emp: Employment,
   entries: readonly TimeEntry[],
   days: readonly number[],
+  anteil: (day: number) => number = () => 1,
 ): number {
   const empStart = startOfDay(emp.startDate).getTime();
   const empEnd = emp.endDate != null ? endOfDay(emp.endDate).getTime() : Infinity;
@@ -173,7 +182,7 @@ function fillUpCreditMs(
           : s,
       0,
     );
-    return sum + Math.max(0, perDay - istOfDay);
+    return sum + Math.min(perDay * anteil(day), Math.max(0, perDay - istOfDay));
   }, 0);
   return Math.round(creditMs / MINUTE) * MINUTE;
 }
@@ -195,6 +204,7 @@ function vacationOfMonth(
   entries: readonly TimeEntry[],
   vacationDates: readonly number[],
   monthRef: number,
+  halfDates: readonly number[] = [],
 ): { days: number; creditMs: number } {
   const mStart = startOfMonth(monthRef).getTime();
   const mEnd = endOfMonth(monthRef).getTime();
@@ -210,7 +220,13 @@ function vacationOfMonth(
       d <= empEnd &&
       !feiertage.has(startOfDay(d).getTime()),
   );
-  return { days: inMonth.length, creditMs: fillUpCreditMs(emp, entries, inMonth) };
+  // Ein halber Urlaubstag zaehlt 0,5 und fuellt hoechstens das halbe Tagessoll auf (AUF-046).
+  const halbe = new Set(halfDates.map((d) => startOfDay(d).getTime()));
+  const anteil = (d: number) => (halbe.has(startOfDay(d).getTime()) ? HALF_VACATION_DAY : 1);
+  return {
+    days: inMonth.reduce((n, d) => n + anteil(d), 0),
+    creditMs: fillUpCreditMs(emp, entries, inMonth, anteil),
+  };
 }
 
 /**
@@ -294,6 +310,11 @@ function sickOfMonth(
  * `sickDates` (Krankheitstage, vorher mit splitVacationAndSickness von den Urlaubstagen
  * getrennt) entlasten ebenso (AUF-033); ohne sie rechnet die Funktion wie zuvor.
  *
+ * `halfVacationDates` nennt die halben unter den Urlaubstagen (AUF-046): sie zaehlen 0,5, und die
+ * Gutschrift eines solchen Tages ist hoechstens das halbe Tagessoll. Ein Datum nur dort ist kein
+ * Urlaubstag. Krankheit schreibt an einem halben Urlaubstag nichts gut -- wie an jedem
+ * Urlaubstag geht der Urlaub vor.
+ *
  * Mit Klausel fuer abgegoltene Ueberstunden: jeder Monat fuer sich — der Vertrag zaehlt
  * Ueberstunden pro Monat und kennt kein Konto; Minusstunden aus Vormonaten mindern die
  * Abgeltung nicht.
@@ -304,6 +325,7 @@ export function buildBalanceLedger(
   refEpoch: number,
   vacationDates: readonly number[] = [],
   sickDates: readonly number[] = [],
+  halfVacationDates: readonly number[] = [],
 ): BalanceLedger | null {
   const firstMonth = startOfMonth(emp.startDate);
   const targetMonth = startOfMonth(refEpoch);
@@ -315,7 +337,7 @@ export function buildBalanceLedger(
   }).map((m) => {
     const sollMs = monthSollMs(emp, m.getTime());
     const istMs = istMsOfMonth(emp, entries, m.getTime());
-    const vac = vacationOfMonth(emp, entries, vacationDates, m.getTime());
+    const vac = vacationOfMonth(emp, entries, vacationDates, m.getTime(), halfVacationDates);
     const vacationDays = vac.days;
     // Deckel auf das Monats-Soll: reiner Urlaub kann die Arbeitspflicht
     // hoechstens aufheben, niemals Ueberstunden erzeugen. Nicht gegen das

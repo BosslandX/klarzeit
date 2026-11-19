@@ -135,14 +135,19 @@ export function wochentageAm(
   return workWeekdaysOf((emp.contractHistory ?? []).find((c) => tag <= c.validUntil) ?? emp);
 }
 
-/** Ein genommener Urlaubstag (jeweils 1 Arbeitstag), als Tagesdatum (epoch ms). */
+/** Ein genommener Urlaubstag (1 Arbeitstag, ein halber 0,5), als Tagesdatum (epoch ms). */
 export interface VacationDay {
   employmentId: string;
   date: number; // lokale Mitternacht des Urlaubstags
   note: string;
+  /** Halber Urlaubstag (AUF-046): zaehlt 0,5, die Gutschrift hoechstens das halbe Tagessoll; fehlt = ganzer Tag. */
+  halfDay?: true;
   /** Clockodo-Antrag, zu dem der Tag gehoert; fehlt = nie beantragt. */
   clockodoAbsence?: ClockodoAbsenceRef;
 }
+
+/** Anteil eines halben Urlaubstags am ganzen (AUF-046). */
+export const HALF_VACATION_DAY = 0.5;
 
 // --- Konstanten (gesetzliche Grundlagen) ---
 
@@ -369,7 +374,7 @@ export interface VacationStatus {
   isEntryYear: boolean;
   mode: VacationYearMode;
   entitlement: number; // massgebliche Anspruchszahl fuers Jahr
-  taken: number; // genommene Urlaubstage im Jahr
+  taken: number; // genommene Urlaubstage im Jahr, ein halber zaehlt 0,5 (AUF-046)
   remaining: number; // Resturlaub (entitlement - taken)
 }
 
@@ -380,11 +385,15 @@ export interface VacationStatus {
  * gezwoelftelte Teilurlaub (§ 5). Folgejahre: voller Anspruch; bei befristetem
  * Austritt anteilig nur, wenn in der ERSTEN Jahreshaelfte ausgeschieden wird
  * (§ 5 Abs. 1 lit. c) oder vor erfuellter Wartezeit (lit. b).
+ *
+ * `halfDates` nennt die halben unter den genommenen Tagen; sie zaehlen 0,5 (AUF-046). Ein
+ * Datum nur dort ist kein Urlaubstag.
  */
 export function buildVacationStatus(
   emp: Employment,
   takenDates: readonly number[],
   year: number,
+  halfDates: readonly number[] = [],
 ): VacationStatus {
   const entitlementBase = annualEntitlement(emp);
   const annualFull = entitlementBase.days;
@@ -419,11 +428,12 @@ export function buildVacationStatus(
     entitlement = waitingFulfilled ? annualFull : prorataRounded;
   }
 
-  // Urlaubstage auf Feiertagen zaehlen nicht (§ 3 Abs. 2 BUrlG).
+  // Urlaubstage auf Feiertagen zaehlen nicht (§ 3 Abs. 2 BUrlG); ein halber zaehlt 0,5 (AUF-046).
   const feiertage = publicHolidayMap(emp.publicHolidays, year, year);
-  const taken = takenDates.filter(
-    (d) => getYear(d) === year && !feiertage.has(startOfDay(d).getTime()),
-  ).length;
+  const halbe = new Set(halfDates.map((d) => startOfDay(d).getTime()));
+  const taken = takenDates
+    .filter((d) => getYear(d) === year && !feiertage.has(startOfDay(d).getTime()))
+    .reduce((n, d) => n + (halbe.has(startOfDay(d).getTime()) ? HALF_VACATION_DAY : 1), 0);
   return {
     year,
     workdaysPerWeek: emp.workdaysPerWeek,

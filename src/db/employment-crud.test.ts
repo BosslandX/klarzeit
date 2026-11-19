@@ -288,6 +288,26 @@ describe('Beschaeftigungs-Verwaltung', () => {
     expect('clockodoAbsence' in out[2]).toBe(false);
   });
 
+  it('cleanVacationDays traegt halfDay nur als true (AUF-046)', () => {
+    const out = cleanVacationDays([
+      { date: 1_700_100_000_000, note: '', employmentId: 'emp-1', halfDay: true },
+      { date: 1_700_200_000_000, note: '', employmentId: 'emp-1', halfDay: 'ja' },
+      { date: 1_700_300_000_000, note: '', employmentId: 'emp-1', halfDay: false },
+    ]);
+    expect(out[0].halfDay).toBe(true);
+    expect('halfDay' in out[1]).toBe(false);
+    expect('halfDay' in out[2]).toBe(false);
+  });
+
+  it('addVacationDay speichert einen halben Tag; derselbe Tag ganz aendert ihn nicht (AUF-046)', async () => {
+    await addVacationDay(1_700_100_000_000, '', INITIAL_EMPLOYMENT_ID, true);
+    await addVacationDay(1_700_100_000_000, '', INITIAL_EMPLOYMENT_ID);
+    const days = await getVacationDays();
+    expect(days).toEqual([
+      { employmentId: INITIAL_EMPLOYMENT_ID, date: 1_700_100_000_000, note: '', halfDay: true },
+    ]);
+  });
+
   it('removeVacationDay entfernt nur den Tag der genannten Beschaeftigung', async () => {
     const list = await addEmployment({ name: 'Zweit', weeklyHours: 5 });
     const secondId = list[1].id;

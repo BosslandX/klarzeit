@@ -66,6 +66,7 @@ export function VacationDayRow({
       <span>
         {formatDateWithWeekday(day.date)}
         <span className="muted small"> ({employmentLabel})</span>
+        {day.halfDay && <span className="muted small"> · halber Tag</span>}
         {feiertag !== undefined && (
           <span className="muted small">
             {' '}
