@@ -152,7 +152,8 @@ und zeigt die Grundlage dazu.
 - **Ist** – erfasste Zeit abzüglich Pausen, begrenzt auf den Beschäftigungszeitraum.
 - **Gutschriften** – Urlaubstage, gesetzliche Feiertage und Krankheitstage füllen an deinen
   Arbeitstagen bis zum Tagessoll auf (Wochenstunden ÷ Arbeitstage). Wer an dem Tag doch
-  gearbeitet hat, bekommt nur die Differenz; zusammen nie mehr als das Monats-Soll.
+  gearbeitet hat, bekommt nur die Differenz; zusammen nie mehr als das Monats-Soll. Ein halber
+  Urlaubstag zählt 0,5 und füllt höchstens das halbe Tagessoll auf.
 - **Übertrag** – der Saldo wird Monat für Monat fortgeschrieben.
 
 Ein Monat mit 20 Wochenstunden an vier Tagen und vier Urlaubstagen:
@@ -367,7 +368,7 @@ Zwei Regeln halten das zusammen:
    Den Clockodo-Schlüssel verwahrt `clockodo/key-store.ts` im Android KeyStore. Zeiten
    immer als Epoch-Millisekunden; formatiert wird nur in `domain/time.ts`.
 
-Dazu **404 Tests in 32 Dateien** (`npm test`).
+Dazu **413 Tests in 32 Dateien** (`npm test`).
 
 <details>
 <summary><b>Verzeichnisse</b></summary>

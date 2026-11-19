@@ -28,7 +28,7 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
 - **Prüfwerkzeuge des Orchestrators** (seit 2026-11-17 versioniert, vorher nur im Scratchpad):
   `tools/zitat-pruefen.mjs` und `tools/kontext.mjs` prüfen Zitate gegen den Seitentext (Chrome
   kopflos über `puppeteer-core`, eigenes Profil); `tools/oberflaeche/aufNNN_ui.mjs` sind die
-  Oberflächenproben der Aufträge 027–044 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
+  Oberflächenproben der Aufträge 027–046 (`node tools/oberflaeche/auf037_ui.mjs <url>` gegen
   `npm run dev`, Stand ihres Auftrags). Einspiel-Vorlage, Auftragstext-Erzeuger und Stückprüfung
   liegen im Baukasten unter `C:\gamedev\composer-kit\orchestrator\` und werden von dort gerufen.
 - Android SDK-Pfad in `android/local.properties` (`sdk.dir=...`, gitignored, rechnerspezifisch).
@@ -127,6 +127,17 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   wenn derselbe Tag zusätzlich als Zeiteintrag erfasst wurde; monatlich via `min(credit, sollMs)`,
   damit reiner Urlaub keine Überstunden erzeugt. Nicht gegen das Monats-`istMs` deckeln — das zöge
   das Ist zweimal ab und entwertete Arbeit an urlaubsfreien Tagen.
+- **Halbe Urlaubstage (AUF-046):** `VacationDay.halfDay?: true`.
+  - **Speicherung:** nur als `true`, fehlt = ganzer Tag. `cleanVacationDays` trägt das Feld,
+    `addVacationDay(…, halfDay)` legt es an.
+  - **Zählung:** Ein halber Tag zählt `HALF_VACATION_DAY` (0,5) im Urlaubsstand (`buildVacationStatus(…, halfDates)`)
+    und im Konto (`buildBalanceLedger(…, sickDates, halfVacationDates)`). Ein Datum nur in der halben Liste ist kein
+    Urlaubstag.
+  - **Gutschrift** je Tag in `fillUpCreditMs`: `min(Anteil × Tagessoll, max(0, Tagessoll − Ist))`. Anteil 1 rechnet
+    wie bisher.
+  - **Oberfläche:** nur beim Einzeltag, über das Kästchen „halber Tag (zaehlt 0,5)“ in „Mehr“; Zeiträume sind immer
+    ganze Tage. Die Liste zeigt „· halber Tag“.
+  - ⚠️ **Clockodo beantragt einen halben Tag noch als ganzen**, bis AUF-047. Dazwischen kein Release.
 - **Mit dem Gehalt abgegoltene Überstunden (AUF-016):** `Employment.includedOvertimeHoursPerMonth`,
   `null` = keine Klausel. `buildBalanceLedger` weist je Monat
   `includedOvertimeMs = min(includedOvertimeCapMs, max(0, saldoMs))` aus; `saldoMs` bleibt roh,
@@ -235,7 +246,8 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   im PDF. Die Voraussetzungen der Verlängerung nach § 3 und die Ausnahmen des Gesetzes sind nicht
   abgebildet.
 - **Nicht abgebildet:** sonstige bezahlte Freistellung (außer Feiertagen und Krankheit) erzeugt
-  weiterhin Minusstunden; halbe Urlaubstage sind konstruktiv unmöglich (`taken` ist `.length`); kein
+  weiterhin Minusstunden; an einem halben Urlaubstag in einer Krankheitszeit ohne Bescheinigung schreibt die
+  zweite Hälfte nichts gut (der Urlaub geht für den ganzen Tag vor, AUF-046); kein
   Resturlaub-Übertrag (§ 7 III BUrlG); `VacationDay.note` existiert, ist in der UI aber tot.
   Ausgezahlte Überstunden lassen sich nicht buchen (das Konto behält sie als Guthaben), eine
   Genehmigung von Überstunden kennt die App nicht — ihre Veranlassung lässt sich je Eintrag vermerken
@@ -475,6 +487,8 @@ Diese Werte sehen nach Altlast aus, sind aber bewusst eingefroren:
   alle Vermerke zur Veranlassung verloren)
 - `src/domain/types.ts` → Feld `clockodoDone` am `TimeEntry` (Dexie und Backup; umbenannt gilt jeder von
   Hand erledigte Eintrag wieder als offen — der nächste Lauf bucht ihn in Clockodo **doppelt**)
+- `src/domain/employment.ts` → Feld `halfDay` am `VacationDay` (Preferences `vacations` und Backup; umbenannt
+  verwirft `cleanVacationDays` es, und jeder halbe Urlaubstag zählt wieder ganz)
 
 Es sind interne Bezeichner, keine Produktnamen. Eine Umbenennung würde bestehende
 Datenbanken unerreichbar und ältere Backups nicht mehr importierbar machen.
