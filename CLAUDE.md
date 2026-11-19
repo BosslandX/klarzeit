@@ -99,8 +99,8 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
     `isValidEntry` weist jedes ältere Backup ab, auch das automatische beim Start mit
     leerer Datenbank. Das ist einmal passiert (AUF-004, erster Anlauf) und wird seither
     durch einen Test gefangen (`src/db/backup.test.ts`).
-- **Arbeitszeitkonto & gesetzlicher Urlaub:** Logik rein in `src/domain/employment.ts`
-  (Soll/Saldo + BUrlG), getestet; nur Monatsreports erhalten die PDF-Blöcke via `ReportExtras`.
+- **Arbeitszeitkonto & gesetzlicher Urlaub:** Logik rein — Soll/Saldo in `src/domain/balance.ts` (seit
+  AUF-045), BUrlG in `src/domain/employment.ts` —, getestet; nur Monatsreports erhalten die PDF-Blöcke via `ReportExtras`.
   Rechtsgrundlagen als Kommentar/Fußnote referenziert (BUrlG §§ 3–5).
 - **Vertraglicher Urlaub (AUF-009):** `Employment.contractVacationDays`, `null` = kein
   Vertragswert. Entschieden wird **nur** in `annualEntitlement(emp)`: der Vertragswert gilt,
@@ -407,6 +407,16 @@ node tools/version-json-pruefen.mjs <version.json> <build.gradle> <apk-dateiname
   verloren. Probe `tools/oberflaeche/auf043_ui.mjs`: U1–U3 prüfen genau diese Lebensdauern; mit
   `AUF043_DATEI=<datei>` nimmt sie in 15 Zuständen das DOM von „Mehr" ab (Vergleich alter gegen neuer
   Stand).
+- **Konto ausgelagert (AUF-045):** Der Kontoblock — Monats-Soll (`employedFractionOfMonth`,
+  `fullMonthlyTargetMs`, `includedOvertimeCapMs`, `dailyTargetMs`, `monthSollMs`), Ist, die Gutschriften für
+  Urlaub, Feiertage und Krankheit (`fillUpCreditMs`) und `buildBalanceLedger` samt `MonthBalance`/`BalanceLedger`
+  — steht in `src/domain/balance.ts`, wortgleich aus `employment.ts` (787 → 443 Zeilen). `balance.ts` importiert
+  aus `employment.ts` (`Employment`, `contractAt`, `WEEKS_PER_MONTH` und das dafür exportierte `wochentageAm`);
+  **keine Weiterleitung** zurück (`export … from './balance'`), sonst entstünde ein Ringimport — Aufrufer
+  importieren die Kontofunktionen direkt aus `balance`. Die sieben reinen Kontotestblöcke stehen wortgleich in
+  `balance.test.ts` (36 Tests, Hilfen `emp`, `SOLL`, `entry` als Kopie); `employment.test.ts` (1021 → 661 Zeilen)
+  behält die gemischten Blöcke AUF-007, AUF-029, AUF-031. Belegt: dieselben 404 Testnamen, `tsc
+  --noUnusedLocals` dieselben 5 Stellen.
 - Zeiten immer als **Epoch-Millisekunden** speichern; Formatierung nur in `src/domain/time.ts`.
 - PDF/Teilen ausschließlich über `src/pdf/`. Web-Fallback (Download) ist eingebaut.
 - `vite.config.ts`: `base: './'` ist Pflicht (Capacitor lädt via file://).

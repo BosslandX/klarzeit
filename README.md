@@ -367,7 +367,7 @@ Zwei Regeln halten das zusammen:
    Den Clockodo-Schlüssel verwahrt `clockodo/key-store.ts` im Android KeyStore. Zeiten
    immer als Epoch-Millisekunden; formatiert wird nur in `domain/time.ts`.
 
-Dazu **404 Tests in 31 Dateien** (Stand 1.14.2, `npm test`).
+Dazu **404 Tests in 32 Dateien** (`npm test`).
 
 <details>
 <summary><b>Verzeichnisse</b></summary>
@@ -376,7 +376,7 @@ Dazu **404 Tests in 31 Dateien** (Stand 1.14.2, `npm test`).
 ```
 src/
   domain/     types · time · aggregate · breaks · entry-dates
-              employment (Arbeitszeitkonto + BUrlG)
+              balance (Arbeitszeitkonto) · employment (Vertrag + BUrlG)
               clockodo · clockodo-transfer · clockodo-absence · clockodo-lock
   db/         db (Dexie) · entries · profile · running · employment
               backup · auto-backup · clockodo-lists · clockodo-deletes · clockodo-lock
